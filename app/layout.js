@@ -1,12 +1,17 @@
+import './globals.css'
+import { Providers } from './providers'
+
 export const metadata = {
-  title: 'Gadagido CRM',
-  description: 'CRM Application',
+  title: 'ShopBrain CRM',
+  description: 'Revenue & KPI Management System',
 }
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }

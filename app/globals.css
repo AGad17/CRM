@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+:root {
+  --sidebar-width: 240px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #f9fafb;
+  color: #111827;
+}
+
+/* RTL support for Arabic names in LTR tables */
+[dir="rtl"], .rtl-text {
+  unicode-bidi: embed;
+  direction: rtl;
+  text-align: right;
+}
