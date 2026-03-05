@@ -8,7 +8,10 @@
     "start": "next start -p ${PORT:-3000}",
     "migrate": "node scripts/migrate-excel.js",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "seed:admin": "node scripts/seed-admin.js",
+    "seed:countries": "node scripts/migrate-countries.js",
+    "seed:backfill": "node scripts/backfill-usd-rates.js"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
