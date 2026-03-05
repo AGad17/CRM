@@ -8,6 +8,7 @@ const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/accounts', label: 'Accounts', icon: '🏢' },
   { href: '/contracts', label: 'Contracts', icon: '📄' },
+  { href: '/products', label: 'Products', icon: '📦' },
   {
     label: 'Analytics',
     icon: '📈',
@@ -21,6 +22,7 @@ const NAV = [
   { href: '/churn', label: 'Churn Analysis', icon: '📉' },
   { href: '/revenue-quality', label: 'Revenue Quality', icon: '💎' },
   { href: '/cohorts', label: 'Cohort Retention', icon: '🔄' },
+  { href: '/settings', label: 'Settings', icon: '⚙️' },
 ]
 
 export function Sidebar() {

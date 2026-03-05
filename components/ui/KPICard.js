@@ -20,7 +20,7 @@ function formatValue(value, format, currency) {
   if (value === null || value === undefined) return '—'
   switch (format) {
     case 'currency':
-      return `${currency || 'SAR'} ${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      return `${currency || 'USD'} ${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     case 'percent':
       return `${(Number(value) * 100).toFixed(1)}%`
     case 'integer':

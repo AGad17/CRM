@@ -23,16 +23,15 @@ export async function POST(request) {
 
   const body = await request.json()
 
-  if (!body.accountId || !body.contractValue || !body.startDate || !body.endDate || !body.type) {
-    return NextResponse.json({ error: 'accountId, contractValue, startDate, endDate, and type are required' }, { status: 400 })
+  const hasItems = Array.isArray(body.items) && body.items.length > 0
+  if (!body.accountId || !body.startDate || !body.endDate || !body.type) {
+    return NextResponse.json({ error: 'accountId, startDate, endDate, and type are required' }, { status: 400 })
   }
-
+  if (!hasItems && (!body.contractValue || Number(body.contractValue) <= 0)) {
+    return NextResponse.json({ error: 'Provide either items[] or a contractValue > 0' }, { status: 400 })
+  }
   if (new Date(body.endDate) < new Date(body.startDate)) {
     return NextResponse.json({ error: 'endDate must be >= startDate' }, { status: 400 })
-  }
-
-  if (Number(body.contractValue) <= 0) {
-    return NextResponse.json({ error: 'contractValue must be > 0' }, { status: 400 })
   }
 
   const contract = await createContract(body)

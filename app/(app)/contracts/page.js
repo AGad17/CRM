@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DataTable } from '@/components/ui/DataTable'
 import { Badge } from '@/components/ui/Badge'
@@ -9,7 +9,9 @@ import { ContractForm } from '@/components/forms/ContractForm'
 export default function ContractsPage() {
   const qc = useQueryClient()
   const [filters, setFilters] = useState({ type: '', year: '' })
+  const [search, setSearch] = useState('')
   const [modal, setModal] = useState(null)
+  const [editTarget, setEditTarget] = useState(null)
   const [cancelId, setCancelId] = useState(null)
 
   const { data: contracts = [], isLoading } = useQuery({
@@ -27,9 +29,19 @@ export default function ContractsPage() {
     queryFn: () => fetch('/api/accounts').then((r) => r.json()),
   })
 
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => fetch('/api/products').then((r) => r.json()),
+  })
+
   const create = useMutation({
     mutationFn: (data) => fetch('/api/contracts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then((r) => r.json()),
     onSuccess: () => { qc.invalidateQueries(['contracts']); qc.invalidateQueries(['dashboard']); setModal(null) },
+  })
+
+  const update = useMutation({
+    mutationFn: ({ id, data }) => fetch(`/api/contracts/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then((r) => r.json()),
+    onSuccess: () => { qc.invalidateQueries(['contracts']); qc.invalidateQueries(['dashboard']); setEditTarget(null) },
   })
 
   const cancel = useMutation({
@@ -39,21 +51,30 @@ export default function ContractsPage() {
 
   const years = [...new Set(contracts.map((c) => new Date(c.startDate).getFullYear()))].sort((a, b) => b - a)
 
+  const displayed = useMemo(() => {
+    if (!search.trim()) return contracts
+    const q = search.toLowerCase()
+    return contracts.filter((c) => c.account?.name?.toLowerCase().includes(q))
+  }, [contracts, search])
+
   const columns = [
     { key: 'id', label: '#', render: (r) => <span className="text-xs text-gray-400 font-mono">#{r.id}</span> },
     { key: 'accountName', label: 'Account', rtl: true, render: (r) => <span className="font-medium">{r.account?.name}</span> },
-    { key: 'country', label: 'Country', render: (r) => r.account?.country },
+    { key: 'country', label: 'Country', render: (r) => r.account?.countryCode },
     { key: 'type', label: 'Type', render: (r) => <Badge value={r.type} /> },
     { key: 'startDate', label: 'Start', render: (r) => new Date(r.startDate).toLocaleDateString() },
     { key: 'endDate', label: 'End', render: (r) => new Date(r.endDate).toLocaleDateString() },
-    { key: 'contractValue', label: 'Value', render: (r) => `SAR ${Number(r.contractValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-    { key: 'mrr', label: 'MRR', render: (r) => `SAR ${(r.mrr || 0).toFixed(2)}` },
+    { key: 'contractValue', label: 'Value', render: (r) => `USD ${Number(r.contractValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
+    { key: 'mrr', label: 'MRR', render: (r) => `USD ${(r.mrr || 0).toFixed(2)}` },
     { key: 'contractStatus', label: 'Status', render: (r) => <Badge value={r.contractStatus} /> },
     { key: 'churnFlag', label: 'Churn', render: (r) => <Badge value={r.churnFlag} /> },
     { key: 'actions', label: '', sortable: false, render: (r) => (
-      r.churnFlag === 'Active' ? (
-        <button onClick={() => setCancelId(r.id)} className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50">Cancel</button>
-      ) : <span className="text-xs text-gray-300">Churned</span>
+      <div className="flex items-center gap-1 justify-end">
+        <button onClick={() => setEditTarget(r)} className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100">Edit</button>
+        {r.churnFlag === 'Active' ? (
+          <button onClick={() => setCancelId(r.id)} className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50">Cancel</button>
+        ) : <span className="text-xs text-gray-300">Churned</span>}
+      </div>
     )},
   ]
 
@@ -68,17 +89,38 @@ export default function ContractsPage() {
           <option value="">All Years</option>
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
+        <input
+          type="text"
+          placeholder="Search by account…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white w-52"
+        />
         <div className="flex-1" />
         <a href="/api/export/csv?type=contracts" className="text-xs text-gray-500 border border-gray-200 bg-white px-3 py-2 rounded-xl hover:bg-gray-50">↓ Export</a>
         <button onClick={() => setModal('create')} className="bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors">+ New Contract</button>
       </div>
 
       {isLoading ? <div className="animate-pulse h-64 bg-gray-200 rounded-2xl" /> : (
-        <DataTable columns={columns} data={contracts} exportFilename="contracts.csv" />
+        <DataTable columns={columns} data={displayed} exportFilename="contracts.csv" />
       )}
 
       <Modal isOpen={modal === 'create'} onClose={() => setModal(null)} title="New Contract">
-        <ContractForm accounts={accounts} onSubmit={(data) => create.mutate(data)} onCancel={() => setModal(null)} loading={create.isPending} />
+        <ContractForm accounts={accounts} products={products} onSubmit={(data) => create.mutate(data)} onCancel={() => setModal(null)} loading={create.isPending} />
+      </Modal>
+
+      <Modal isOpen={!!editTarget} onClose={() => setEditTarget(null)} title={`Edit Contract #${editTarget?.id}`}>
+        {editTarget && (
+          <ContractForm
+            isEdit
+            initial={editTarget}
+            accounts={accounts}
+            products={products}
+            onSubmit={(data) => update.mutate({ id: editTarget.id, data })}
+            onCancel={() => setEditTarget(null)}
+            loading={update.isPending}
+          />
+        )}
       </Modal>
 
       <Modal isOpen={!!cancelId} onClose={() => setCancelId(null)} title="Cancel Contract">

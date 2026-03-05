@@ -3,7 +3,7 @@ import { DeltaBadge } from '@/components/ui/DeltaBadge'
 
 function fmt(v, type) {
   if (v === null || v === undefined) return '—'
-  if (type === 'currency') return `SAR ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  if (type === 'currency') return `USD ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   if (type === 'percent') return `${(Number(v) * 100).toFixed(1)}%`
   return Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 })
 }

@@ -1,11 +1,65 @@
 'use client'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AnalyticsTable } from '../_components/AnalyticsTable'
 
 export default function YoYPage() {
-  const { data = [], isLoading } = useQuery({
-    queryKey: ['analytics-yoy'],
-    queryFn: () => fetch('/api/analytics/yoy').then((r) => r.json()),
+  const [country, setCountry] = useState('')
+  const [yearFrom, setYearFrom] = useState('')
+  const [yearTo, setYearTo] = useState('')
+
+  const { data: countries = [] } = useQuery({
+    queryKey: ['countries'],
+    queryFn: () => fetch('/api/countries').then((r) => r.json()),
   })
-  return <AnalyticsTable data={data} isLoading={isLoading} periodLabel="Year" exportFilename="yoy.csv" />
+
+  const { data = [], isLoading } = useQuery({
+    queryKey: ['analytics-yoy', country],
+    queryFn: () => {
+      const p = new URLSearchParams()
+      if (country) p.set('country', country)
+      return fetch(`/api/analytics/yoy?${p}`).then((r) => r.json())
+    },
+  })
+
+  const years = useMemo(() => [...new Set(data.map((r) => Number(r.period)))].sort(), [data])
+
+  const filtered = useMemo(() => data.filter((r) => {
+    const y = Number(r.period)
+    if (yearFrom && y < Number(yearFrom)) return false
+    if (yearTo && y > Number(yearTo)) return false
+    return true
+  }), [data, yearFrom, yearTo])
+
+  return (
+    <div className="space-y-4">
+      <AnalyticsFilterBar
+        countries={countries} country={country} onCountry={setCountry}
+        years={years} yearFrom={yearFrom} onYearFrom={setYearFrom} yearTo={yearTo} onYearTo={setYearTo}
+        onClear={() => { setCountry(''); setYearFrom(''); setYearTo('') }}
+      />
+      <AnalyticsTable data={filtered} isLoading={isLoading} periodLabel="Year" exportFilename="yoy.csv" />
+    </div>
+  )
+}
+
+function AnalyticsFilterBar({ countries, country, onCountry, years, yearFrom, onYearFrom, yearTo, onYearTo, onClear }) {
+  const hasFilters = country || yearFrom || yearTo
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white" value={country} onChange={(e) => onCountry(e.target.value)}>
+        <option value="">All Countries</option>
+        {countries.filter((c) => c.isActive).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+      </select>
+      <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white" value={yearFrom} onChange={(e) => onYearFrom(e.target.value)}>
+        <option value="">From Year</option>
+        {years.map((y) => <option key={y} value={y}>{y}</option>)}
+      </select>
+      <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white" value={yearTo} onChange={(e) => onYearTo(e.target.value)}>
+        <option value="">To Year</option>
+        {years.map((y) => <option key={y} value={y}>{y}</option>)}
+      </select>
+      {hasFilters && <button className="text-xs text-gray-500 hover:text-gray-700 underline" onClick={onClear}>Clear filters</button>}
+    </div>
+  )
 }

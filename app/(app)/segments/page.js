@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { DataTable } from '@/components/ui/DataTable'
 
 function pct(v) { return v !== null && v !== undefined ? `${(v * 100).toFixed(1)}%` : '—' }
-function sar(v) { return `SAR ${Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}` }
+function sar(v) { return `USD ${Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}` }
 
 export default function SegmentsPage() {
   const { data, isLoading } = useQuery({

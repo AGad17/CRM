@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -20,14 +19,6 @@ enum LeadSource {
   Sonic
 }
 
-enum Country {
-  KSA
-  Egypt
-  UAE
-  Bahrain
-  Jordan
-}
-
 enum ContractType {
   New
   Renewal
@@ -41,13 +32,41 @@ enum Role {
   READ_ONLY
 }
 
+enum ProductCategory {
+  Plan
+  AddOn
+}
+
+enum PaymentPlan {
+  Yearly
+  Quarterly
+  OneTime
+}
+
+// ─── Country (dynamic DB table) ───────────────────────────────────────────────
+
+model Country {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  name      String
+  currency  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts       Account[]
+  productPricing ProductPricing[]
+
+  @@map("countries")
+}
+
 // ─── Account ──────────────────────────────────────────────────────────────────
 
 model Account {
   id                  Int        @id @default(autoincrement())
   name                String
   leadSource          LeadSource
-  country             Country
+  countryId           Int
   brands              Int        @default(1)
   numberOfBranches    Int        @default(1)
   numberOfCostCentres Int?
@@ -55,6 +74,7 @@ model Account {
   updatedAt           DateTime   @updatedAt
 
   contracts Contract[]
+  country   Country    @relation(fields: [countryId], references: [id])
 
   @@map("accounts")
 }
@@ -69,12 +89,81 @@ model Contract {
   endDate          DateTime
   type             ContractType
   cancellationDate DateTime?
+  usdRate          Decimal?     @db.Decimal(14, 6)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  account Account @relation(fields: [accountId], references: [id])
+  account Account        @relation(fields: [accountId], references: [id])
+  items   ContractItem[]
 
   @@map("contracts")
+}
+
+// ─── Contract Items ───────────────────────────────────────────────────────────
+
+model ContractItem {
+  id          Int         @id @default(autoincrement())
+  contractId  Int
+  productId   Int?
+  description String
+  quantity    Int         @default(1)
+  unitPrice   Decimal     @db.Decimal(14, 2)
+  paymentPlan PaymentPlan
+  lineTotal   Decimal     @db.Decimal(14, 2)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  contract Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  product  Product?  @relation(fields: [productId], references: [id])
+
+  @@map("contract_items")
+}
+
+// ─── Product & Pricing ────────────────────────────────────────────────────────
+
+model Product {
+  id          Int             @id @default(autoincrement())
+  name        String
+  description String?
+  category    ProductCategory
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  pricing       ProductPricing[]
+  contractItems ContractItem[]
+
+  @@map("products")
+}
+
+model ProductPricing {
+  id            Int      @id @default(autoincrement())
+  productId     Int
+  countryId     Int
+  price         Decimal  @db.Decimal(14, 2)
+  currency      String
+  effectiveFrom DateTime @default(now())
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  country Country @relation(fields: [countryId], references: [id])
+
+  @@map("product_pricing")
+}
+
+// ─── Exchange Rates (FX cache) ────────────────────────────────────────────────
+
+model ExchangeRate {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @db.Date
+  currency  String
+  rateToUSD Decimal  @db.Decimal(14, 6)
+  createdAt DateTime @default(now())
+
+  @@unique([date, currency])
+  @@map("exchange_rates")
 }
 
 // ─── NextAuth Models ──────────────────────────────────────────────────────────
@@ -87,6 +176,7 @@ model User {
   image         String?
   password      String?
   role          Role      @default(READ_ONLY)
+  isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

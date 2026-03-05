@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { DataTable } from '@/components/ui/DataTable'
 
-function sar(v) { return `SAR ${Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}` }
+function sar(v) { return `USD ${Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}` }
 function pct(v) { return v !== null && v !== undefined ? `${(v * 100).toFixed(1)}%` : '—' }
 
 export default function RevenueQualityPage() {
