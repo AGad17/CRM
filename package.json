@@ -35,5 +35,6 @@
     "recharts": "^3.7.0",
     "tailwindcss": "^4.2.1",
     "xlsx": "^0.18.5"
-  }
+  },
+  "type": "module"
 }
