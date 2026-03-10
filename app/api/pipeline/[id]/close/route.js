@@ -164,6 +164,57 @@ export async function POST(request, { params }) {
         },
       })
 
+      // 5. Create Contract + ContractItems (locks unit prices at signing time)
+      const CONTRACT_TYPE_MAP = { New: 'New', Renewal: 'Renewal', Upsell: 'Expansion' }
+      const contractType = CONTRACT_TYPE_MAP[body.dealType] || 'New'
+      const paymentPlan  = body.paymentType === 'Quarterly' ? 'Quarterly' : 'Yearly'
+      const endDate      = new Date(body.startDate)
+      endDate.setMonth(endDate.getMonth() + summary.contractMonths)
+
+      const items = []
+      const months = summary.contractMonths
+      const cc  = body.country
+      const pkg = body.package
+
+      // Branch line items
+      const normalPrice = Number(config.branchPricing.find(r => r.countryCode === cc && r.package === pkg && r.branchType === 'Normal')?.price        || 0)
+      const ckPrice     = Number(config.branchPricing.find(r => r.countryCode === cc && r.package === pkg && r.branchType === 'CentralKitchen')?.price || 0)
+      const wPrice      = Number(config.branchPricing.find(r => r.countryCode === cc && r.package === pkg && r.branchType === 'Warehouse')?.price      || 0)
+
+      if (Number(body.normalBranches)  > 0) items.push({ description: `${pkg} Plan – Normal Branches`,   quantity: Number(body.normalBranches),  unitPrice: normalPrice, paymentPlan, lineTotal: normalPrice * Number(body.normalBranches)  * months })
+      if (Number(body.centralKitchens) > 0) items.push({ description: `${pkg} Plan – Central Kitchens`,  quantity: Number(body.centralKitchens), unitPrice: ckPrice,     paymentPlan, lineTotal: ckPrice     * Number(body.centralKitchens) * months })
+      if (Number(body.warehouses)      > 0) items.push({ description: `${pkg} Plan – Warehouses`,         quantity: Number(body.warehouses),      unitPrice: wPrice,      paymentPlan, lineTotal: wPrice      * Number(body.warehouses)      * months })
+
+      // Accounting line items
+      if (body.hasAccounting) {
+        const mainPrice  = Number(config.accountingPricing.find(r => r.countryCode === cc && r.package === pkg && r.isMainLicense === true)?.price  || 0)
+        const extraPrice = Number(config.accountingPricing.find(r => r.countryCode === cc && r.package === pkg && r.isMainLicense === false)?.price || 0)
+        items.push({ description: `${pkg} Plan – Accounting (Main License)`,     quantity: 1,                                    unitPrice: mainPrice,  paymentPlan, lineTotal: mainPrice  * months })
+        if (Number(body.extraAccountingBranches) > 0)
+          items.push({ description: `${pkg} Plan – Accounting (Extra Branches)`, quantity: Number(body.extraAccountingBranches), unitPrice: extraPrice, paymentPlan, lineTotal: extraPrice * Number(body.extraAccountingBranches) * months })
+      }
+
+      // Flat module line items
+      if (body.hasButchering) {
+        const p = Number(config.flatModulePricing.find(r => r.countryCode === cc && r.module === 'Butchering')?.price || 0)
+        items.push({ description: 'Butchering Module',     quantity: 1,                          unitPrice: p, paymentPlan, lineTotal: p * months })
+      }
+      if (Number(body.aiAgentUsers) > 0) {
+        const p = Number(config.flatModulePricing.find(r => r.countryCode === cc && r.module === 'AIAgent')?.price || 0)
+        items.push({ description: 'AI Agent Named Users',  quantity: Number(body.aiAgentUsers),  unitPrice: p, paymentPlan, lineTotal: p * Number(body.aiAgentUsers) * months })
+      }
+
+      await tx.contract.create({
+        data: {
+          accountId:     account.id,
+          contractValue: summary.contractValue,
+          startDate:     new Date(body.startDate),
+          endDate,
+          type:          contractType,
+          items:         { create: items },
+        },
+      })
+
       return { account, deal }
     })
 
