@@ -7,8 +7,6 @@ import clsx from 'clsx'
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/accounts', label: 'Accounts', icon: '🏢' },
-  { href: '/contracts', label: 'Contracts', icon: '📄' },
-  { href: '/products', label: 'Products', icon: '📦' },
   {
     label: 'Analytics',
     icon: '📈',
@@ -22,6 +20,32 @@ const NAV = [
   { href: '/churn', label: 'Churn Analysis', icon: '📉' },
   { href: '/revenue-quality', label: 'Revenue Quality', icon: '💎' },
   { href: '/cohorts', label: 'Cohort Retention', icon: '🔄' },
+  {
+    label: 'Sales',
+    icon: '🎯',
+    children: [
+      { href: '/pipeline',           label: 'Pipeline'  },
+      { href: '/pipeline/analytics', label: 'Analytics' },
+    ],
+  },
+  {
+    label: 'Invoicing',
+    icon: '🧾',
+    children: [
+      { href: '/invoicing/deal-calculator', label: 'Deal Calculator' },
+      { href: '/invoicing/sales-log',       label: 'Sales Log' },
+      { href: '/invoicing/invoices',        label: 'Invoices' },
+      { href: '/invoicing/ar-report',       label: 'AR Report' },
+      { href: '/invoicing/pricing',         label: 'Pricing Config' },
+    ],
+  },
+  {
+    label: 'Operations',
+    icon: '🚀',
+    children: [
+      { href: '/onboarding', label: 'Onboarding' },
+    ],
+  },
   { href: '/settings', label: 'Settings', icon: '⚙️' },
 ]
 

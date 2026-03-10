@@ -6,7 +6,8 @@ export async function GET(request, { params }) {
   const { error } = await requireAuth('read')
   if (error) return error
 
-  const account = await getAccountById(params.id)
+  const { id } = await params
+  const account = await getAccountById(id)
   if (!account) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(account)
 }
@@ -15,6 +16,7 @@ export async function PUT(request, { params }) {
   const { error } = await requireAuth('write')
   if (error) return error
 
+  const { id } = await params
   const body = await request.json()
   const data = {}
   if (body.name) data.name = body.name
@@ -25,6 +27,6 @@ export async function PUT(request, { params }) {
   if (body.numberOfCostCentres !== undefined)
     data.numberOfCostCentres = body.numberOfCostCentres ? Number(body.numberOfCostCentres) : null
 
-  const account = await updateAccount(params.id, data)
+  const account = await updateAccount(id, data)
   return NextResponse.json(account)
 }
