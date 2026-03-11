@@ -30,11 +30,11 @@ const PHASE_TEAMS = {
 }
 
 const PHASE_COLORS = {
-  DealClosure:       { badge: 'bg-sky-100 text-sky-700',    section: 'border-sky-200 bg-sky-50',    heading: 'text-sky-700',    bar: 'bg-sky-500'    },
-  Onboarding:        { badge: 'bg-yellow-100 text-yellow-700', section: 'border-yellow-200 bg-yellow-50', heading: 'text-yellow-700', bar: 'bg-yellow-500' },
-  Training:          { badge: 'bg-purple-100 text-purple-700', section: 'border-purple-200 bg-purple-50', heading: 'text-purple-700', bar: 'bg-purple-500' },
-  Incubation:        { badge: 'bg-orange-100 text-orange-700', section: 'border-orange-200 bg-orange-50', heading: 'text-orange-700', bar: 'bg-orange-500' },
-  AccountManagement: { badge: 'bg-green-100 text-green-700',  section: 'border-green-200 bg-green-50',  heading: 'text-green-700',  bar: 'bg-green-500'  },
+  DealClosure:       { badge: 'bg-sky-100 text-sky-700',       section: 'border-sky-200 bg-sky-50',       heading: 'text-sky-700',    bar: 'bg-sky-500',    ring: 'ring-sky-400',    btn: 'bg-sky-600 hover:bg-sky-700'    },
+  Onboarding:        { badge: 'bg-yellow-100 text-yellow-700', section: 'border-yellow-200 bg-yellow-50', heading: 'text-yellow-700', bar: 'bg-yellow-500', ring: 'ring-yellow-400', btn: 'bg-yellow-600 hover:bg-yellow-700' },
+  Training:          { badge: 'bg-purple-100 text-purple-700', section: 'border-purple-200 bg-purple-50', heading: 'text-purple-700', bar: 'bg-purple-500', ring: 'ring-purple-400', btn: 'bg-purple-600 hover:bg-purple-700' },
+  Incubation:        { badge: 'bg-orange-100 text-orange-700', section: 'border-orange-200 bg-orange-50', heading: 'text-orange-700', bar: 'bg-orange-500', ring: 'ring-orange-400', btn: 'bg-orange-600 hover:bg-orange-700' },
+  AccountManagement: { badge: 'bg-green-100 text-green-700',   section: 'border-green-200 bg-green-50',   heading: 'text-green-700',  bar: 'bg-green-500',  ring: 'ring-green-400',  btn: 'bg-green-600 hover:bg-green-700'  },
 }
 
 export default function OnboardingDetailPage() {
@@ -42,7 +42,9 @@ export default function OnboardingDetailPage() {
   const router = useRouter()
   const qc = useQueryClient()
   const notesRef = useRef(null)
-  const [advanceWarning, setAdvanceWarning] = useState(false)
+
+  // pendingPhase = { phase, idx } — set when user clicks a step or nav button
+  const [pendingPhase, setPendingPhase] = useState(null)
 
   const { data: tracker, isLoading } = useQuery({
     queryKey: ['onboarding', id],
@@ -55,15 +57,15 @@ export default function OnboardingDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['onboarding', id] }),
   })
 
-  const advanceMutation = useMutation({
-    mutationFn: () =>
+  const setPhaseMutation = useMutation({
+    mutationFn: (phase) =>
       fetch(`/api/onboarding/${id}`, {
-        method: 'PATCH',
+        method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'advance' }),
+        body:    JSON.stringify({ action: 'setPhase', phase }),
       }).then(r => r.json()),
     onSuccess: () => {
-      setAdvanceWarning(false)
+      setPendingPhase(null)
       qc.invalidateQueries({ queryKey: ['onboarding', id] })
       qc.invalidateQueries({ queryKey: ['onboarding'] })
     },
@@ -72,35 +74,37 @@ export default function OnboardingDetailPage() {
   const notesMutation = useMutation({
     mutationFn: (notes) =>
       fetch(`/api/onboarding/${id}`, {
-        method: 'PATCH',
+        method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'notes', notes }),
+        body:    JSON.stringify({ action: 'notes', notes }),
       }).then(r => r.json()),
   })
 
   if (isLoading) return <div className="animate-pulse h-96 bg-gray-100 rounded-2xl" />
   if (!tracker || tracker.error) return <div className="text-red-500">Tracker not found</div>
 
-  const currentPhaseIdx  = PHASE_ORDER.indexOf(tracker.phase)
-  const nextPhase        = PHASE_ORDER[currentPhaseIdx + 1]
-  const isLastPhase      = currentPhaseIdx === PHASE_ORDER.length - 1
-  const currentColors    = PHASE_COLORS[tracker.phase] || PHASE_COLORS.DealClosure
-
-  const currentTasks     = tracker.tasksByPhase?.[tracker.phase] || []
-  const allCurrentDone   = currentTasks.length > 0 && currentTasks.every(t => t.completed)
+  const currentPhaseIdx   = PHASE_ORDER.indexOf(tracker.phase)
+  const currentColors     = PHASE_COLORS[tracker.phase] || PHASE_COLORS.DealClosure
+  const currentTasks      = tracker.tasksByPhase?.[tracker.phase] || []
+  const allCurrentDone    = currentTasks.length > 0 && currentTasks.every(t => t.completed)
   const incompleteCurrent = currentTasks.filter(t => !t.completed).length
 
-  function handleAdvanceClick() {
-    if (!allCurrentDone && !advanceWarning) {
-      setAdvanceWarning(true)
-      return
-    }
-    advanceMutation.mutate()
+  const prevPhase = PHASE_ORDER[currentPhaseIdx - 1] ?? null
+  const nextPhase = PHASE_ORDER[currentPhaseIdx + 1] ?? null
+
+  function requestMove(phase) {
+    if (phase === tracker.phase) return
+    const idx = PHASE_ORDER.indexOf(phase)
+    setPendingPhase({ phase, idx })
   }
 
   function handleNotesBlur() {
     notesMutation.mutate(notesRef.current?.value ?? '')
   }
+
+  const pendingIdx       = pendingPhase ? PHASE_ORDER.indexOf(pendingPhase.phase) : null
+  const pendingDirection = pendingIdx !== null ? (pendingIdx > currentPhaseIdx ? 'forward' : 'backward') : null
+  const pendingColors    = pendingPhase ? PHASE_COLORS[pendingPhase.phase] : null
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -111,7 +115,7 @@ export default function OnboardingDetailPage() {
           ← Customer Journey
         </button>
         <h2 className="text-xl font-bold text-gray-900">{tracker.account?.name}</h2>
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${currentColors.badge}`}>
+        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${currentColors.badge}`}>
           {PHASE_ICONS[tracker.phase]} {PHASE_LABELS[tracker.phase]}
         </span>
         <span className="text-xs text-gray-400 italic">{PHASE_TEAMS[tracker.phase]}</span>
@@ -147,43 +151,118 @@ export default function OnboardingDetailPage() {
         </div>
       </div>
 
-      {/* Phase Stepper */}
-      <div className="flex items-start gap-0 overflow-x-auto pb-1">
-        {PHASE_ORDER.map((phase, idx) => {
-          const isPast    = idx < currentPhaseIdx
-          const isCurrent = idx === currentPhaseIdx
-          const colors    = PHASE_COLORS[phase]
-          return (
-            <div key={phase} className="flex items-center flex-1 min-w-0">
-              <div className="flex flex-col items-center flex-shrink-0">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${
-                  isPast    ? 'bg-green-500 border-green-500 text-white' :
-                  isCurrent ? `border-2 text-white ${colors.bar.replace('bg-', 'bg-').replace('500', '600')} border-transparent` :
-                              'bg-white border-gray-300 text-gray-400'
-                }`}
-                style={isCurrent ? { backgroundColor: '' } : {}}
-                >
-                  {isPast ? '✓' : PHASE_ICONS[phase]}
+      {/* ── Clickable Phase Stepper ─────────────────────────────────────────── */}
+      <div>
+        <p className="text-xs text-gray-400 mb-3 uppercase tracking-wider">Click any stage to move the account</p>
+        <div className="flex items-start gap-0 overflow-x-auto pb-1">
+          {PHASE_ORDER.map((phase, idx) => {
+            const isPast    = idx < currentPhaseIdx
+            const isCurrent = idx === currentPhaseIdx
+            const colors    = PHASE_COLORS[phase]
+
+            return (
+              <div key={phase} className="flex items-center flex-1 min-w-0">
+                <div className="flex flex-col items-center flex-shrink-0">
+                  <button
+                    onClick={() => requestMove(phase)}
+                    disabled={isCurrent}
+                    title={isCurrent ? 'Current stage' : `Move to ${PHASE_LABELS[phase]}`}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all focus:outline-none ${
+                      isCurrent
+                        ? `${colors.bar} border-transparent text-white ring-2 ring-offset-2 ${colors.ring} cursor-default`
+                        : isPast
+                          ? 'bg-green-500 border-green-500 text-white hover:bg-green-400 hover:scale-110 cursor-pointer'
+                          : 'bg-white border-gray-300 text-gray-400 hover:border-gray-400 hover:scale-110 cursor-pointer'
+                    }`}
+                  >
+                    {isPast ? '✓' : PHASE_ICONS[phase]}
+                  </button>
+                  <p className={`text-xs mt-1.5 text-center whitespace-nowrap font-medium ${
+                    isCurrent ? colors.heading :
+                    isPast    ? 'text-green-600' : 'text-gray-400'
+                  }`}>
+                    {PHASE_LABELS[phase]}
+                  </p>
+                  <p className="text-xs text-gray-400 text-center whitespace-nowrap hidden sm:block">
+                    {PHASE_TEAMS[phase].split('/')[0].trim().split(' ').slice(0, 2).join(' ')}
+                  </p>
                 </div>
-                <p className={`text-xs mt-1 text-center whitespace-nowrap ${
-                  isCurrent ? colors.heading + ' font-semibold' :
-                  isPast    ? 'text-green-600' : 'text-gray-400'
-                }`}>
-                  {PHASE_LABELS[phase]}
-                </p>
-                <p className="text-xs text-gray-400 text-center whitespace-nowrap hidden sm:block">
-                  {PHASE_TEAMS[phase].split(' ')[0]}
-                </p>
+                {idx < PHASE_ORDER.length - 1 && (
+                  <div className={`flex-1 h-0.5 mx-2 mb-9 ${isPast ? 'bg-green-400' : 'bg-gray-200'}`} />
+                )}
               </div>
-              {idx < PHASE_ORDER.length - 1 && (
-                <div className={`flex-1 h-0.5 mx-1 mb-8 ${isPast ? 'bg-green-400' : 'bg-gray-200'}`} />
-              )}
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
 
-      {/* Task sections by phase */}
+      {/* ── Move Confirmation Card ──────────────────────────────────────────── */}
+      {pendingPhase && (
+        <div className={`rounded-xl border p-4 ${pendingColors.section}`}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className={`font-semibold text-sm ${pendingColors.heading}`}>
+                {pendingDirection === 'backward' ? '← Move back to' : 'Move forward to →'}{' '}
+                {PHASE_ICONS[pendingPhase.phase]} {PHASE_LABELS[pendingPhase.phase]}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Responsible team: {PHASE_TEAMS[pendingPhase.phase]}
+              </p>
+              {pendingDirection === 'forward' && !allCurrentDone && (
+                <p className="text-xs text-amber-600 mt-1.5 font-medium">
+                  ⚠️ {incompleteCurrent} task{incompleteCurrent !== 1 ? 's' : ''} still incomplete in the current stage.
+                </p>
+              )}
+              {pendingDirection === 'backward' && (
+                <p className="text-xs text-gray-500 mt-1.5">
+                  Completed tasks will not be reset.
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              <button
+                onClick={() => setPendingPhase(null)}
+                className="px-4 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setPhaseMutation.mutate(pendingPhase.phase)}
+                disabled={setPhaseMutation.isPending}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium text-white transition-colors ${pendingColors.btn}`}
+              >
+                {setPhaseMutation.isPending ? 'Moving…' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Quick nav buttons ───────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3">
+        {prevPhase && (
+          <button
+            onClick={() => requestMove(prevPhase)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            ← {PHASE_LABELS[prevPhase]}
+          </button>
+        )}
+        <div className="flex-1" />
+        {nextPhase && (
+          <button
+            onClick={() => requestMove(nextPhase)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors ${
+              allCurrentDone ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-amber-500 hover:bg-amber-600'
+            }`}
+          >
+            {allCurrentDone ? '' : '⚠️ '}
+            {PHASE_LABELS[nextPhase]} →
+          </button>
+        )}
+      </div>
+
+      {/* ── Task sections by phase ──────────────────────────────────────────── */}
       <div className="space-y-4">
         {PHASE_ORDER.map((phase, phaseIdx) => {
           const tasks     = tracker.tasksByPhase?.[phase] || []
@@ -209,14 +288,18 @@ export default function OnboardingDetailPage() {
                   }`}>
                     {PHASE_LABELS[phase]}
                   </h3>
-                  <span className={`text-xs font-medium ${
+                  <span className={`text-xs ${
                     isCurrent ? 'text-gray-500' :
                     isPast    ? 'text-green-500' : 'text-gray-300'
                   }`}>
                     · {PHASE_TEAMS[phase]}
                   </span>
                   {isPast    && <span className="text-xs text-green-600 font-medium ml-1">✓ Completed</span>}
-                  {isCurrent && <span className={`text-xs font-medium ml-1 ${colors.heading}`}>{doneCount}/{tasks.length} done</span>}
+                  {isCurrent && (
+                    <span className={`text-xs font-medium ml-1 ${colors.heading}`}>
+                      {doneCount}/{tasks.length} done
+                    </span>
+                  )}
                 </div>
                 {isCurrent && tasks.length > 0 && (
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -270,37 +353,7 @@ export default function OnboardingDetailPage() {
         })}
       </div>
 
-      {/* Advance phase button */}
-      {!isLastPhase && (
-        <div className="flex flex-col gap-2">
-          {advanceWarning && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-700">
-              ⚠️ {incompleteCurrent} task{incompleteCurrent !== 1 ? 's' : ''} still incomplete in this stage. Click again to advance anyway.
-            </div>
-          )}
-          <button
-            onClick={handleAdvanceClick}
-            disabled={advanceMutation.isPending}
-            className={`self-start px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
-              allCurrentDone
-                ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                : 'bg-amber-500 hover:bg-amber-600 text-white'
-            }`}
-          >
-            {advanceMutation.isPending
-              ? 'Advancing…'
-              : `Advance to ${PHASE_LABELS[nextPhase]} →`}
-          </button>
-        </div>
-      )}
-
-      {isLastPhase && (
-        <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-4 text-green-700 font-medium">
-          ⭐ This account is now in <strong>Account Management</strong> — managed by the Customer Success Team.
-        </div>
-      )}
-
-      {/* Notes */}
+      {/* ── Notes ──────────────────────────────────────────────────────────── */}
       <div>
         <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
           Internal Notes

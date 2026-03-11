@@ -409,7 +409,7 @@ enum OnboardingPhase {
 model OnboardingTracker {
   id        Int             @id @default(autoincrement())
   accountId Int             @unique
-  dealId    Int             @unique
+  dealId    Int?            @unique
   phase     OnboardingPhase @default(DealClosure)
   startDate DateTime        @default(now())
   notes     String?
@@ -417,7 +417,7 @@ model OnboardingTracker {
   updatedAt DateTime        @updatedAt
 
   account Account         @relation(fields: [accountId], references: [id])
-  deal    Deal            @relation(fields: [dealId], references: [id])
+  deal    Deal?           @relation(fields: [dealId], references: [id])
   tasks   OnboardingTask[]
 
   @@map("onboarding_trackers")

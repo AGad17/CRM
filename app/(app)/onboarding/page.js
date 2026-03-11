@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { DataTable } from '@/components/ui/DataTable'
 
@@ -130,13 +130,26 @@ function TrackerCard({ tracker, phase, onClick }) {
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const qc = useQueryClient()
   const [view,   setView]   = useState('kanban')
   const [phase,  setPhase]  = useState('')
   const [search, setSearch] = useState('')
+  const [syncMsg, setSyncMsg] = useState(null)
 
   const { data: trackers = [], isLoading } = useQuery({
     queryKey: ['onboarding'],
     queryFn:  () => fetch('/api/onboarding').then((r) => r.json()),
+  })
+
+  const seedMutation = useMutation({
+    mutationFn: () => fetch('/api/onboarding/seed', { method: 'POST' }).then(r => r.json()),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['onboarding'] })
+      setSyncMsg(data.count === 0
+        ? 'All accounts are already synced.'
+        : `✓ Added ${data.count} account${data.count !== 1 ? 's' : ''} to the tracker.`)
+      setTimeout(() => setSyncMsg(null), 4000)
+    },
   })
 
   const filtered = trackers.filter((t) => {
@@ -223,17 +236,32 @@ export default function OnboardingPage() {
             Track every account from Deal Closure through to Account Management.
           </p>
         </div>
-        <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
-          <button onClick={() => setView('kanban')}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${view === 'kanban' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
-            ⊞ Kanban
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => seedMutation.mutate()}
+            disabled={seedMutation.isPending}
+            className="px-4 py-2 text-sm font-medium rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 shadow-sm transition-colors disabled:opacity-50"
+          >
+            {seedMutation.isPending ? '⏳ Syncing…' : '⟳ Sync All Accounts'}
           </button>
-          <button onClick={() => setView('list')}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${view === 'list' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
-            ☰ List
-          </button>
+          <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+            <button onClick={() => setView('kanban')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${view === 'kanban' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+              ⊞ Kanban
+            </button>
+            <button onClick={() => setView('list')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${view === 'list' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+              ☰ List
+            </button>
+          </div>
         </div>
       </div>
+
+      {syncMsg && (
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 text-sm text-green-700 font-medium">
+          {syncMsg}
+        </div>
+      )}
 
       {/* Stage summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
