@@ -407,34 +407,74 @@ enum OnboardingPhase {
 // ─── Operations: Onboarding Tracker ──────────────────────────────────────────
 
 model OnboardingTracker {
-  id        Int             @id @default(autoincrement())
-  accountId Int             @unique
-  dealId    Int?            @unique
-  phase     OnboardingPhase @default(DealClosure)
-  startDate DateTime        @default(now())
-  notes     String?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  id             Int             @id @default(autoincrement())
+  accountId      Int             @unique
+  dealId         Int?            @unique
+  phase          OnboardingPhase @default(DealClosure)
+  phaseStartedAt DateTime        @default(now())
+  startDate      DateTime        @default(now())
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
-  account Account         @relation(fields: [accountId], references: [id])
-  deal    Deal?           @relation(fields: [dealId], references: [id])
-  tasks   OnboardingTask[]
+  account     Account          @relation(fields: [accountId], references: [id])
+  deal        Deal?            @relation(fields: [dealId], references: [id])
+  tasks       OnboardingTask[]
+  csatRecords CsatRecord[]
+  npsRecords  NpsRecord[]
 
   @@map("onboarding_trackers")
 }
 
 model OnboardingTask {
+  id             Int             @id @default(autoincrement())
+  trackerId      Int
+  phase          OnboardingPhase
+  title          String
+  completed      Boolean         @default(false)
+  completedAt    DateTime?
+  dueDays        Int?            // days from phaseStartedAt by which task should be done
+  dueDate        DateTime?       // absolute due date (used for recurring task instances)
+  recurring      Boolean         @default(false)
+  recurrenceDays Int?            // days between recurrences (30 = monthly, 90 = quarterly)
+  createdAt      DateTime        @default(now())
+
+  tracker OnboardingTracker @relation(fields: [trackerId], references: [id], onDelete: Cascade)
+
+  @@map("onboarding_tasks")
+}
+
+// CSAT: auto-created on every phase transition
+model CsatRecord {
   id          Int             @id @default(autoincrement())
   trackerId   Int
-  phase       OnboardingPhase
-  title       String
-  completed   Boolean         @default(false)
+  fromPhase   OnboardingPhase
+  toPhase     OnboardingPhase
+  score       Int?            // 1–5 satisfaction score
+  notes       String?
   completedAt DateTime?
   createdAt   DateTime        @default(now())
 
   tracker OnboardingTracker @relation(fields: [trackerId], references: [id], onDelete: Cascade)
 
-  @@map("onboarding_tasks")
+  @@map("csat_records")
+}
+
+// NPS: seeded quarterly for all Incubation + AccountManagement accounts
+model NpsRecord {
+  id          Int             @id @default(autoincrement())
+  trackerId   Int
+  phase       OnboardingPhase // phase the account was in when NPS was triggered
+  quarter     String          // e.g. "Q1-2026"
+  score       Int?            // 0–10 NPS score
+  notes       String?
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+
+  tracker OnboardingTracker @relation(fields: [trackerId], references: [id], onDelete: Cascade)
+
+  @@unique([trackerId, quarter])
+  @@map("nps_records")
 }
 
 // ─── Pipeline: Lead ───────────────────────────────────────────────────────────
