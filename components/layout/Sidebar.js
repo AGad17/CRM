@@ -42,7 +42,8 @@ const NAV = [
     label: 'Operations',
     icon: '🚀',
     children: [
-      { href: '/onboarding', label: 'Onboarding' },
+      { href: '/onboarding', label: 'Customer Journey' },
+      { href: '/surveys',    label: 'CSAT & NPS' },
     ],
   },
   {
