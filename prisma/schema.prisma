@@ -397,11 +397,11 @@ model Invoice {
 // ─── Onboarding Enums ─────────────────────────────────────────────────────────
 
 enum OnboardingPhase {
-  WelcomeCall
-  Onboarding
-  Training
-  Incubation
-  Active
+  DealClosure       // Stage 1 — Sales / Account Management
+  Onboarding        // Stage 2 — Onboarding Team
+  Training          // Stage 3 — Onboarding Team
+  Incubation        // Stage 4 — Onboarding Team (2-week max)
+  AccountManagement // Stage 5 — Customer Success Team
 }
 
 // ─── Operations: Onboarding Tracker ──────────────────────────────────────────
@@ -410,7 +410,7 @@ model OnboardingTracker {
   id        Int             @id @default(autoincrement())
   accountId Int             @unique
   dealId    Int             @unique
-  phase     OnboardingPhase @default(WelcomeCall)
+  phase     OnboardingPhase @default(DealClosure)
   startDate DateTime        @default(now())
   notes     String?
   createdAt DateTime        @default(now())

@@ -4,21 +4,23 @@ import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { DataTable } from '@/components/ui/DataTable'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Phase definitions ────────────────────────────────────────────────────────
 
 const PHASES = [
   {
-    key:   'WelcomeCall',
-    label: 'Welcome Call',
-    icon:  '📞',
-    light: 'bg-blue-50 border-blue-200',
-    text:  'text-blue-700',
-    badge: 'bg-blue-100 text-blue-700',
-    bar:   'bg-blue-500',
+    key:   'DealClosure',
+    label: 'Deal Closure',
+    team:  'Sales / AM',
+    icon:  '🤝',
+    light: 'bg-sky-50 border-sky-200',
+    text:  'text-sky-700',
+    badge: 'bg-sky-100 text-sky-700',
+    bar:   'bg-sky-500',
   },
   {
     key:   'Onboarding',
     label: 'Onboarding',
+    team:  'Onboarding',
     icon:  '🏗️',
     light: 'bg-yellow-50 border-yellow-200',
     text:  'text-yellow-700',
@@ -28,6 +30,7 @@ const PHASES = [
   {
     key:   'Training',
     label: 'Training',
+    team:  'Onboarding',
     icon:  '📚',
     light: 'bg-purple-50 border-purple-200',
     text:  'text-purple-700',
@@ -37,6 +40,7 @@ const PHASES = [
   {
     key:   'Incubation',
     label: 'Incubation',
+    team:  'Onboarding',
     icon:  '🔍',
     light: 'bg-orange-50 border-orange-200',
     text:  'text-orange-700',
@@ -44,9 +48,10 @@ const PHASES = [
     bar:   'bg-orange-500',
   },
   {
-    key:   'Active',
-    label: 'Active',
-    icon:  '✅',
+    key:   'AccountManagement',
+    label: 'Account Mgmt',
+    team:  'Customer Success',
+    icon:  '⭐',
     light: 'bg-green-50 border-green-200',
     text:  'text-green-700',
     badge: 'bg-green-100 text-green-700',
@@ -71,12 +76,10 @@ function TrackerCard({ tracker, phase, onClick }) {
       onClick={onClick}
       className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer space-y-2.5"
     >
-      {/* Account name */}
       <p className="font-semibold text-sm text-gray-900 leading-tight truncate">
         {tracker.account?.name || '—'}
       </p>
 
-      {/* Country + Days in phase */}
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-gray-400 truncate">
           {tracker.account?.country?.name || '—'}
@@ -86,7 +89,6 @@ function TrackerCard({ tracker, phase, onClick }) {
         </span>
       </div>
 
-      {/* Package + POS */}
       {(tracker.deal?.package || tracker.deal?.posSystem) && (
         <div className="flex flex-wrap gap-1">
           {tracker.deal?.package && (
@@ -102,10 +104,9 @@ function TrackerCard({ tracker, phase, onClick }) {
         </div>
       )}
 
-      {/* Phase progress bar */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs text-gray-400">Phase progress</span>
+          <span className="text-xs text-gray-400">Stage tasks</span>
           <span className="text-xs text-gray-500 font-medium">
             {tracker.currentPhaseCompleted}/{tracker.currentPhaseTasks}
           </span>
@@ -118,7 +119,6 @@ function TrackerCard({ tracker, phase, onClick }) {
         </div>
       </div>
 
-      {/* Started date */}
       <p className="text-xs text-gray-300">
         Started {new Date(tracker.startDate).toLocaleDateString('en-GB')}
       </p>
@@ -134,30 +134,24 @@ export default function OnboardingPage() {
   const [phase,  setPhase]  = useState('')
   const [search, setSearch] = useState('')
 
-  // Always fetch everything — filter client-side for both views
   const { data: trackers = [], isLoading } = useQuery({
     queryKey: ['onboarding'],
     queryFn:  () => fetch('/api/onboarding').then((r) => r.json()),
   })
 
-  // Shared filter logic for both views
   const filtered = trackers.filter((t) => {
     if (phase  && t.phase !== phase) return false
     if (search && !t.account?.name?.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
 
-  // ── Table columns (list view) ──
   const columns = [
     {
-      key:      'account',
-      label:    'Account',
-      sortable: true,
-      render:   (r) => <span className="font-medium text-gray-900">{r.account?.name || '—'}</span>,
+      key: 'account', label: 'Account', sortable: true,
+      render: (r) => <span className="font-medium text-gray-900">{r.account?.name || '—'}</span>,
     },
     {
-      key:   'phase',
-      label: 'Phase',
+      key: 'phase', label: 'Stage',
       render: (r) => {
         const p = PHASES.find((x) => x.key === r.phase)
         return (
@@ -168,8 +162,11 @@ export default function OnboardingPage() {
       },
     },
     {
-      key:   'progress',
-      label: 'Phase Progress',
+      key: 'team', label: 'Responsible Team',
+      render: (r) => <span className="text-xs text-gray-500">{r.phaseTeam}</span>,
+    },
+    {
+      key: 'progress', label: 'Stage Progress',
       render: (r) => {
         const pct = r.currentPhaseTasks > 0
           ? Math.round((r.currentPhaseCompleted / r.currentPhaseTasks) * 100) : 0
@@ -186,38 +183,29 @@ export default function OnboardingPage() {
       },
     },
     {
-      key:      'started',
-      label:    'Started',
-      sortable: true,
-      render:   (r) => new Date(r.startDate).toLocaleDateString('en-GB'),
+      key: 'started', label: 'Started', sortable: true,
+      render: (r) => new Date(r.startDate).toLocaleDateString('en-GB'),
     },
     {
-      key:      'daysInPhase',
-      label:    'Days in Phase',
-      sortable: true,
-      render:   (r) => (
+      key: 'daysInPhase', label: 'Days in Stage', sortable: true,
+      render: (r) => (
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
           r.daysInPhase > 14 ? 'bg-red-100 text-red-600' :
-          r.daysInPhase > 7  ? 'bg-amber-100 text-amber-600' :
-                               'text-gray-500'
+          r.daysInPhase > 7  ? 'bg-amber-100 text-amber-600' : 'text-gray-500'
         }`}>
           {r.daysInPhase}d
         </span>
       ),
     },
     {
-      key:   'country',
-      label: 'Country',
+      key: 'country', label: 'Country',
       render: (r) => r.account?.country?.name || '—',
     },
     {
-      key:   'actions',
-      label: '',
+      key: 'actions', label: '',
       render: (r) => (
-        <button
-          onClick={() => router.push(`/onboarding/${r.id}`)}
-          className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-        >
+        <button onClick={() => router.push(`/onboarding/${r.id}`)}
+          className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
           View →
         </button>
       ),
@@ -227,134 +215,98 @@ export default function OnboardingPage() {
   return (
     <div className="space-y-6">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Onboarding Tracker</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Track account onboarding from Welcome Call to Active.</p>
+          <h2 className="text-xl font-bold text-gray-900">Customer Journey Tracker</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Track every account from Deal Closure through to Account Management.
+          </p>
         </div>
-
-        {/* View toggle */}
         <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
-          <button
-            onClick={() => setView('kanban')}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              view === 'kanban' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-          >
+          <button onClick={() => setView('kanban')}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${view === 'kanban' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             ⊞ Kanban
           </button>
-          <button
-            onClick={() => setView('list')}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              view === 'list' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-          >
+          <button onClick={() => setView('list')}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${view === 'list' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
             ☰ List
           </button>
         </div>
       </div>
 
-      {/* ── Phase summary count cards (clickable filter) ── */}
+      {/* Stage summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {PHASES.map((p) => {
-          const count = trackers.filter((t) => t.phase === p.key).length
+          const count  = trackers.filter((t) => t.phase === p.key).length
           const active = phase === p.key
           return (
-            <button
-              key={p.key}
-              onClick={() => setPhase(active ? '' : p.key)}
-              className={`rounded-xl border p-3 text-left transition-all ${
-                active ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'
-              }`}
-            >
+            <button key={p.key} onClick={() => setPhase(active ? '' : p.key)}
+              className={`rounded-xl border p-3 text-left transition-all ${active ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
               <p className="text-xs text-gray-400 uppercase tracking-wider">{p.icon} {p.label}</p>
               <p className="text-2xl font-bold text-gray-800 mt-1">{count}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{p.team}</p>
             </button>
           )
         })}
       </div>
 
-      {/* ── Filters ── */}
+      {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        <input
-          type="text"
-          placeholder="Search account…"
-          value={search}
+        <input type="text" placeholder="Search account…" value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-56 bg-white"
-        />
-        {/* Phase filter tabs — only shown in list view; kanban uses column headers */}
+          className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-56 bg-white" />
         {view === 'list' && (
           <div className="flex gap-1 flex-wrap">
-            {[{ key: '', label: 'All' }, ...PHASES].map((p) => (
-              <button
-                key={p.key}
-                onClick={() => setPhase(p.key)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  phase === p.key
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
+            {[{ key: '', label: 'All', icon: '' }, ...PHASES].map((p) => (
+              <button key={p.key} onClick={() => setPhase(p.key)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${phase === p.key ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                 {p.icon ? `${p.icon} ` : ''}{p.label}
               </button>
             ))}
           </div>
         )}
-        <span className="text-sm text-gray-400 ml-auto">{filtered.length} tracker{filtered.length !== 1 ? 's' : ''}</span>
+        <span className="text-sm text-gray-400 ml-auto">
+          {filtered.length} account{filtered.length !== 1 ? 's' : ''}
+        </span>
       </div>
 
-      {/* ── Content ── */}
+      {/* Content */}
       {isLoading ? (
         <div className="animate-pulse h-64 bg-gray-100 rounded-xl" />
       ) : view === 'kanban' ? (
 
-        /* ── Kanban Board ─────────────────────────────────────────────── */
+        /* Kanban Board */
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-1 px-1">
           {PHASES.map((p) => {
             const cards = filtered.filter((t) => t.phase === p.key)
             return (
               <div key={p.key} className="flex-none w-64">
-
-                {/* Column header */}
-                <div className={`rounded-t-xl px-3 py-2.5 border border-b-0 ${p.light} flex items-center justify-between`}>
-                  <span className={`text-sm font-semibold ${p.text}`}>
-                    {p.icon} {p.label}
-                  </span>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${p.badge}`}>
-                    {cards.length}
-                  </span>
+                <div className={`rounded-t-xl px-3 py-2.5 border border-b-0 ${p.light}`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm font-semibold ${p.text}`}>{p.icon} {p.label}</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${p.badge}`}>{cards.length}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">{p.team}</p>
                 </div>
-
-                {/* Cards container */}
                 <div className={`rounded-b-xl border ${p.light} p-2 space-y-2 min-h-[200px]`}>
                   {cards.length === 0 ? (
-                    <div className="flex items-center justify-center h-24 text-xs text-gray-300 italic">
-                      No accounts
-                    </div>
+                    <div className="flex items-center justify-center h-24 text-xs text-gray-300 italic">No accounts</div>
                   ) : (
                     cards.map((t) => (
-                      <TrackerCard
-                        key={t.id}
-                        tracker={t}
-                        phase={p}
-                        onClick={() => router.push(`/onboarding/${t.id}`)}
-                      />
+                      <TrackerCard key={t.id} tracker={t} phase={p}
+                        onClick={() => router.push(`/onboarding/${t.id}`)} />
                     ))
                   )}
                 </div>
-
               </div>
             )
           })}
         </div>
 
       ) : (
-
-        /* ── List Table ───────────────────────────────────────────────── */
-        <DataTable columns={columns} data={filtered} exportFilename="onboarding" />
-
+        /* List Table */
+        <DataTable columns={columns} data={filtered} exportFilename="customer-journey" />
       )}
     </div>
   )
