@@ -7,6 +7,7 @@ import clsx from 'clsx'
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/accounts', label: 'Accounts', icon: '🏢' },
+  { href: '/contracts', label: 'Contracts', icon: '📄' },
   {
     label: 'Analytics',
     icon: '📈',
@@ -32,11 +33,9 @@ const NAV = [
     label: 'Invoicing',
     icon: '🧾',
     children: [
-      { href: '/invoicing/deal-calculator', label: 'Deal Calculator' },
-      { href: '/invoicing/sales-log',       label: 'Sales Log' },
-      { href: '/invoicing/invoices',        label: 'Invoices' },
-      { href: '/invoicing/ar-report',       label: 'AR Report' },
-      { href: '/invoicing/pricing',         label: 'Pricing Config' },
+      { href: '/invoicing/sales-log',  label: 'Sales Log' },
+      { href: '/invoicing/invoices',   label: 'Invoices' },
+      { href: '/invoicing/ar-report',  label: 'AR Report' },
     ],
   },
   {
@@ -46,7 +45,15 @@ const NAV = [
       { href: '/onboarding', label: 'Onboarding' },
     ],
   },
-  { href: '/settings', label: 'Settings', icon: '⚙️' },
+  {
+    label: 'Settings',
+    icon: '⚙️',
+    children: [
+      { href: '/settings',                 label: 'General' },
+      { href: '/settings/pricing',         label: 'Pricing Config' },
+      { href: '/settings/pricing-history', label: 'Pricing History' },
+    ],
+  },
 ]
 
 export function Sidebar() {

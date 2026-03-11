@@ -34,6 +34,11 @@ export async function POST(request) {
     return NextResponse.json({ error: 'ownerId is required' }, { status: 400 })
   }
 
+  // For expansion/renewal, accountId is required
+  if ((body.opportunityType === 'Expansion' || body.opportunityType === 'Renewal') && !body.accountId) {
+    return NextResponse.json({ error: 'accountId is required for Expansion/Renewal opportunities' }, { status: 400 })
+  }
+
   const lead = await createLead(body)
   return NextResponse.json(lead, { status: 201 })
 }

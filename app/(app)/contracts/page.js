@@ -10,7 +10,6 @@ export default function ContractsPage() {
   const qc = useQueryClient()
   const [filters, setFilters] = useState({ type: '', year: '' })
   const [search, setSearch] = useState('')
-  const [modal, setModal] = useState(null)
   const [editTarget, setEditTarget] = useState(null)
   const [cancelId, setCancelId] = useState(null)
 
@@ -24,19 +23,9 @@ export default function ContractsPage() {
     },
   })
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts'],
-    queryFn: () => fetch('/api/accounts').then((r) => r.json()),
-  })
-
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
     queryFn: () => fetch('/api/products').then((r) => r.json()),
-  })
-
-  const create = useMutation({
-    mutationFn: (data) => fetch('/api/contracts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then((r) => r.json()),
-    onSuccess: () => { qc.invalidateQueries(['contracts']); qc.invalidateQueries(['dashboard']); setModal(null) },
   })
 
   const update = useMutation({
@@ -98,23 +87,18 @@ export default function ContractsPage() {
         />
         <div className="flex-1" />
         <a href="/api/export/csv?type=contracts" className="text-xs text-gray-500 border border-gray-200 bg-white px-3 py-2 rounded-xl hover:bg-gray-50">↓ Export</a>
-        <button onClick={() => setModal('create')} className="bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors">+ New Contract</button>
       </div>
 
       {isLoading ? <div className="animate-pulse h-64 bg-gray-200 rounded-2xl" /> : (
         <DataTable columns={columns} data={displayed} exportFilename="contracts.csv" />
       )}
 
-      <Modal isOpen={modal === 'create'} onClose={() => setModal(null)} title="New Contract">
-        <ContractForm accounts={accounts} products={products} onSubmit={(data) => create.mutate(data)} onCancel={() => setModal(null)} loading={create.isPending} />
-      </Modal>
-
       <Modal isOpen={!!editTarget} onClose={() => setEditTarget(null)} title={`Edit Contract #${editTarget?.id}`}>
         {editTarget && (
           <ContractForm
             isEdit
             initial={editTarget}
-            accounts={accounts}
+            accounts={[]}
             products={products}
             onSubmit={(data) => update.mutate({ id: editTarget.id, data })}
             onCancel={() => setEditTarget(null)}

@@ -12,19 +12,34 @@ import { calcDealSummary } from '@/lib/invoicingCalc'
 const PACKAGES    = ['Essential', 'Operations', 'Enterprise']
 const PAY_TYPES   = ['Annual', 'Quarterly', 'Special']
 const POS_SYSTEMS = ['Foodics', 'Geidea', 'Sonic']
-const DEAL_TYPES  = ['New', 'Renewal', 'Upsell']
-const CHANNELS    = ['Direct', 'Partner', 'Ambassador', 'Online']
+const DEAL_TYPES  = ['New', 'Renewal', 'Expansion', 'Upsell']
+
+const CHANNELS = [
+  { value: 'Foodics',            label: 'Foodics' },
+  { value: 'DirectSales',        label: 'Direct Sales' },
+  { value: 'PartnerReferral',    label: 'Partner Referral' },
+  { value: 'CustomerReferral',   label: 'Customer Referral' },
+  { value: 'EmployeeReferral',   label: 'Employee Referral' },
+  { value: 'AmbassadorReferral', label: 'Ambassador Referral' },
+  { value: 'Website',            label: 'Website' },
+  { value: 'Sonic',              label: 'Sonic' },
+]
 
 const EMPTY_ACCOUNT = { accountName: '', brands: 1, numberOfBranches: 1, numberOfCostCentres: '' }
 const EMPTY_DEAL = {
   brandNames: '', numberOfBrands: 1,
   startDate: new Date().toISOString().slice(0, 10),
   dealType: 'New', posSystem: 'Foodics', countryCode: '',
-  salesChannel: 'Direct', package: 'Essential',
+  salesChannel: 'DirectSales', package: 'Essential',
   paymentType: 'Annual', contractYears: 1, agentId: '',
   normalBranches: 0, centralKitchens: 0, warehouses: 0,
   hasAccounting: false, extraAccountingBranches: 0,
   hasButchering: false, aiAgentUsers: 0, notes: '',
+  discount: '',  // overall deal discount %
+}
+
+const EMPTY_LINE_DISCOUNTS = {
+  inventory: '', ck: '', warehouse: '', accMain: '', accExtra: '', butchering: '', ai: '',
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -45,11 +60,29 @@ function Section({ title, children }) {
   )
 }
 
-function PreviewRow({ label, value, bold }) {
+function PreviewRow({ label, value, bold, highlight }) {
   return (
     <div className="flex justify-between items-center">
-      <span className={bold ? 'font-semibold text-gray-700 text-sm' : 'text-gray-500 text-sm'}>{label}</span>
-      <span className={`font-mono text-sm ${bold ? 'font-bold text-gray-900' : 'text-gray-700'}`}>{value}</span>
+      <span className={`text-sm ${bold ? 'font-semibold text-gray-700' : 'text-gray-500'} ${highlight ? 'text-indigo-600 font-medium' : ''}`}>{label}</span>
+      <span className={`font-mono text-sm ${bold ? 'font-bold text-gray-900' : 'text-gray-700'} ${highlight ? 'text-indigo-600' : ''}`}>{value}</span>
+    </div>
+  )
+}
+
+function DiscountInput({ value, onChange, placeholder = '0' }) {
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="number"
+        min={0}
+        max={100}
+        step={0.5}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-16 text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 text-right"
+        placeholder={placeholder}
+      />
+      <span className="text-xs text-gray-400">%</span>
     </div>
   )
 }
@@ -61,11 +94,12 @@ export default function CloseDealPage() {
   const router = useRouter()
   const { data: session } = useSession()
 
-  const [account, setAccount] = useState(EMPTY_ACCOUNT)
-  const [deal, setDeal]       = useState(EMPTY_DEAL)
-  const [errors, setErrors]   = useState({})
-  const [modal, setModal]     = useState(null) // 'confirm' | null
-  const [prefilled, setPrefilled] = useState(false)
+  const [account, setAccount]             = useState(EMPTY_ACCOUNT)
+  const [deal, setDeal]                   = useState(EMPTY_DEAL)
+  const [lineDiscounts, setLineDiscounts] = useState(EMPTY_LINE_DISCOUNTS)
+  const [errors, setErrors]               = useState({})
+  const [modal, setModal]                 = useState(null)
+  const [prefilled, setPrefilled]         = useState(false)
 
   // ── Data ──
   const { data: lead, isLoading: leadLoading } = useQuery({
@@ -88,27 +122,33 @@ export default function CloseDealPage() {
   // ── Pre-fill from lead ──
   useEffect(() => {
     if (lead && !lead.error && !prefilled) {
-      setAccount((prev) => ({ ...prev, accountName: lead.companyName || '' }))
+      const oppType = lead.opportunityType
+      const accountName = lead.account?.name || lead.companyName || ''
+      setAccount((prev) => ({ ...prev, accountName }))
       setDeal((prev) => ({
         ...prev,
-        brandNames:  lead.companyName || '',
-        countryCode: lead.countryCode  || '',
-        agentId:     lead.ownerId      || session?.user?.id || '',
+        brandNames:   accountName,
+        countryCode:  lead.countryCode  || (lead.account?.country?.code ?? ''),
+        agentId:      lead.ownerId      || session?.user?.id || '',
+        salesChannel: lead.channel      || prev.salesChannel,
         ...(lead.packageInterest && { package: lead.packageInterest }),
+        // Lock deal type to opportunity type for expansion/renewal
+        ...(oppType === 'Expansion' && { dealType: 'Expansion' }),
+        ...(oppType === 'Renewal'   && { dealType: 'Renewal' }),
       }))
       setPrefilled(true)
     }
   }, [lead, prefilled, session])
 
   // ── Derived ──
-  const countries      = pricing?.countries || []
+  const countries       = pricing?.countries || []
   const selectedCountry = countries.find((c) => c.code === deal.countryCode)
   const currency        = selectedCountry?.currency || ''
   const vatRate         = Number(selectedCountry?.vatRate || 0)
   const invoiceCount    = deal.paymentType === 'Quarterly' ? 4 : 1
 
   const summary = useMemo(() => {
-    if (!pricing || !deal.countryCode || !deal.package) return null
+    if (!pricing || !deal.countryCode || !deal.package || !deal.salesChannel) return null
     return calcDealSummary({
       normalBranches:          Number(deal.normalBranches)          || 0,
       centralKitchens:         Number(deal.centralKitchens)         || 0,
@@ -118,26 +158,37 @@ export default function CloseDealPage() {
       hasButchering:           deal.hasButchering,
       aiAgentUsers:            Number(deal.aiAgentUsers)            || 0,
       countryCode:             deal.countryCode,
+      salesChannel:            deal.salesChannel,
       package:                 deal.package,
       paymentType:             deal.paymentType,
       contractYears:           Number(deal.contractYears) || 1,
       vatRate,
-      branchPricing:           pricing.branchPricing     || [],
-      accountingPricing:       pricing.accountingPricing || [],
-      flatModulePricing:       pricing.flatModulePricing || [],
+      discount:                Number(deal.discount) || 0,
+      lineDiscounts: {
+        inventory:  Number(lineDiscounts.inventory)  || 0,
+        ck:         Number(lineDiscounts.ck)         || 0,
+        warehouse:  Number(lineDiscounts.warehouse)  || 0,
+        accMain:    Number(lineDiscounts.accMain)    || 0,
+        accExtra:   Number(lineDiscounts.accExtra)   || 0,
+        butchering: Number(lineDiscounts.butchering) || 0,
+        ai:         Number(lineDiscounts.ai)         || 0,
+      },
+      inventoryPricing: pricing.inventoryPricing || [],
+      addOnPricing:     pricing.addOnPricing     || [],
     })
-  }, [deal, pricing, vatRate])
+  }, [deal, lineDiscounts, pricing, vatRate])
 
   // ── Setters ──
-  const setA = (key) => (e) => {
+  const setA  = (key) => (e) => {
     setAccount((p) => ({ ...p, [key]: e.target.value }))
     if (errors[key]) setErrors((p) => ({ ...p, [key]: undefined }))
   }
-  const setD = (key) => (e) => {
+  const setD  = (key) => (e) => {
     const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value
     setDeal((p) => ({ ...p, [key]: v }))
     if (errors[key]) setErrors((p) => ({ ...p, [key]: undefined }))
   }
+  const setLD = (key) => (v) => setLineDiscounts((p) => ({ ...p, [key]: v }))
 
   // ── Validation ──
   function validate() {
@@ -200,6 +251,16 @@ export default function CloseDealPage() {
       hasButchering:           deal.hasButchering,
       aiAgentUsers:            Number(deal.aiAgentUsers)            || 0,
       notes:                   deal.notes,
+      discount:                Number(deal.discount) || 0,
+      lineDiscounts: {
+        inventory:  Number(lineDiscounts.inventory)  || 0,
+        ck:         Number(lineDiscounts.ck)         || 0,
+        warehouse:  Number(lineDiscounts.warehouse)  || 0,
+        accMain:    Number(lineDiscounts.accMain)    || 0,
+        accExtra:   Number(lineDiscounts.accExtra)   || 0,
+        butchering: Number(lineDiscounts.butchering) || 0,
+        ai:         Number(lineDiscounts.ai)         || 0,
+      },
     })
   }
 
@@ -207,9 +268,7 @@ export default function CloseDealPage() {
     `text-sm border rounded-xl px-3 py-2 bg-white w-full focus:outline-none focus:ring-2 focus:ring-indigo-400 ${errors[key] ? 'border-red-400' : 'border-gray-200'}`
 
   // ── Loading / Error states ──
-  if (leadLoading) {
-    return <div className="animate-pulse h-64 bg-gray-100 rounded-xl" />
-  }
+  if (leadLoading) return <div className="animate-pulse h-64 bg-gray-100 rounded-xl" />
   if (!lead || lead.error) {
     return (
       <div className="text-center py-16 text-gray-500">
@@ -223,9 +282,7 @@ export default function CloseDealPage() {
       <div className="text-center py-16 text-gray-500">
         <p className="text-lg font-medium">This lead is already closed</p>
         {lead.accountId && (
-          <Link href={`/accounts/${lead.accountId}`} className="text-indigo-600 hover:underline text-sm mt-2 inline-block">
-            View Account →
-          </Link>
+          <Link href={`/accounts/${lead.accountId}`} className="text-indigo-600 hover:underline text-sm mt-2 inline-block">View Account →</Link>
         )}
         <div className="mt-2">
           <Link href="/pipeline" className="text-gray-400 hover:text-gray-700 text-sm">← Back to Pipeline</Link>
@@ -233,6 +290,11 @@ export default function CloseDealPage() {
       </div>
     )
   }
+
+  const hasBranches   = Number(deal.normalBranches) > 0
+  const hasCK         = Number(deal.centralKitchens) > 0
+  const hasWarehouse  = Number(deal.warehouses) > 0
+  const hasAI         = Number(deal.aiAgentUsers) > 0
 
   // ── Render ──
   return (
@@ -249,14 +311,22 @@ export default function CloseDealPage() {
       </div>
 
       {/* Lead context banner */}
-      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        <span className="text-emerald-600 font-semibold">🎉 Closing Won</span>
-        <span className="text-emerald-700 font-medium">{lead.companyName}</span>
-        {lead.countryCode      && <span className="text-emerald-600">{lead.countryCode}</span>}
-        {lead.packageInterest  && <span className="text-emerald-600 bg-emerald-100 rounded-full px-2 py-0.5">{lead.packageInterest}</span>}
-        {lead.estimatedValue   && <span className="text-emerald-700 font-mono">{Number(lead.estimatedValue).toLocaleString()} est.</span>}
-        {lead.channel          && <span className="text-gray-400">via {lead.channel}</span>}
-      </div>
+      {(() => {
+        const oppType = lead.opportunityType
+        const isExpRen = oppType === 'Expansion' || oppType === 'Renewal'
+        const bannerLabel = oppType === 'Expansion' ? '📈 Expansion Deal' : oppType === 'Renewal' ? '🔄 Renewal' : '🎉 Closing Won'
+        return (
+          <div className={`border rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm ${isExpRen ? 'bg-indigo-50 border-indigo-200' : 'bg-emerald-50 border-emerald-200'}`}>
+            <span className={`font-semibold ${isExpRen ? 'text-indigo-600' : 'text-emerald-600'}`}>{bannerLabel}</span>
+            <span className={`font-medium ${isExpRen ? 'text-indigo-700' : 'text-emerald-700'}`}>{lead.account?.name || lead.companyName}</span>
+            {lead.countryCode     && <span className={isExpRen ? 'text-indigo-600' : 'text-emerald-600'}>{lead.countryCode}</span>}
+            {lead.packageInterest && <span className={`rounded-full px-2 py-0.5 ${isExpRen ? 'text-indigo-600 bg-indigo-100' : 'text-emerald-600 bg-emerald-100'}`}>{lead.packageInterest}</span>}
+            {lead.estimatedValue  && <span className={`font-mono ${isExpRen ? 'text-indigo-700' : 'text-emerald-700'}`}>{Number(lead.estimatedValue).toLocaleString()} est.</span>}
+            {lead.channel         && <span className="text-gray-400">via {lead.channel}</span>}
+            {isExpRen             && <span className="text-xs text-indigo-500 italic">Existing account — no new account will be created</span>}
+          </div>
+        )
+      })()}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -264,27 +334,36 @@ export default function CloseDealPage() {
         <div className="lg:col-span-2 space-y-5">
 
           {/* Account Details */}
-          <Section title="Account Details">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Account Name *</label>
-                <input className={fc('accountName')} value={account.accountName} onChange={setA('accountName')} placeholder="e.g. Al Baik Restaurant Group" />
-                {errors.accountName && <p className="text-xs text-red-500 mt-1">{errors.accountName}</p>}
+          {lead.opportunityType === 'Expansion' || lead.opportunityType === 'Renewal' ? (
+            <Section title="Account">
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 text-sm">
+                <p className="font-semibold text-indigo-800">{lead.account?.name || account.accountName}</p>
+                <p className="text-indigo-500 text-xs mt-0.5">Existing account · deal will be added to this account's history</p>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Number of Brands</label>
-                <input type="number" min={1} className={fc('brands')} value={account.brands} onChange={setA('brands')} />
+            </Section>
+          ) : (
+            <Section title="Account Details">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Account Name *</label>
+                  <input className={fc('accountName')} value={account.accountName} onChange={setA('accountName')} placeholder="e.g. Al Baik Restaurant Group" />
+                  {errors.accountName && <p className="text-xs text-red-500 mt-1">{errors.accountName}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Number of Brands</label>
+                  <input type="number" min={1} className={fc('brands')} value={account.brands} onChange={setA('brands')} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Total Branches</label>
+                  <input type="number" min={1} className={fc('numberOfBranches')} value={account.numberOfBranches} onChange={setA('numberOfBranches')} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Cost Centres</label>
+                  <input type="number" min={0} className={fc('numberOfCostCentres')} value={account.numberOfCostCentres} onChange={setA('numberOfCostCentres')} placeholder="Optional" />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Total Branches</label>
-                <input type="number" min={1} className={fc('numberOfBranches')} value={account.numberOfBranches} onChange={setA('numberOfBranches')} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Cost Centres</label>
-                <input type="number" min={0} className={fc('numberOfCostCentres')} value={account.numberOfCostCentres} onChange={setA('numberOfCostCentres')} placeholder="Optional" />
-              </div>
-            </div>
-          </Section>
+            </Section>
+          )}
 
           {/* Deal Configuration */}
           <Section title="Contract & Deal Configuration">
@@ -303,6 +382,12 @@ export default function CloseDealPage() {
                   {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
                 </select>
                 {errors.countryCode && <p className="text-xs text-red-500 mt-1">{errors.countryCode}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Sales Channel *</label>
+                <select className={fc('salesChannel')} value={deal.salesChannel} onChange={setD('salesChannel')}>
+                  {CHANNELS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Package *</label>
@@ -334,12 +419,6 @@ export default function CloseDealPage() {
                 <input type="date" className={fc('startDate')} value={deal.startDate} onChange={setD('startDate')} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Sales Channel</label>
-                <select className={fc('salesChannel')} value={deal.salesChannel} onChange={setD('salesChannel')}>
-                  {CHANNELS.map((c) => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Sales Agent *</label>
                 <select className={fc('agentId')} value={deal.agentId} onChange={setD('agentId')}>
                   <option value="">Select agent…</option>
@@ -358,45 +437,90 @@ export default function CloseDealPage() {
             </div>
           </Section>
 
-          {/* Branch Configuration */}
+          {/* Branch Configuration + per-line discounts */}
           <Section title="Branch Configuration">
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Normal Branches</label>
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide pb-1 border-b border-gray-100">
+                <span>Branch Type</span>
+                <span>Quantity</span>
+                <span>Line Discount</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 items-center">
+                <label className="text-sm text-gray-700">Normal Branches</label>
                 <input type="number" min={0} className={fc('normalBranches')} value={deal.normalBranches} onChange={setD('normalBranches')} />
+                {hasBranches ? <DiscountInput value={lineDiscounts.inventory} onChange={setLD('inventory')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Central Kitchens</label>
+              <div className="grid grid-cols-3 gap-2 items-center">
+                <label className="text-sm text-gray-700">Central Kitchens</label>
                 <input type="number" min={0} className={fc('centralKitchens')} value={deal.centralKitchens} onChange={setD('centralKitchens')} />
+                {hasCK ? <DiscountInput value={lineDiscounts.ck} onChange={setLD('ck')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Warehouses</label>
+              <div className="grid grid-cols-3 gap-2 items-center">
+                <label className="text-sm text-gray-700">Warehouses</label>
                 <input type="number" min={0} className={fc('warehouses')} value={deal.warehouses} onChange={setD('warehouses')} />
+                {hasWarehouse ? <DiscountInput value={lineDiscounts.warehouse} onChange={setLD('warehouse')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
               </div>
             </div>
           </Section>
 
-          {/* Add-on Modules */}
+          {/* Add-on Modules + per-line discounts */}
           <Section title="Add-on Modules">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-3">
-                <input type="checkbox" id="hasAccounting" checked={deal.hasAccounting} onChange={setD('hasAccounting')} className="w-4 h-4 accent-indigo-600" />
-                <label htmlFor="hasAccounting" className="text-sm text-gray-700 font-medium">Accounting Module</label>
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide pb-1 border-b border-gray-100">
+                <span className="col-span-2">Module</span>
+                <span>Line Discount</span>
               </div>
+
+              {/* Accounting Main */}
+              <div className="grid grid-cols-3 gap-2 items-center">
+                <div className="col-span-2 flex items-center gap-2">
+                  <input type="checkbox" id="hasAccounting" checked={deal.hasAccounting} onChange={setD('hasAccounting')} className="w-4 h-4 accent-indigo-600" />
+                  <label htmlFor="hasAccounting" className="text-sm text-gray-700">Accounting (Main License)</label>
+                </div>
+                {deal.hasAccounting ? <DiscountInput value={lineDiscounts.accMain} onChange={setLD('accMain')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
+              </div>
+
+              {/* Accounting Extra Branches */}
               {deal.hasAccounting && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Extra Accounting Branches</label>
-                  <input type="number" min={0} className={fc('extraAccountingBranches')} value={deal.extraAccountingBranches} onChange={setD('extraAccountingBranches')} />
+                <div className="grid grid-cols-3 gap-2 items-center ml-6">
+                  <div className="col-span-1">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Extra Acct. Branches</label>
+                    <input type="number" min={0} className={fc('extraAccountingBranches')} value={deal.extraAccountingBranches} onChange={setD('extraAccountingBranches')} />
+                  </div>
+                  <div />
+                  {Number(deal.extraAccountingBranches) > 0
+                    ? <DiscountInput value={lineDiscounts.accExtra} onChange={setLD('accExtra')} />
+                    : <span className="text-gray-300 text-xs pl-1">—</span>}
                 </div>
               )}
-              <div className="flex items-center gap-3">
-                <input type="checkbox" id="hasButchering" checked={deal.hasButchering} onChange={setD('hasButchering')} className="w-4 h-4 accent-indigo-600" />
-                <label htmlFor="hasButchering" className="text-sm text-gray-700 font-medium">Butchering Module</label>
+
+              {/* Butchering */}
+              <div className="grid grid-cols-3 gap-2 items-center">
+                <div className="col-span-2 flex items-center gap-2">
+                  <input type="checkbox" id="hasButchering" checked={deal.hasButchering} onChange={setD('hasButchering')} className="w-4 h-4 accent-indigo-600" />
+                  <label htmlFor="hasButchering" className="text-sm text-gray-700">Butchering Module</label>
+                </div>
+                {deal.hasButchering ? <DiscountInput value={lineDiscounts.butchering} onChange={setLD('butchering')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">AI Agent Named Users</label>
-                <input type="number" min={0} className={fc('aiAgentUsers')} value={deal.aiAgentUsers} onChange={setD('aiAgentUsers')} />
+
+              {/* AI Agent */}
+              <div className="grid grid-cols-3 gap-2 items-center">
+                <div className="col-span-1">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">AI Agent Named Users</label>
+                  <input type="number" min={0} className={fc('aiAgentUsers')} value={deal.aiAgentUsers} onChange={setD('aiAgentUsers')} />
+                </div>
+                <div />
+                {hasAI ? <DiscountInput value={lineDiscounts.ai} onChange={setLD('ai')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
               </div>
+            </div>
+          </Section>
+
+          {/* Overall Discount */}
+          <Section title="Discount">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Overall Deal Discount (%)</label>
+              <DiscountInput value={deal.discount} onChange={(v) => setDeal((p) => ({ ...p, discount: v }))} placeholder="0" />
+              <p className="text-xs text-gray-400 mt-1.5">Applied after per-line discounts, before quarterly premium (+6%).</p>
             </div>
           </Section>
 
@@ -424,28 +548,87 @@ export default function CloseDealPage() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Live Preview</p>
 
             {!summary ? (
-              <p className="text-sm text-gray-400">Select country and package to see pricing.</p>
+              <p className="text-sm text-gray-400">Select country, channel, and package to see pricing.</p>
             ) : (
               <div className="space-y-3">
-                <PreviewRow label="Branch MRR"     value={fmt(summary.branchMRR, currency)} />
-                <PreviewRow label="Accounting MRR" value={fmt(summary.accountingMRR, currency)} />
-                <PreviewRow label="Add-on MRR"     value={fmt(summary.flatMRR, currency)} />
+                {/* Per-component annual values */}
+                {summary.invGross > 0 && (
+                  <PreviewRow
+                    label={`Normal Branches${Number(lineDiscounts.inventory) > 0 ? ` −${lineDiscounts.inventory}%` : ''}`}
+                    value={fmt(summary.invNet, currency)}
+                  />
+                )}
+                {summary.ckGross > 0 && (
+                  <PreviewRow
+                    label={`Central Kitchens${Number(lineDiscounts.ck) > 0 ? ` −${lineDiscounts.ck}%` : ''}`}
+                    value={fmt(summary.ckNet, currency)}
+                  />
+                )}
+                {summary.wGross > 0 && (
+                  <PreviewRow
+                    label={`Warehouses${Number(lineDiscounts.warehouse) > 0 ? ` −${lineDiscounts.warehouse}%` : ''}`}
+                    value={fmt(summary.wNet, currency)}
+                  />
+                )}
+                {summary.accMainGross > 0 && (
+                  <PreviewRow
+                    label={`Acct. Main${Number(lineDiscounts.accMain) > 0 ? ` −${lineDiscounts.accMain}%` : ''}`}
+                    value={fmt(summary.accMainNet, currency)}
+                  />
+                )}
+                {summary.accExtraGross > 0 && (
+                  <PreviewRow
+                    label={`Acct. Extra${Number(lineDiscounts.accExtra) > 0 ? ` −${lineDiscounts.accExtra}%` : ''}`}
+                    value={fmt(summary.accExtraNet, currency)}
+                  />
+                )}
+                {summary.butchGross > 0 && (
+                  <PreviewRow
+                    label={`Butchering${Number(lineDiscounts.butchering) > 0 ? ` −${lineDiscounts.butchering}%` : ''}`}
+                    value={fmt(summary.butchNet, currency)}
+                  />
+                )}
+                {summary.aiGross > 0 && (
+                  <PreviewRow
+                    label={`AI Agent${Number(lineDiscounts.ai) > 0 ? ` −${lineDiscounts.ai}%` : ''}`}
+                    value={fmt(summary.aiNet, currency)}
+                  />
+                )}
+
+                {/* Aggregates */}
                 <div className="border-t border-gray-100 pt-3 space-y-2">
-                  <PreviewRow label="Total MRR (excl. VAT)" value={fmt(summary.totalMRR, currency)} bold />
+                  <PreviewRow label="Base Annual" value={fmt(summary.baseAnnual, currency)} />
+                  {summary.discountAmt > 0 && (
+                    <PreviewRow label={`Overall Discount (−${deal.discount}%)`} value={`−${fmt(summary.discountAmt, currency)}`} highlight />
+                  )}
+                  <PreviewRow label="Discounted Annual" value={fmt(summary.discountedAnnual, currency)} bold />
+                  {deal.paymentType === 'Quarterly' && (
+                    <PreviewRow label="Quarterly Premium (+6%)" value={`+${fmt(summary.effectiveAnnual - summary.discountedAnnual, currency)}`} />
+                  )}
+                  <PreviewRow label="Effective Annual" value={fmt(summary.effectiveAnnual, currency)} bold />
+                </div>
+
+                {/* MRR */}
+                <div className="border-t border-gray-100 pt-3 space-y-2">
+                  <PreviewRow label="MRR (excl. VAT)" value={fmt(summary.totalMRR, currency)} bold />
                   <PreviewRow label={`VAT (${(vatRate * 100).toFixed(0)}%)`} value={fmt(summary.totalMRR * vatRate, currency)} />
-                  <PreviewRow label="Total MRR (incl. VAT)" value={fmt(summary.totalMRRInclVAT, currency)} bold />
+                  <PreviewRow label="MRR (incl. VAT)" value={fmt(summary.totalMRRInclVAT, currency)} />
                 </div>
+
+                {/* Contract value */}
                 <div className="border-t border-gray-100 pt-3 space-y-2">
-                  <PreviewRow label="Contract Months"            value={`${summary.contractMonths} months`} />
-                  <PreviewRow label="Contract Value (excl. VAT)" value={fmt(summary.contractValue, currency)} bold />
-                  <PreviewRow label="Contract Value (incl. VAT)" value={fmt(summary.contractValueInclVAT, currency)} bold />
+                  <PreviewRow label="Contract Months" value={`${summary.contractMonths} months`} />
+                  <PreviewRow label="Contract Value (excl.)" value={fmt(summary.contractValue, currency)} bold />
+                  <PreviewRow label="Contract Value (incl.)" value={fmt(summary.contractValueInclVAT, currency)} bold />
                 </div>
+
                 {deal.paymentType === 'Quarterly' && (
                   <div className="border-t border-gray-100 pt-3 space-y-2">
-                    <PreviewRow label="Quarterly Billing (excl.)" value={fmt(summary.quarterlyBilling, currency)} />
-                    <PreviewRow label="Quarterly Billing (incl.)" value={fmt(summary.quarterlyBillingInclVAT, currency)} />
+                    <PreviewRow label="Per Invoice (excl.)" value={fmt(summary.quarterlyBilling, currency)} />
+                    <PreviewRow label="Per Invoice (incl.)" value={fmt(summary.quarterlyBillingInclVAT, currency)} />
                   </div>
                 )}
+
                 <div className="border-t border-gray-100 pt-3 text-xs text-gray-500">
                   {invoiceCount} invoice{invoiceCount > 1 ? 's' : ''} will be generated
                 </div>
@@ -462,14 +645,20 @@ export default function CloseDealPage() {
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-1.5 text-sm">
               <p><span className="text-gray-500">Account:</span> <span className="font-semibold">{account.accountName}</span></p>
               <p><span className="text-gray-500">Country:</span> {selectedCountry?.name || deal.countryCode}</p>
-              <p><span className="text-gray-500">Package:</span> {deal.package} · {deal.posSystem}</p>
+              <p><span className="text-gray-500">Channel · Package:</span> {deal.salesChannel} · {deal.package}</p>
               <p><span className="text-gray-500">Payment:</span> {deal.paymentType}{deal.paymentType === 'Special' ? ` (${deal.contractYears} yr)` : ''}</p>
+              {summary.discountAmt > 0 && (
+                <p><span className="text-gray-500">Discount:</span> <span className="text-indigo-600 font-medium">−{deal.discount}% overall</span></p>
+              )}
               <p><span className="text-gray-500">MRR (excl. VAT):</span> <span className="font-mono font-semibold">{fmt(summary.totalMRR, currency)}</span></p>
               <p><span className="text-gray-500">Contract Value (incl. VAT):</span> <span className="font-mono font-semibold">{fmt(summary.contractValueInclVAT, currency)}</span></p>
-              <p><span className="text-gray-500">Invoices to generate:</span> <span className="font-semibold">{invoiceCount}</span></p>
+              <p><span className="text-gray-500">Invoices:</span> <span className="font-semibold">{invoiceCount}</span></p>
             </div>
             <p className="text-sm text-gray-600">
-              This will <strong>create the CRM account</strong>, <strong>record the deal</strong>, and <strong>generate {invoiceCount} invoice{invoiceCount > 1 ? 's' : ''}</strong> — all in one step. The lead will be marked as <strong>Closed Won</strong>.
+              {lead.opportunityType === 'Expansion' || lead.opportunityType === 'Renewal'
+                ? <>This will <strong>record the deal</strong> against the existing account and <strong>generate {invoiceCount} invoice{invoiceCount > 1 ? 's' : ''}</strong>. The opportunity will be marked as <strong>Closed Won</strong>.</>
+                : <>This will <strong>create the CRM account</strong>, <strong>record the deal</strong>, and <strong>generate {invoiceCount} invoice{invoiceCount > 1 ? 's' : ''}</strong> — all in one step. The lead will be marked as <strong>Closed Won</strong>.</>
+              }
             </p>
             {closeMutation.error && (
               <p className="text-sm text-red-500">{closeMutation.error.message}</p>
@@ -480,7 +669,10 @@ export default function CloseDealPage() {
                 disabled={closeMutation.isPending}
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors"
               >
-                {closeMutation.isPending ? 'Creating…' : 'Confirm & Create Account'}
+                {closeMutation.isPending ? 'Creating…'
+                  : (lead.opportunityType === 'Expansion' || lead.opportunityType === 'Renewal')
+                    ? 'Confirm & Record Deal'
+                    : 'Confirm & Create Account'}
               </button>
               <button
                 onClick={() => setModal(null)}

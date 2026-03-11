@@ -17,6 +17,7 @@ enum LeadSource {
   AmbassadorReferral
   DirectSales
   Sonic
+  Historical
 }
 
 enum ContractType {
@@ -83,12 +84,7 @@ enum DealType {
   New
   Renewal
   Upsell
-}
-
-enum BranchType {
-  Normal
-  CentralKitchen
-  Warehouse
+  Expansion
 }
 
 // ─── Country (dynamic DB table) ───────────────────────────────────────────────
@@ -119,12 +115,13 @@ model Account {
   brands              Int        @default(1)
   numberOfBranches    Int        @default(1)
   numberOfCostCentres Int?
+  externalCode        String?
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 
   contracts  Contract[]
   country    Country            @relation(fields: [countryId], references: [id])
-  lead       Lead?
+  leads      Lead[]
   deals      Deal[]
   onboarding OnboardingTracker?
 
@@ -160,6 +157,7 @@ model ContractItem {
   description String
   quantity    Int         @default(1)
   unitPrice   Decimal     @db.Decimal(14, 2)
+  discountPct Decimal?    @db.Decimal(5, 2)   // per-line discount %
   paymentPlan PaymentPlan
   lineTotal   Decimal     @db.Decimal(14, 2)
   createdAt   DateTime    @default(now())
@@ -280,41 +278,43 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// ─── Invoicing: Pricing Tables ────────────────────────────────────────────────
+// ─── Invoicing: Pricing Tables (new — annual, by channel, with history) ──────
 
-model BranchPricing {
-  id          Int        @id @default(autoincrement())
-  countryCode String
-  package     InvoicePkg
-  branchType  BranchType
-  price       Decimal    @db.Decimal(14, 2)
-  currency    String
-
-  @@unique([countryCode, package, branchType])
-  @@map("branch_pricing")
+enum AddOnModule {
+  CentralKitchen
+  Warehouse
+  AccountingMain
+  AccountingExtra
+  Butchering
+  AIAgent
 }
 
-model AccountingPricing {
-  id            Int        @id @default(autoincrement())
-  countryCode   String
-  package       InvoicePkg
-  isMainLicense Boolean
-  price         Decimal    @db.Decimal(14, 2)
-  currency      String
+model InventoryPricing {
+  id           Int        @id @default(autoincrement())
+  countryCode  String
+  salesChannel LeadSource
+  package      InvoicePkg
+  annualPrice  Decimal    @db.Decimal(14, 2)
+  currency     String
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  createdAt    DateTime   @default(now())
 
-  @@unique([countryCode, package, isMainLicense])
-  @@map("accounting_pricing")
+  @@map("inventory_pricing")
 }
 
-model FlatModulePricing {
-  id          Int     @id @default(autoincrement())
-  countryCode String
-  module      String  // Butchering | AIAgent
-  price       Decimal @db.Decimal(14, 2)
-  currency    String
+model AddOnPricing {
+  id           Int         @id @default(autoincrement())
+  countryCode  String
+  salesChannel LeadSource
+  module       AddOnModule
+  annualPrice  Decimal     @db.Decimal(14, 2)
+  currency     String
+  effectiveFrom DateTime   @default(now())
+  effectiveTo   DateTime?
+  createdAt    DateTime    @default(now())
 
-  @@unique([countryCode, module])
-  @@map("flat_module_pricing")
+  @@map("addon_pricing")
 }
 
 // ─── Invoicing: Deal (Sales Log) ──────────────────────────────────────────────
@@ -322,16 +322,17 @@ model FlatModulePricing {
 model Deal {
   id                    Int            @id @default(autoincrement())
   startDate             DateTime
-  agentId               String
+  agentId               String?
   accountName           String
-  brandNames            String
+  brandNames            String?
   numberOfBrands        Int            @default(1)
   dealType              DealType
-  posSystem             POSSystem
+  posSystem             POSSystem?
   countryCode           String
   salesChannel          String?
-  package               InvoicePkg
+  package               InvoicePkg?
   paymentType           InvoicePayType
+  isHistorical          Boolean        @default(false)
   contractYears         Int?
   normalBranches        Int            @default(0)
   centralKitchens       Int            @default(0)
@@ -341,6 +342,8 @@ model Deal {
   hasButchering         Boolean        @default(false)
   aiAgentUsers          Int            @default(0)
   notes                 String?
+
+  discount              Decimal?       @db.Decimal(5, 2)   // overall deal discount %
 
   // Snapshot of calculated values at confirmation (immutable)
   totalMRR              Decimal        @db.Decimal(14, 2)
@@ -353,7 +356,7 @@ model Deal {
   accountId Int?
   createdAt DateTime @default(now())
 
-  agent      User               @relation(fields: [agentId], references: [id])
+  agent      User?              @relation(fields: [agentId], references: [id])
   invoices   Invoice[]
   account    Account?           @relation(fields: [accountId], references: [id])
   onboarding OnboardingTracker?
@@ -452,7 +455,8 @@ model Lead {
   expectedCloseDate DateTime?
   ownerId           String
   owner             User        @relation("UserLeads", fields: [ownerId], references: [id])
-  accountId         Int?        @unique
+  opportunityType   DealType?
+  accountId         Int?
   account           Account?    @relation(fields: [accountId], references: [id])
   convertedAt       DateTime?
   createdAt         DateTime    @default(now())

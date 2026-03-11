@@ -15,7 +15,7 @@ export default function AccountsPage() {
   const qc = useQueryClient()
   const [filters, setFilters] = useState({ country: '', leadSource: '' })
   const [search, setSearch] = useState('')
-  const [modal, setModal] = useState(null)       // 'create' | { edit: account }
+  const [modal, setModal] = useState(null)       // { edit: account }
   const [churnTarget, setChurnTarget] = useState(null) // account row to churn
 
   const { data: accounts = [], isLoading } = useQuery({
@@ -26,11 +26,6 @@ export default function AccountsPage() {
       if (filters.leadSource) p.set('leadSource', filters.leadSource)
       return fetch(`/api/accounts?${p}`).then((r) => r.json())
     },
-  })
-
-  const create = useMutation({
-    mutationFn: (data) => fetch('/api/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then((r) => r.json()),
-    onSuccess: () => { qc.invalidateQueries(['accounts']); setModal(null) },
   })
 
   const update = useMutation({
@@ -104,20 +99,19 @@ export default function AccountsPage() {
         />
         <div className="flex-1" />
         <a href="/api/export/csv?type=accounts" className="text-xs text-gray-500 border border-gray-200 bg-white px-3 py-2 rounded-xl hover:bg-gray-50">↓ Export</a>
-        <button onClick={() => setModal('create')} className="bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors">+ New Account</button>
       </div>
 
       {isLoading ? <div className="animate-pulse h-64 bg-gray-200 rounded-2xl" /> : (
         <DataTable columns={columns} data={displayed} exportFilename="accounts.csv" />
       )}
 
-      {/* Edit / Create modal */}
-      <Modal isOpen={!!modal} onClose={() => setModal(null)} title={modal?.edit ? 'Edit Account' : 'New Account'}>
+      {/* Edit modal */}
+      <Modal isOpen={!!modal} onClose={() => setModal(null)} title="Edit Account">
         <AccountForm
           initial={modal?.edit || {}}
-          onSubmit={(data) => modal?.edit ? update.mutate({ id: modal.edit.id, data }) : create.mutate(data)}
+          onSubmit={(data) => update.mutate({ id: modal.edit.id, data })}
           onCancel={() => setModal(null)}
-          loading={create.isPending || update.isPending}
+          loading={update.isPending}
         />
       </Modal>
 

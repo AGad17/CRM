@@ -44,6 +44,18 @@ const PACKAGES  = ['Essential', 'Operations', 'Enterprise']
 
 const COUNTRY_CURRENCY = { Egypt: 'EGP', KSA: 'SAR', UAE: 'AED', Bahrain: 'BHD', Jordan: 'JOD' }
 
+const OPP_TYPES = [
+  { key: 'New',       label: 'New',       desc: 'Brand new account — no prior relationship', icon: '✨' },
+  { key: 'Expansion', label: 'Expansion', desc: 'Existing account adding more branches or modules', icon: '📈' },
+  { key: 'Renewal',   label: 'Renewal',   desc: 'Existing account renewing their current contract', icon: '🔄' },
+]
+
+const OPP_COLORS = {
+  New:       'bg-indigo-100 text-indigo-700',
+  Expansion: 'bg-emerald-100 text-emerald-700',
+  Renewal:   'bg-amber-100 text-amber-700',
+}
+
 const EMPTY_FORM = {
   companyName: '', contactName: '', contactEmail: '', contactPhone: '',
   channel: '', countryCode: '', estimatedValue: '', packageInterest: '',
@@ -204,6 +216,11 @@ function LeadCard({ lead, onStageAction, onEdit, isAdmin }) {
 
       {/* Tags */}
       <div className="flex flex-wrap gap-1">
+        {lead.opportunityType && (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${OPP_COLORS[lead.opportunityType] || 'bg-gray-100 text-gray-600'}`}>
+            {lead.opportunityType}
+          </span>
+        )}
         <ChannelBadge channel={lead.channel} />
         {lead.countryCode && (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{lead.countryCode}</span>
@@ -251,9 +268,8 @@ function CardActions({ lead, onStageAction, isAdmin }) {
   )
   if (stage === 'Qualified') return (
     <div className="flex flex-wrap gap-1.5 pt-1 border-t border-gray-100">
-      <button onClick={() => onStageAction(lead, 'ClosedWon')} className="flex-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg px-2 py-1.5 font-medium transition-colors">Won ✓</button>
+      <button onClick={() => onStageAction(lead, 'ClosedWon')} className="flex-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg px-2 py-1.5 font-medium transition-colors">Close Won ✓</button>
       <button onClick={() => onStageAction(lead, 'ClosedLost')} className="flex-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded-lg px-2 py-1.5 font-medium transition-colors">✗ Lost</button>
-      <button onClick={() => onStageAction(lead, 'StartDeal')} className="w-full text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg px-2 py-1.5 font-medium transition-colors">🚀 Start Deal</button>
       <button onClick={() => onStageAction(lead, 'Lead')} className="w-full text-xs text-gray-400 hover:text-gray-600 rounded-lg px-2 py-1 transition-colors text-center">← Move back to Lead</button>
     </div>
   )
@@ -285,12 +301,17 @@ export default function PipelinePage() {
   const [ownerFilter, setOwnerFilter] = useState('')
 
   // Modals
-  // null | 'create' | { edit: lead } | { confirmStage: { lead, stage } } | { confirmLoss: lead } | { confirmChurn: lead } | 'migrate'
+  // null | 'create' | { edit: lead } | { confirmLoss: lead } | { confirmChurn: lead } | 'migrate'
   const [modal, setModal] = useState(null)
   const [lostReason, setLostReason] = useState('')
   const [formData, setFormData] = useState(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState({})
   const [migrateResult, setMigrateResult] = useState(null)
+
+  // New Opportunity flow
+  const [oppType, setOppType] = useState(null)           // null | 'New' | 'Expansion' | 'Renewal'
+  const [accountSearch, setAccountSearch] = useState('')
+  const [selectedAccount, setSelectedAccount] = useState(null)
 
   // ── Data ──
   const { data: leads = [], isLoading } = useQuery({
@@ -301,6 +322,11 @@ export default function PipelinePage() {
   const { data: agents = [] } = useQuery({
     queryKey: ['invoicing-agents'],
     queryFn: () => fetch('/api/invoicing/agents').then((r) => r.json()),
+  })
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['crm-accounts'],
+    queryFn: () => fetch('/api/accounts?selector=true').then((r) => r.json()),
   })
 
   // ── Mutations ──
@@ -371,6 +397,9 @@ export default function PipelinePage() {
   function openCreate() {
     setFormData({ ...EMPTY_FORM, ownerId: session?.user?.id || '' })
     setFormErrors({})
+    setOppType(null)
+    setAccountSearch('')
+    setSelectedAccount(null)
     setModal('create')
   }
 
@@ -394,32 +423,35 @@ export default function PipelinePage() {
 
   function validateForm() {
     const e = {}
-    if (!formData.companyName.trim()) e.companyName = 'Required'
-    if (!formData.channel)            e.channel     = 'Required'
-    if (!formData.ownerId)            e.ownerId     = 'Required'
+    const isExpRen = oppType === 'Expansion' || oppType === 'Renewal'
+    if (!isExpRen && !formData.companyName.trim()) e.companyName = 'Required'
+    if (isExpRen && !selectedAccount)              e.account     = 'Select an account'
+    if (!formData.channel)                         e.channel     = 'Required'
+    if (!formData.ownerId)                         e.ownerId     = 'Required'
     return e
   }
 
   function handleSubmit() {
     const e = validateForm()
     if (Object.keys(e).length > 0) { setFormErrors(e); return }
+    const isExpRen = oppType === 'Expansion' || oppType === 'Renewal'
+    const payload = {
+      ...formData,
+      opportunityType: oppType || 'New',
+      ...(isExpRen && selectedAccount && {
+        companyName: selectedAccount.name,
+        countryCode: selectedAccount.country?.code || formData.countryCode,
+        accountId:   selectedAccount.id,
+      }),
+    }
     if (modal === 'create') {
-      createM.mutate(formData)
+      createM.mutate(payload)
     } else if (modal?.edit) {
       updateM.mutate({ id: modal.edit.id, data: formData })
     }
   }
 
   function handleStageAction(lead, action) {
-    if (action === 'StartDeal') {
-      const params = new URLSearchParams({
-        accountName: lead.companyName,
-        ...(lead.countryCode  && { country: lead.countryCode }),
-        leadId: String(lead.id),
-      })
-      router.push(`/invoicing/deal-calculator?${params.toString()}`)
-      return
-    }
     if (action === 'ClosedWon')  { router.push('/pipeline/close/' + lead.id); return }
     if (action === 'ClosedLost') { setModal({ confirmLoss:  lead }); setLostReason(''); return }
     if (action === 'Churned')    { setModal({ confirmChurn: lead }); return }
@@ -464,7 +496,6 @@ export default function PipelinePage() {
           {r.stage === 'Qualified' && <button onClick={() => handleStageAction(r, 'ClosedWon')}  className="text-xs text-emerald-600 hover:text-emerald-800 font-medium">Won</button>}
           {(r.stage === 'Lead' || r.stage === 'Qualified') && <button onClick={() => handleStageAction(r, 'ClosedLost')} className="text-xs text-red-500 hover:text-red-700 font-medium">Lost</button>}
           {r.stage === 'ClosedWon' && <button onClick={() => handleStageAction(r, 'Churned')} className="text-xs text-amber-600 hover:text-amber-800 font-medium">Churned</button>}
-          {r.stage === 'Qualified' && <button onClick={() => handleStageAction(r, 'StartDeal')} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Start Deal</button>}
           {isAdmin && <button onClick={() => { if (confirm('Delete this lead?')) deleteM.mutate(r.id) }} className="text-xs text-gray-400 hover:text-red-500 font-medium">Delete</button>}
         </div>
       ),
@@ -494,7 +525,7 @@ export default function PipelinePage() {
             <button onClick={() => setView('kanban')} className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${view === 'kanban' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>⬛ Kanban</button>
             <button onClick={() => setView('table')}  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${view === 'table'  ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>☰ Table</button>
           </div>
-          <button onClick={openCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">+ Add Lead</button>
+          <button onClick={openCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">+ New Opportunity</button>
         </div>
       </div>
 
@@ -609,16 +640,148 @@ export default function PipelinePage() {
 
       {/* ── MODALS ── */}
 
-      {/* Create / Edit Lead */}
-      <Modal isOpen={modal === 'create' || !!modal?.edit} onClose={() => setModal(null)} title={modal === 'create' ? 'New Lead' : 'Edit Lead'}>
+      {/* Create Opportunity */}
+      <Modal isOpen={modal === 'create'} onClose={() => setModal(null)} title="New Opportunity">
+        <div className="space-y-5">
+          {/* Step 1: choose type */}
+          {!oppType ? (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500">What kind of opportunity is this?</p>
+              {OPP_TYPES.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setOppType(t.key)}
+                  className="w-full flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-3 hover:border-indigo-400 hover:bg-indigo-50 transition-colors text-left"
+                >
+                  <span className="text-2xl">{t.icon}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{t.label}</p>
+                    <p className="text-xs text-gray-400">{t.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            /* Step 2: form based on type */
+            <div className="space-y-5">
+              {/* Type badge + back link */}
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setOppType(null); setSelectedAccount(null); setFormErrors({}) }} className="text-xs text-gray-400 hover:text-gray-700 underline">← Back</button>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${OPP_COLORS[oppType]}`}>{oppType}</span>
+              </div>
+
+              {/* Expansion / Renewal: account selector */}
+              {(oppType === 'Expansion' || oppType === 'Renewal') ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Select Account *</label>
+                    <input
+                      type="text"
+                      placeholder="Search accounts…"
+                      value={accountSearch}
+                      onChange={(e) => { setAccountSearch(e.target.value); setSelectedAccount(null) }}
+                      className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${formErrors.account ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white'}`}
+                    />
+                    {formErrors.account && <p className="text-xs text-red-500 mt-0.5">{formErrors.account}</p>}
+                    {accountSearch && !selectedAccount && (
+                      <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm max-h-48 overflow-y-auto">
+                        {accounts
+                          .filter((a) => a.name.toLowerCase().includes(accountSearch.toLowerCase()))
+                          .slice(0, 8)
+                          .map((a) => (
+                            <button
+                              key={a.id}
+                              onClick={() => { setSelectedAccount(a); setAccountSearch(a.name) }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 border-b border-gray-100 last:border-0"
+                            >
+                              <span className="font-medium text-gray-900">{a.name}</span>
+                              <span className="text-gray-400 text-xs ml-2">{a.country?.code} · {a.numberOfBranches} branches</span>
+                            </button>
+                          ))
+                        }
+                        {accounts.filter((a) => a.name.toLowerCase().includes(accountSearch.toLowerCase())).length === 0 && (
+                          <p className="px-3 py-2 text-sm text-gray-400">No accounts found</p>
+                        )}
+                      </div>
+                    )}
+                    {selectedAccount && (
+                      <div className="mt-1 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 text-sm flex items-center justify-between">
+                        <span><span className="font-semibold text-indigo-800">{selectedAccount.name}</span> <span className="text-indigo-500 text-xs">{selectedAccount.country?.code} · {selectedAccount.numberOfBranches} branches</span></span>
+                        <button onClick={() => { setSelectedAccount(null); setAccountSearch('') }} className="text-indigo-400 hover:text-indigo-700 text-xs">✕</button>
+                      </div>
+                    )}
+                  </div>
+                  {/* Lead details for expansion/renewal (no company name — taken from account) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Channel *</label>
+                      <select
+                        className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${formErrors.channel ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white'}`}
+                        value={formData.channel} onChange={(e) => setFormData((p) => ({ ...p, channel: e.target.value }))}>
+                        <option value="">Select channel…</option>
+                        {Object.entries(CHANNEL_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                      {formErrors.channel && <p className="text-xs text-red-500 mt-0.5">{formErrors.channel}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Owner *</label>
+                      <select
+                        className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${formErrors.ownerId ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white'}`}
+                        value={formData.ownerId} onChange={(e) => setFormData((p) => ({ ...p, ownerId: e.target.value }))}>
+                        <option value="">Assign to…</option>
+                        {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                      {formErrors.ownerId && <p className="text-xs text-red-500 mt-0.5">{formErrors.ownerId}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Package Interest</label>
+                      <select className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        value={formData.packageInterest} onChange={(e) => setFormData((p) => ({ ...p, packageInterest: e.target.value }))}>
+                        <option value="">Any</option>
+                        {PACKAGES.map((p) => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Expected Close Date</label>
+                      <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        value={formData.expectedCloseDate} onChange={(e) => setFormData((p) => ({ ...p, expectedCloseDate: e.target.value }))} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Notes</label>
+                      <textarea rows={2} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+                        value={formData.notes} onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))} placeholder="Optional notes…" />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* New: standard lead form */
+                <LeadForm form={formData} setForm={setFormData} errors={formErrors} agents={agents} />
+              )}
+
+              {(createM.data?.error) && (
+                <p className="text-sm text-red-500">{createM.data.error}</p>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button onClick={handleSubmit} disabled={createM.isPending} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors">
+                  {createM.isPending ? 'Saving…' : `Create ${oppType} Opportunity`}
+                </button>
+                <button onClick={() => setModal(null)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Edit Lead */}
+      <Modal isOpen={!!modal?.edit} onClose={() => setModal(null)} title="Edit Opportunity">
         <div className="space-y-5">
           <LeadForm form={formData} setForm={setFormData} errors={formErrors} agents={agents} />
-          {(createM.data?.error || updateM.data?.error) && (
-            <p className="text-sm text-red-500">{createM.data?.error || updateM.data?.error}</p>
+          {updateM.data?.error && (
+            <p className="text-sm text-red-500">{updateM.data.error}</p>
           )}
           <div className="flex gap-3 pt-2">
-            <button onClick={handleSubmit} disabled={createM.isPending || updateM.isPending} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors">
-              {createM.isPending || updateM.isPending ? 'Saving…' : modal === 'create' ? 'Create Lead' : 'Save Changes'}
+            <button onClick={handleSubmit} disabled={updateM.isPending} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors">
+              {updateM.isPending ? 'Saving…' : 'Save Changes'}
             </button>
             <button onClick={() => setModal(null)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
           </div>

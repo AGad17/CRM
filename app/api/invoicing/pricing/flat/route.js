@@ -1,14 +1,4 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
-import { upsertFlatModulePricing } from '@/lib/db/invoicing'
-
-export async function POST(request) {
-  const { error } = await requireAuth('write')
-  if (error) return error
-  const body = await request.json()
-  if (!Array.isArray(body.rows) || body.rows.length === 0) {
-    return NextResponse.json({ error: 'rows[] required' }, { status: 400 })
-  }
-  const config = await upsertFlatModulePricing(body.rows)
-  return NextResponse.json(config)
-}
+// Removed — use /api/invoicing/pricing/addon instead
+export async function GET()  { return NextResponse.json({ error: 'Removed. Use /api/invoicing/pricing/addon' }, { status: 410 }) }
+export async function POST() { return NextResponse.json({ error: 'Removed. Use /api/invoicing/pricing/addon' }, { status: 410 }) }

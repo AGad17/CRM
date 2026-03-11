@@ -26,17 +26,21 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: 'Lead is already closed' }, { status: 400 })
   }
 
-  // Fetch country by code (full name in this DB, e.g. "Egypt", "KSA")
+  // Fetch country
   const country = await prisma.country.findFirst({ where: { code: body.country } })
   if (!country) {
     return NextResponse.json({ error: `Country not found: ${body.country}` }, { status: 400 })
   }
 
-  // Load pricing config and calculate deal summary
-  const config = await getPricingConfig()
-  const vatRate = Number(country.vatRate || 0)
+  // Load pricing config (new: inventoryPricing + addOnPricing)
+  const config      = await getPricingConfig()
+  const vatRate     = Number(country.vatRate || 0)
   const contractYears = Number(body.contractYears) || 1
+  const salesChannel  = body.salesChannel || lead.channel || 'DirectSales'
+  const discount      = Number(body.discount) || 0
+  const lineDiscounts = body.lineDiscounts || {}
 
+  // Calculate deal summary with new pricing engine
   const summary = calcDealSummary({
     normalBranches:          Number(body.normalBranches)          || 0,
     centralKitchens:         Number(body.centralKitchens)         || 0,
@@ -46,16 +50,24 @@ export async function POST(request, { params }) {
     hasButchering:           !!body.hasButchering,
     aiAgentUsers:            Number(body.aiAgentUsers)            || 0,
     countryCode:             body.country,
+    salesChannel,
     package:                 body.package,
     paymentType:             body.paymentType,
     contractYears,
     vatRate,
-    branchPricing:           config.branchPricing,
-    accountingPricing:       config.accountingPricing,
-    flatModulePricing:       config.flatModulePricing,
+    discount,
+    lineDiscounts,
+    inventoryPricing:        config.inventoryPricing,
+    addOnPricing:            config.addOnPricing,
   })
 
-  const invoiceDates = calcInvoiceDates(body.startDate, body.paymentType, summary.totalMRR, contractYears)
+  // effectiveAnnual is the post-discount, post-premium annual value
+  const invoiceDates = calcInvoiceDates(
+    body.startDate,
+    body.paymentType,
+    summary.effectiveAnnual,
+    contractYears
+  )
 
   // Pre-generate unique invoice numbers (with collision retry)
   const invoiceNumbers = []
@@ -96,19 +108,44 @@ export async function POST(request, { params }) {
     }
   })
 
+  // Determine if this is an expansion/renewal (existing account) or new
+  const isExistingAccount = !!lead.accountId
+
+  // Prevent duplicate account names for New opportunities
+  if (!isExistingAccount) {
+    const existing = await prisma.account.findFirst({
+      where: { name: { equals: body.accountName.trim(), mode: 'insensitive' } },
+      select: { id: true, name: true },
+    })
+    if (existing) {
+      return NextResponse.json(
+        { error: `An account named "${existing.name}" already exists (ID #${existing.id}). Use Expansion or Renewal instead.` },
+        { status: 409 }
+      )
+    }
+  }
+
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Create Account
-      const account = await tx.account.create({
-        data: {
-          name:                body.accountName.trim(),
-          leadSource:          lead.channel,
-          countryId:           country.id,
-          brands:              Number(body.brands)             || 1,
-          numberOfBranches:    Number(body.numberOfBranches)   || 1,
-          numberOfCostCentres: body.numberOfCostCentres ? Number(body.numberOfCostCentres) : null,
-        },
-      })
+      let account
+
+      if (isExistingAccount) {
+        // Expansion / Renewal — use the already-linked account
+        account = await tx.account.findUnique({ where: { id: lead.accountId } })
+        if (!account) throw new Error('Linked account not found')
+      } else {
+        // New — create the account
+        account = await tx.account.create({
+          data: {
+            name:                body.accountName.trim(),
+            leadSource:          lead.channel,
+            countryId:           country.id,
+            brands:              Number(body.brands)             || 1,
+            numberOfBranches:    Number(body.numberOfBranches)   || 1,
+            numberOfCostCentres: body.numberOfCostCentres ? Number(body.numberOfCostCentres) : null,
+          },
+        })
+      }
 
       // 2. Create Deal with nested Invoices
       const deal = await tx.deal.create({
@@ -121,7 +158,7 @@ export async function POST(request, { params }) {
           dealType:                body.dealType   || 'New',
           posSystem:               body.posSystem,
           countryCode:             body.country,
-          salesChannel:            body.salesChannel  || null,
+          salesChannel:            salesChannel,
           package:                 body.package,
           paymentType:             body.paymentType,
           contractYears:           body.paymentType === 'Special' ? contractYears : null,
@@ -133,6 +170,7 @@ export async function POST(request, { params }) {
           hasButchering:           !!body.hasButchering,
           aiAgentUsers:            Number(body.aiAgentUsers)            || 0,
           notes:                   body.notes || null,
+          discount:                discount || null,
           totalMRR:                summary.totalMRR,
           vatRate,
           totalMRRInclVAT:         summary.totalMRRInclVAT,
@@ -154,54 +192,133 @@ export async function POST(request, { params }) {
         data:  { stage: 'ClosedWon', convertedAt: new Date(), accountId: account.id },
       })
 
-      // 4. Create Onboarding Tracker with default tasks
-      await tx.onboardingTracker.create({
-        data: {
-          accountId: account.id,
-          dealId:    deal.id,
-          startDate: new Date(),
-          tasks:     { create: DEFAULT_TASKS },
-        },
-      })
+      // 4. Create Onboarding Tracker (new accounts only — existing accounts are already onboarded)
+      if (!isExistingAccount) {
+        await tx.onboardingTracker.create({
+          data: {
+            accountId: account.id,
+            dealId:    deal.id,
+            startDate: new Date(),
+            tasks:     { create: DEFAULT_TASKS },
+          },
+        })
+      }
 
-      // 5. Create Contract + ContractItems (locks unit prices at signing time)
-      const CONTRACT_TYPE_MAP = { New: 'New', Renewal: 'Renewal', Upsell: 'Expansion' }
+      // 5. Create Contract + ContractItems (locks annual unit prices at signing time)
+      const CONTRACT_TYPE_MAP = { New: 'New', Renewal: 'Renewal', Upsell: 'Expansion', Expansion: 'Expansion' }
       const contractType = CONTRACT_TYPE_MAP[body.dealType] || 'New'
       const paymentPlan  = body.paymentType === 'Quarterly' ? 'Quarterly' : 'Yearly'
       const endDate      = new Date(body.startDate)
       endDate.setMonth(endDate.getMonth() + summary.contractMonths)
 
       const items = []
-      const months = summary.contractMonths
       const cc  = body.country
+      const ch  = salesChannel
       const pkg = body.package
+      const months = summary.contractMonths
 
-      // Branch line items
-      const normalPrice = Number(config.branchPricing.find(r => r.countryCode === cc && r.package === pkg && r.branchType === 'Normal')?.price        || 0)
-      const ckPrice     = Number(config.branchPricing.find(r => r.countryCode === cc && r.package === pkg && r.branchType === 'CentralKitchen')?.price || 0)
-      const wPrice      = Number(config.branchPricing.find(r => r.countryCode === cc && r.package === pkg && r.branchType === 'Warehouse')?.price      || 0)
+      // Helper to get annual price per unit from new pricing tables
+      function getInvAnnualPrice() {
+        const row = config.inventoryPricing.find(
+          (r) => r.countryCode === cc && r.salesChannel === ch && r.package === pkg
+        )
+        return Number(row?.annualPrice || 0)
+      }
+      function getAddOnAnnualPrice(module) {
+        const row = config.addOnPricing.find(
+          (r) => r.countryCode === cc && r.salesChannel === ch && r.module === module
+        )
+        return Number(row?.annualPrice || 0)
+      }
 
-      if (Number(body.normalBranches)  > 0) items.push({ description: `${pkg} Plan – Normal Branches`,   quantity: Number(body.normalBranches),  unitPrice: normalPrice, paymentPlan, lineTotal: normalPrice * Number(body.normalBranches)  * months })
-      if (Number(body.centralKitchens) > 0) items.push({ description: `${pkg} Plan – Central Kitchens`,  quantity: Number(body.centralKitchens), unitPrice: ckPrice,     paymentPlan, lineTotal: ckPrice     * Number(body.centralKitchens) * months })
-      if (Number(body.warehouses)      > 0) items.push({ description: `${pkg} Plan – Warehouses`,         quantity: Number(body.warehouses),      unitPrice: wPrice,      paymentPlan, lineTotal: wPrice      * Number(body.warehouses)      * months })
+      // Build line items using annual unit price × qty × (months/12), with per-line discount
+      function lineTotal(annualUnitPrice, qty, lineDiscPct) {
+        const effective = annualUnitPrice * (1 - Number(lineDiscPct || 0) / 100)
+        return effective * qty * months / 12
+      }
 
-      // Accounting line items
+      const normalBranches = Number(body.normalBranches) || 0
+      const ckBranches     = Number(body.centralKitchens) || 0
+      const warehouses     = Number(body.warehouses) || 0
+
+      if (normalBranches > 0) {
+        const unitPrice = getInvAnnualPrice()
+        items.push({
+          description: `${pkg} Plan – Normal Branches`,
+          quantity:    normalBranches,
+          unitPrice:   unitPrice / 12,  // store as monthly equivalent
+          discountPct: Number(lineDiscounts.inventory) || null,
+          paymentPlan,
+          lineTotal:   lineTotal(unitPrice, normalBranches, lineDiscounts.inventory),
+        })
+      }
+      if (ckBranches > 0) {
+        const unitPrice = getAddOnAnnualPrice('CentralKitchen')
+        items.push({
+          description: 'Central Kitchen Branches',
+          quantity:    ckBranches,
+          unitPrice:   unitPrice / 12,
+          discountPct: Number(lineDiscounts.ck) || null,
+          paymentPlan,
+          lineTotal:   lineTotal(unitPrice, ckBranches, lineDiscounts.ck),
+        })
+      }
+      if (warehouses > 0) {
+        const unitPrice = getAddOnAnnualPrice('Warehouse')
+        items.push({
+          description: 'Warehouse Branches',
+          quantity:    warehouses,
+          unitPrice:   unitPrice / 12,
+          discountPct: Number(lineDiscounts.warehouse) || null,
+          paymentPlan,
+          lineTotal:   lineTotal(unitPrice, warehouses, lineDiscounts.warehouse),
+        })
+      }
       if (body.hasAccounting) {
-        const mainPrice  = Number(config.accountingPricing.find(r => r.countryCode === cc && r.package === pkg && r.isMainLicense === true)?.price  || 0)
-        const extraPrice = Number(config.accountingPricing.find(r => r.countryCode === cc && r.package === pkg && r.isMainLicense === false)?.price || 0)
-        items.push({ description: `${pkg} Plan – Accounting (Main License)`,     quantity: 1,                                    unitPrice: mainPrice,  paymentPlan, lineTotal: mainPrice  * months })
-        if (Number(body.extraAccountingBranches) > 0)
-          items.push({ description: `${pkg} Plan – Accounting (Extra Branches)`, quantity: Number(body.extraAccountingBranches), unitPrice: extraPrice, paymentPlan, lineTotal: extraPrice * Number(body.extraAccountingBranches) * months })
+        const unitPrice = getAddOnAnnualPrice('AccountingMain')
+        items.push({
+          description: 'Accounting Module (Main License)',
+          quantity:    1,
+          unitPrice:   unitPrice / 12,
+          discountPct: Number(lineDiscounts.accMain) || null,
+          paymentPlan,
+          lineTotal:   lineTotal(unitPrice, 1, lineDiscounts.accMain),
+        })
+        const extraBranches = Number(body.extraAccountingBranches) || 0
+        if (extraBranches > 0) {
+          const extraPrice = getAddOnAnnualPrice('AccountingExtra')
+          items.push({
+            description: 'Accounting Module (Extra Branches)',
+            quantity:    extraBranches,
+            unitPrice:   extraPrice / 12,
+            discountPct: Number(lineDiscounts.accExtra) || null,
+            paymentPlan,
+            lineTotal:   lineTotal(extraPrice, extraBranches, lineDiscounts.accExtra),
+          })
+        }
       }
-
-      // Flat module line items
       if (body.hasButchering) {
-        const p = Number(config.flatModulePricing.find(r => r.countryCode === cc && r.module === 'Butchering')?.price || 0)
-        items.push({ description: 'Butchering Module',     quantity: 1,                          unitPrice: p, paymentPlan, lineTotal: p * months })
+        const unitPrice = getAddOnAnnualPrice('Butchering')
+        items.push({
+          description: 'Butchering Module',
+          quantity:    1,
+          unitPrice:   unitPrice / 12,
+          discountPct: Number(lineDiscounts.butchering) || null,
+          paymentPlan,
+          lineTotal:   lineTotal(unitPrice, 1, lineDiscounts.butchering),
+        })
       }
-      if (Number(body.aiAgentUsers) > 0) {
-        const p = Number(config.flatModulePricing.find(r => r.countryCode === cc && r.module === 'AIAgent')?.price || 0)
-        items.push({ description: 'AI Agent Named Users',  quantity: Number(body.aiAgentUsers),  unitPrice: p, paymentPlan, lineTotal: p * Number(body.aiAgentUsers) * months })
+      const aiUsers = Number(body.aiAgentUsers) || 0
+      if (aiUsers > 0) {
+        const unitPrice = getAddOnAnnualPrice('AIAgent')
+        items.push({
+          description: 'AI Agent Named Users',
+          quantity:    aiUsers,
+          unitPrice:   unitPrice / 12,
+          discountPct: Number(lineDiscounts.ai) || null,
+          paymentPlan,
+          lineTotal:   lineTotal(unitPrice, aiUsers, lineDiscounts.ai),
+        })
       }
 
       await tx.contract.create({

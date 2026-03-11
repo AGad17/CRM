@@ -2,13 +2,25 @@ import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/roleGuard'
 import { updateCountryVAT } from '@/lib/db/invoicing'
 
+/**
+ * POST /api/invoicing/pricing/vat
+ * Body: { countryCode: string, vatRate: number }  (vatRate as decimal, e.g. 0.15 = 15%)
+ * Updates the VAT rate for a country and returns the full pricing config.
+ */
 export async function POST(request) {
   const { error } = await requireAuth('write')
   if (error) return error
-  const body = await request.json()
-  if (!body.countryCode || body.vatRate === undefined) {
-    return NextResponse.json({ error: 'countryCode and vatRate required' }, { status: 400 })
+
+  const { countryCode, vatRate } = await request.json()
+  if (!countryCode || vatRate === undefined || vatRate === null) {
+    return NextResponse.json({ error: 'countryCode and vatRate are required' }, { status: 400 })
   }
-  const config = await updateCountryVAT(body.countryCode, body.vatRate)
-  return NextResponse.json(config)
+
+  try {
+    const config = await updateCountryVAT(countryCode, vatRate)
+    return NextResponse.json(config)
+  } catch (err) {
+    console.error('[vat-pricing]', err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 }

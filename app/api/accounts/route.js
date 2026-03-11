@@ -1,39 +1,38 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/roleGuard'
-import { getAccounts, createAccount } from '@/lib/db/accounts'
+import { prisma } from '@/lib/prisma'
+import { getAccounts } from '@/lib/db/accounts'
 
 export async function GET(request) {
   const { error } = await requireAuth('read')
   if (error) return error
 
   const { searchParams } = new URL(request.url)
+
+  // ?selector=true → lightweight active-only list for the pipeline opportunity picker
+  if (searchParams.get('selector') === 'true') {
+    const accounts = await prisma.account.findMany({
+      select: {
+        id:               true,
+        name:             true,
+        numberOfBranches: true,
+        country:          { select: { code: true, name: true, currency: true } },
+        leads:            { select: { stage: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+      orderBy: { name: 'asc' },
+    })
+    const active = accounts.filter((a) => {
+      const lastLead = a.leads[0]
+      return !lastLead || lastLead.stage !== 'Churned'
+    })
+    return NextResponse.json(active)
+  }
+
+  // Default → full enriched list for the Accounts page
   const filters = {
-    country: searchParams.get('country') || undefined,
+    country:    searchParams.get('country')    || undefined,
     leadSource: searchParams.get('leadSource') || undefined,
   }
-
   const accounts = await getAccounts(filters)
   return NextResponse.json(accounts)
-}
-
-export async function POST(request) {
-  const { error } = await requireAuth('write')
-  if (error) return error
-
-  const body = await request.json()
-
-  if (!body.name || !body.leadSource || !body.country) {
-    return NextResponse.json({ error: 'name, leadSource, and country are required' }, { status: 400 })
-  }
-
-  const account = await createAccount({
-    name: body.name,
-    leadSource: body.leadSource,
-    country: body.country,
-    brands: Number(body.brands) || 1,
-    numberOfBranches: Number(body.numberOfBranches) || 1,
-    numberOfCostCentres: body.numberOfCostCentres ? Number(body.numberOfCostCentres) : null,
-  })
-
-  return NextResponse.json(account, { status: 201 })
 }
