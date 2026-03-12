@@ -6,12 +6,21 @@ import { DeltaBadge } from '@/components/ui/DeltaBadge'
 
 function fmt(v, type = 'number') {
   if (v === null || v === undefined) return '—'
-  if (type === 'currency') return `USD ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  if (type === 'currency') return `USD ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
   if (type === 'percent') return `${(Number(v) * 100).toFixed(1)}%`
   return Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 })
 }
 
 const SOURCES = ['Foodics', 'EmployeeReferral', 'CustomerReferral', 'PartnerReferral', 'Website', 'AmbassadorReferral', 'DirectSales', 'Sonic']
+
+function SectionHeader({ label, color = '#5061F6' }) {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: color }} />
+      <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{label}</h2>
+    </div>
+  )
+}
 
 export default function DashboardPage() {
   const [filters, setFilters] = useState({ country: '', leadSource: '' })
@@ -35,13 +44,15 @@ export default function DashboardPage() {
   if (error || !data) return <div className="text-red-500 text-sm">Failed to load dashboard</div>
 
   const { snapshot, recentMonths, priorMonth } = data
+  const hasFilters = filters.country || filters.leadSource
 
   return (
     <div className="space-y-8">
       {/* Filter Bar */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
+        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mr-1">Filter</span>
         <select
-          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white"
+          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
           value={filters.country}
           onChange={(e) => setFilters({ ...filters, country: e.target.value })}
         >
@@ -51,85 +62,93 @@ export default function DashboardPage() {
           ))}
         </select>
         <select
-          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white"
+          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
           value={filters.leadSource}
           onChange={(e) => setFilters({ ...filters, leadSource: e.target.value })}
         >
           <option value="">All Lead Sources</option>
           {SOURCES.map((s) => <option key={s} value={s}>{s.replace(/([A-Z])/g, ' $1').trim()}</option>)}
         </select>
+        {hasFilters && (
+          <button
+            onClick={() => setFilters({ country: '', leadSource: '' })}
+            className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2"
+          >
+            Clear all
+          </button>
+        )}
         {filters.country && (
-          <span className="text-xs bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full font-medium">
+          <span className="text-xs bg-[#F5F2FF] text-[#5061F6] px-2.5 py-1 rounded-full font-semibold border border-[#5061F6]/20 flex items-center gap-1">
             {countries.find((c) => c.code === filters.country)?.name || filters.country}
-            <button className="ml-1.5 hover:text-indigo-900" onClick={() => setFilters({ ...filters, country: '' })}>✕</button>
+            <button onClick={() => setFilters({ ...filters, country: '' })} className="hover:text-[#3b4cc4] ml-0.5">✕</button>
           </span>
         )}
         {filters.leadSource && (
-          <span className="text-xs bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full font-medium">
+          <span className="text-xs bg-[#F5F2FF] text-[#5061F6] px-2.5 py-1 rounded-full font-semibold border border-[#5061F6]/20 flex items-center gap-1">
             {filters.leadSource.replace(/([A-Z])/g, ' $1').trim()}
-            <button className="ml-1.5 hover:text-indigo-900" onClick={() => setFilters({ ...filters, leadSource: '' })}>✕</button>
+            <button onClick={() => setFilters({ ...filters, leadSource: '' })} className="hover:text-[#3b4cc4] ml-0.5">✕</button>
           </span>
         )}
       </div>
 
       {/* — Accounts Section — */}
       <section>
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Accounts</h2>
+        <SectionHeader label="Accounts" color="#5061F6" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KPICard label="Total Accounts" value={snapshot.totalAccounts} format="integer" />
-          <KPICard label="Active Accounts" value={snapshot.activeAccounts} format="integer" />
-          <KPICard label="Churned Accounts" value={snapshot.churnedAccounts} format="integer" />
-          <KPICard label="Overall Churn Rate" value={snapshot.overallChurnRate} format="percent" />
+          <KPICard label="Total Accounts" value={snapshot.totalAccounts} format="integer" accent="#5061F6" />
+          <KPICard label="Active Accounts" value={snapshot.activeAccounts} format="integer" accent="#49B697" />
+          <KPICard label="Churned Accounts" value={snapshot.churnedAccounts} format="integer" accent="#ef4444" />
+          <KPICard label="Overall Churn Rate" value={snapshot.overallChurnRate} format="percent" accent="#F4BF1D" />
         </div>
       </section>
 
       {/* — Revenue Section — */}
       <section>
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Revenue</h2>
+        <SectionHeader label="Revenue" color="#49B697" />
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <KPICard label="Total MRR" value={snapshot.totalMRR} format="currency" />
-          <KPICard label="Total ARR" value={snapshot.totalARR} format="currency" />
-          <KPICard label="Total ACV" value={snapshot.acv} format="currency" subLabel="annualized contract value" />
-          <KPICard label="Total Contract Value" value={snapshot.totalContractValue} format="currency" />
-          <KPICard label="ARPA" value={snapshot.arpa} format="currency" subLabel="per active account" />
-          <KPICard label="Avg ACV" value={snapshot.avgACV} format="currency" subLabel="per active contract" />
-          <KPICard label="Avg MRR / Contract" value={snapshot.avgMRRPerContract} format="currency" subLabel="active contracts only" />
+          <KPICard label="Total MRR" value={snapshot.totalMRR} format="currency" accent="#49B697" />
+          <KPICard label="Total ARR" value={snapshot.totalARR} format="currency" accent="#49B697" />
+          <KPICard label="Total ACV" value={snapshot.acv} format="currency" subLabel="annualized contract value" accent="#49B697" />
+          <KPICard label="Total Contract Value" value={snapshot.totalContractValue} format="currency" accent="#49B697" />
+          <KPICard label="ARPA" value={snapshot.arpa} format="currency" subLabel="per active account" accent="#49B697" />
+          <KPICard label="Avg ACV" value={snapshot.avgACV} format="currency" subLabel="per active contract" accent="#49B697" />
+          <KPICard label="Avg MRR / Contract" value={snapshot.avgMRRPerContract} format="currency" subLabel="active contracts only" accent="#49B697" />
         </div>
       </section>
 
       {/* — Efficiency & Ratios — */}
       <section>
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Efficiency & Ratios</h2>
+        <SectionHeader label="Efficiency & Ratios" color="#F4BF1D" />
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <KPICard label="NRR (Last Month)" value={snapshot.nrrLastMonth} format="percent" subLabel="net revenue retention" />
-          <KPICard label="NRR (Last Quarter)" value={snapshot.nrrLastQuarter} format="percent" subLabel="net revenue retention" />
-          <KPICard label="MRR per Branch" value={snapshot.mrrPerBranch} format="currency" />
-          <KPICard label="Avg Contract Duration" value={snapshot.avgContractDuration} format="integer" subLabel="months" />
-          <KPICard label="Total Contracts" value={snapshot.totalContracts} format="integer" />
-          <KPICard label="Active Contracts" value={snapshot.activeContracts} format="integer" />
+          <KPICard label="NRR (Last Month)" value={snapshot.nrrLastMonth} format="percent" subLabel="net revenue retention" accent="#F4BF1D" />
+          <KPICard label="NRR (Last Quarter)" value={snapshot.nrrLastQuarter} format="percent" subLabel="net revenue retention" accent="#F4BF1D" />
+          <KPICard label="MRR per Branch" value={snapshot.mrrPerBranch} format="currency" accent="#F4BF1D" />
+          <KPICard label="Avg Contract Duration" value={snapshot.avgContractDuration} format="integer" subLabel="months" accent="#F4BF1D" />
+          <KPICard label="Total Contracts" value={snapshot.totalContracts} format="integer" accent="#F4BF1D" />
+          <KPICard label="Active Contracts" value={snapshot.activeContracts} format="integer" accent="#F4BF1D" />
         </div>
       </section>
 
       {/* — Footprint — */}
       <section>
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Footprint</h2>
+        <SectionHeader label="Footprint" color="#C2B4FB" />
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <KPICard label="Countries Served" value={snapshot.countriesServed} format="integer" />
-          <KPICard label="Total Brands" value={snapshot.totalBrands} format="integer" />
-          <KPICard label="Total Branches" value={snapshot.totalBranches} format="integer" />
+          <KPICard label="Countries Served" value={snapshot.countriesServed} format="integer" accent="#C2B4FB" />
+          <KPICard label="Total Brands" value={snapshot.totalBrands} format="integer" accent="#C2B4FB" />
+          <KPICard label="Total Branches" value={snapshot.totalBranches} format="integer" accent="#C2B4FB" />
         </div>
       </section>
 
       {/* Recent Performance */}
       <section>
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Recent Performance</h2>
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
+        <SectionHeader label="Recent Performance" color="#5061F6" />
+        <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50">Metric</th>
+              <tr style={{ background: 'linear-gradient(to right, #F5F2FF, #FAFAFA)' }} className="border-b border-gray-100">
+                <th className="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-widest sticky left-0 bg-transparent whitespace-nowrap">Metric</th>
                 {recentMonths.map((m) => (
-                  <th key={m.label} className="px-5 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">{m.label}</th>
+                  <th key={m.label} className="px-5 py-3 text-right text-[11px] font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">{m.label}</th>
                 ))}
               </tr>
             </thead>
@@ -147,14 +166,17 @@ export default function DashboardPage() {
                 { label: 'NRR', key: 'nrr', type: 'percent' },
                 { label: 'GRR', key: 'grr', type: 'percent' },
               ].map((row) => (
-                <tr key={row.key} className="hover:bg-gray-50">
-                  <td className={`px-5 py-3 sticky left-0 bg-white whitespace-nowrap ${row.bold ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>{row.label}</td>
+                <tr key={row.key} className="hover:bg-[#F5F2FF]/40 transition-colors">
+                  <td className={`px-5 py-3 sticky left-0 bg-white whitespace-nowrap ${row.bold ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
+                    {row.bold && <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#5061F6] mr-2 mb-px" />}
+                    {row.label}
+                  </td>
                   {recentMonths.map((m, i) => {
                     const prev = recentMonths[i + 1] || priorMonth
                     const delta = prev && prev[row.key] ? (m[row.key] - prev[row.key]) / Math.abs(prev[row.key]) : null
                     return (
                       <td key={m.label} className="px-5 py-3 text-right">
-                        <div className={`font-medium ${row.bold ? 'text-gray-900' : 'text-gray-700'}`}>{fmt(m[row.key], row.type)}</div>
+                        <div className={`font-medium ${row.bold ? 'text-gray-900 font-semibold' : 'text-gray-700'}`}>{fmt(m[row.key], row.type)}</div>
                         {delta !== null && row.type !== 'percent' && <DeltaBadge value={delta} />}
                       </td>
                     )
@@ -172,12 +194,20 @@ export default function DashboardPage() {
 function LoadingSkeleton() {
   return (
     <div className="space-y-8 animate-pulse">
-      <div className="h-10 bg-gray-100 rounded-xl w-64" />
-      {[4, 5, 5, 3].map((n, si) => (
+      <div className="h-14 bg-gray-100 rounded-2xl w-full" />
+      {[
+        { n: 4, color: '#5061F6' },
+        { n: 7, color: '#49B697' },
+        { n: 6, color: '#F4BF1D' },
+        { n: 3, color: '#C2B4FB' },
+      ].map(({ n, color }, si) => (
         <div key={si}>
-          <div className="h-3 bg-gray-200 rounded w-24 mb-3" />
-          <div className={`grid grid-cols-${n} gap-4`}>
-            {[...Array(n)].map((_, i) => <div key={i} className="h-24 bg-gray-200 rounded-xl" />)}
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-1 h-4 rounded-full" style={{ background: color }} />
+            <div className="h-3 bg-gray-200 rounded w-24" />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[...Array(n)].map((_, i) => <div key={i} className="h-24 bg-gray-200 rounded-2xl" />)}
           </div>
         </div>
       ))}
