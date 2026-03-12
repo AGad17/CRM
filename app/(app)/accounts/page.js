@@ -84,7 +84,7 @@ export default function AccountsPage() {
     { key: 'actions', label: '', sortable: false, render: (r) => (
       <div className="flex items-center gap-1 justify-end">
         <button onClick={() => setModal({ edit: r })} className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100">Edit</button>
-        {r.status !== 'Churned' && (
+        {r.status !== 'Churned' && r.status !== 'No Contract' && (
           <button
             onClick={() => setChurnTarget(r)}
             className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 font-medium"
