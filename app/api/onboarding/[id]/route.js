@@ -27,7 +27,12 @@ export async function PATCH(request, { params }) {
 
     if (body.action === 'setPhase') {
       if (!body.phase) return NextResponse.json({ error: 'phase is required' }, { status: 400 })
-      const tracker = await setPhase(id, body.phase)
+      const assignments = {
+        onboardingSpecialistId: body.onboardingSpecialistId,
+        trainingSpecialistId:   body.trainingSpecialistId,
+        accountManagerId:       body.accountManagerId,
+      }
+      const tracker = await setPhase(id, body.phase, assignments)
       return NextResponse.json(tracker)
     }
 

@@ -79,9 +79,20 @@ export default function OnboardingDetailPage() {
   const [npsScore,     setNpsScore]       = useState(null)
   const [npsNotes,     setNpsNotes]       = useState('')
 
+  // Staff assignment state (used when moving to specific phases)
+  const [assignOb, setAssignOb] = useState('') // Onboarding Specialist
+  const [assignTr, setAssignTr] = useState('') // Training Specialist
+  const [assignAm, setAssignAm] = useState('') // Account Manager
+
   const { data: tracker, isLoading } = useQuery({
     queryKey: ['onboarding', id],
     queryFn: () => fetch(`/api/onboarding/${id}`).then(r => r.json()),
+  })
+
+  const { data: staffUsers = [] } = useQuery({
+    queryKey: ['staff-users'],
+    queryFn: () => fetch('/api/users/staff').then(r => r.json()),
+    staleTime: 5 * 60 * 1000,
   })
 
   const toggleMutation = useMutation({
@@ -91,14 +102,20 @@ export default function OnboardingDetailPage() {
   })
 
   const setPhaseMutation = useMutation({
-    mutationFn: (phase) =>
+    mutationFn: ({ phase, onboardingSpecialistId, trainingSpecialistId, accountManagerId }) =>
       fetch(`/api/onboarding/${id}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ action: 'setPhase', phase }),
+        body:    JSON.stringify({
+          action: 'setPhase', phase,
+          onboardingSpecialistId: onboardingSpecialistId || undefined,
+          trainingSpecialistId:   trainingSpecialistId   || undefined,
+          accountManagerId:       accountManagerId       || undefined,
+        }),
       }).then(r => r.json()),
     onSuccess: () => {
       setPendingPhase(null)
+      setAssignOb(''); setAssignTr(''); setAssignAm('')
       qc.invalidateQueries({ queryKey: ['onboarding', id] })
       qc.invalidateQueries({ queryKey: ['onboarding'] })
     },
@@ -153,6 +170,11 @@ export default function OnboardingDetailPage() {
   const pendingIdx       = pendingPhase ? PHASE_ORDER.indexOf(pendingPhase.phase) : null
   const pendingDirection = pendingIdx !== null ? (pendingIdx > currentPhaseIdx ? 'forward' : 'backward') : null
   const pendingColors    = pendingPhase ? PHASE_COLORS[pendingPhase.phase] : null
+
+  // Which assignments are required for the pending phase transition?
+  const needsObTr         = pendingPhase?.phase === 'Onboarding'
+  const needsAm           = pendingPhase?.phase === 'AccountManagement'
+  const assignmentComplete = (!needsObTr || (assignOb && assignTr)) && (!needsAm || assignAm)
 
   const pendingCsat = tracker.csatRecords?.filter(c => !c.completedAt) ?? []
   const doneCsat    = tracker.csatRecords?.filter(c =>  c.completedAt) ?? []
@@ -351,6 +373,22 @@ export default function OnboardingDetailPage() {
             </p>
           </div>
         )}
+        {(tracker.onboardingSpecialist || tracker.trainingSpecialist) && (
+          <div>
+            <p className="text-xs text-gray-400 uppercase tracking-wider">Onboarding Team</p>
+            <p className="font-medium text-gray-700 text-xs leading-relaxed">
+              {tracker.onboardingSpecialist && <span>🏗️ {tracker.onboardingSpecialist.name || tracker.onboardingSpecialist.email}</span>}
+              {tracker.onboardingSpecialist && tracker.trainingSpecialist && <br />}
+              {tracker.trainingSpecialist && <span>📚 {tracker.trainingSpecialist.name || tracker.trainingSpecialist.email}</span>}
+            </p>
+          </div>
+        )}
+        {tracker.accountManager && (
+          <div>
+            <p className="text-xs text-gray-400 uppercase tracking-wider">Account Manager</p>
+            <p className="font-medium text-gray-700">⭐ {tracker.accountManager.name || tracker.accountManager.email}</p>
+          </div>
+        )}
       </div>
 
       {/* ── Clickable Phase Stepper ─────────────────────────────────────────── */}
@@ -396,9 +434,9 @@ export default function OnboardingDetailPage() {
 
       {/* ── Move Confirmation Card ──────────────────────────────────────────── */}
       {pendingPhase && (
-        <div className={`rounded-xl border p-4 ${pendingColors.section}`}>
+        <div className={`rounded-xl border p-4 space-y-3 ${pendingColors.section}`}>
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="flex-1 min-w-0">
               <p className={`font-semibold text-sm ${pendingColors.heading}`}>
                 {pendingDirection === 'backward' ? '← Move back to' : 'Move forward to →'}{' '}
                 {PHASE_ICONS[pendingPhase.phase]} {PHASE_LABELS[pendingPhase.phase]}
@@ -418,18 +456,94 @@ export default function OnboardingDetailPage() {
                 <p className="text-xs text-gray-500 mt-1.5">Completed tasks will not be reset.</p>
               )}
             </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <button onClick={() => setPendingPhase(null)}
-                className="px-4 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">
-                Cancel
-              </button>
-              <button
-                onClick={() => setPhaseMutation.mutate(pendingPhase.phase)}
-                disabled={setPhaseMutation.isPending}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium text-white transition-colors ${pendingColors.btn}`}>
-                {setPhaseMutation.isPending ? 'Moving…' : 'Confirm'}
-              </button>
+          </div>
+
+          {/* ── Staff assignment dropdowns (only for specific phase transitions) ── */}
+          {(needsObTr || needsAm) && (
+            <div className="border-t border-gray-200 pt-3 space-y-2.5">
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Assign Staff</p>
+
+              {needsObTr && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Onboarding Specialist <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={assignOb}
+                      onChange={e => setAssignOb(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                    >
+                      <option value="">— select —</option>
+                      {staffUsers.map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.name || u.email} ({u.role.replace('_', ' ')})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Training Specialist <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={assignTr}
+                      onChange={e => setAssignTr(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                    >
+                      <option value="">— select —</option>
+                      {staffUsers.map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.name || u.email} ({u.role.replace('_', ' ')})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {needsAm && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    Account Manager <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={assignAm}
+                    onChange={e => setAssignAm(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                  >
+                    <option value="">— select —</option>
+                    {staffUsers.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || u.email} ({u.role.replace('_', ' ')})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
+          )}
+
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => { setPendingPhase(null); setAssignOb(''); setAssignTr(''); setAssignAm('') }}
+              className="px-4 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">
+              Cancel
+            </button>
+            <button
+              onClick={() => setPhaseMutation.mutate({
+                phase: pendingPhase.phase,
+                onboardingSpecialistId: assignOb || undefined,
+                trainingSpecialistId:   assignTr || undefined,
+                accountManagerId:       assignAm || undefined,
+              })}
+              disabled={setPhaseMutation.isPending || !assignmentComplete}
+              title={!assignmentComplete ? 'Please assign required staff before confirming' : undefined}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium text-white transition-colors ${
+                assignmentComplete ? pendingColors.btn : 'bg-gray-300 cursor-not-allowed'
+              }`}>
+              {setPhaseMutation.isPending ? 'Moving…' : 'Confirm'}
+            </button>
           </div>
         </div>
       )}

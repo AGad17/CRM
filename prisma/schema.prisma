@@ -235,6 +235,11 @@ model User {
   deals    Deal[]
   leads    Lead[]    @relation("UserLeads")
 
+  // Onboarding staff assignments
+  obTrackers OnboardingTracker[] @relation("ObSpecialist")
+  trTrackers OnboardingTracker[] @relation("TrSpecialist")
+  amTrackers OnboardingTracker[] @relation("AccManager")
+
   @@map("users")
 }
 
@@ -417,11 +422,19 @@ model OnboardingTracker {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  account     Account          @relation(fields: [accountId], references: [id])
-  deal        Deal?            @relation(fields: [dealId], references: [id])
-  tasks       OnboardingTask[]
-  csatRecords CsatRecord[]
-  npsRecords  NpsRecord[]
+  // Staff assignments
+  onboardingSpecialistId String?
+  trainingSpecialistId   String?
+  accountManagerId       String?
+
+  account              Account          @relation(fields: [accountId], references: [id])
+  deal                 Deal?            @relation(fields: [dealId], references: [id])
+  tasks                OnboardingTask[]
+  csatRecords          CsatRecord[]
+  npsRecords           NpsRecord[]
+  onboardingSpecialist User?            @relation("ObSpecialist", fields: [onboardingSpecialistId], references: [id])
+  trainingSpecialist   User?            @relation("TrSpecialist", fields: [trainingSpecialistId],   references: [id])
+  accountManager       User?            @relation("AccManager",   fields: [accountManagerId],       references: [id])
 
   @@map("onboarding_trackers")
 }
