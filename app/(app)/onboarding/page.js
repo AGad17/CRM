@@ -57,6 +57,16 @@ const PHASES = [
     badge: 'bg-green-100 text-green-700',
     bar:   'bg-green-500',
   },
+  {
+    key:   'Churned',
+    label: 'Churned',
+    team:  '—',
+    icon:  '🚫',
+    light: 'bg-gray-50 border-gray-200',
+    text:  'text-gray-500',
+    badge: 'bg-gray-100 text-gray-500',
+    bar:   'bg-gray-400',
+  },
 ]
 
 // ─── Kanban Card ──────────────────────────────────────────────────────────────
@@ -264,7 +274,7 @@ export default function OnboardingPage() {
       )}
 
       {/* Stage summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {PHASES.map((p) => {
           const count  = trackers.filter((t) => t.phase === p.key).length
           const active = phase === p.key

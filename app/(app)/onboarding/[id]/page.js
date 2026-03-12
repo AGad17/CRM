@@ -35,6 +35,7 @@ const PHASE_COLORS = {
   Training:          { badge: 'bg-purple-100 text-purple-700', section: 'border-purple-200 bg-purple-50', heading: 'text-purple-700', bar: 'bg-purple-500', ring: 'ring-purple-400', btn: 'bg-purple-600 hover:bg-purple-700' },
   Incubation:        { badge: 'bg-orange-100 text-orange-700', section: 'border-orange-200 bg-orange-50', heading: 'text-orange-700', bar: 'bg-orange-500', ring: 'ring-orange-400', btn: 'bg-orange-600 hover:bg-orange-700' },
   AccountManagement: { badge: 'bg-green-100 text-green-700',   section: 'border-green-200 bg-green-50',   heading: 'text-green-700',  bar: 'bg-green-500',  ring: 'ring-green-400',  btn: 'bg-green-600 hover:bg-green-700'  },
+  Churned:           { badge: 'bg-gray-100 text-gray-500',     section: 'border-gray-200 bg-gray-50',     heading: 'text-gray-500',   bar: 'bg-gray-400',   ring: 'ring-gray-300',   btn: 'bg-gray-500 hover:bg-gray-600'    },
 }
 
 // ── Score picker (shared for CSAT 1-5 and NPS 0-10) ──────────────────────────
@@ -82,7 +83,11 @@ export default function OnboardingDetailPage() {
   // Staff assignment state (used when moving to specific phases)
   const [assignOb, setAssignOb] = useState('') // Onboarding Specialist
   const [assignTr, setAssignTr] = useState('') // Training Specialist
-  const [assignAm, setAssignAm] = useState('') // Account Manager
+  const [assignAm, setAssignAm] = useState('') // Account Manager (phase change)
+
+  // Inline account manager change (any time)
+  const [editingAm, setEditingAm]   = useState(false)
+  const [inlineAm,  setInlineAm]    = useState('')
 
   const { data: tracker, isLoading } = useQuery({
     queryKey: ['onboarding', id],
@@ -156,15 +161,30 @@ export default function OnboardingDetailPage() {
       }).then(r => r.json()),
   })
 
+  const assignAmMutation = useMutation({
+    mutationFn: (accountManagerId) =>
+      fetch(`/api/onboarding/${id}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: 'assign', accountManagerId }),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      setEditingAm(false)
+      qc.invalidateQueries({ queryKey: ['onboarding', id] })
+      qc.invalidateQueries({ queryKey: ['accounts'] })
+    },
+  })
+
   if (isLoading) return <div className="animate-pulse h-96 bg-gray-100 rounded-2xl" />
   if (!tracker || tracker.error) return <div className="text-red-500">Tracker not found</div>
 
+  const isChurned         = tracker.phase === 'Churned'
   const currentPhaseIdx   = PHASE_ORDER.indexOf(tracker.phase)
   const currentColors     = PHASE_COLORS[tracker.phase] || PHASE_COLORS.DealClosure
   const currentTasks      = tracker.tasksByPhase?.[tracker.phase] || []
   const allCurrentDone    = currentTasks.length > 0 && currentTasks.every(t => t.completed)
   const incompleteCurrent = currentTasks.filter(t => !t.completed).length
-  const prevPhase         = PHASE_ORDER[currentPhaseIdx - 1] ?? null
+  const prevPhase         = isChurned ? 'AccountManagement' : (PHASE_ORDER[currentPhaseIdx - 1] ?? null)
   const nextPhase         = PHASE_ORDER[currentPhaseIdx + 1] ?? null
 
   const pendingIdx       = pendingPhase ? PHASE_ORDER.indexOf(pendingPhase.phase) : null
@@ -202,6 +222,25 @@ export default function OnboardingDetailPage() {
           </span>
         )}
       </div>
+
+      {/* ── Churned banner ─────────────────────────────────────────────────── */}
+      {isChurned && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-300 bg-gray-50 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span className="text-lg">🚫</span>
+            <div>
+              <p className="font-semibold text-sm text-gray-700">This account has churned</p>
+              <p className="text-xs text-gray-400 mt-0.5">All contracts were cancelled. Move back to Account Management to reactivate.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setPendingPhase({ phase: 'AccountManagement', idx: 4 })}
+            className="flex-shrink-0 px-4 py-1.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors"
+          >
+            ↩ Reactivate
+          </button>
+        </div>
+      )}
 
       {/* ── Renewal flag ───────────────────────────────────────────────────── */}
       {renewal && (
@@ -383,15 +422,61 @@ export default function OnboardingDetailPage() {
             </p>
           </div>
         )}
-        {tracker.accountManager && (
-          <div>
+        {/* ── Inline Account Manager editor ── */}
+        <div className="min-w-[160px]">
+          <div className="flex items-center gap-1.5 mb-1">
             <p className="text-xs text-gray-400 uppercase tracking-wider">Account Manager</p>
-            <p className="font-medium text-gray-700">⭐ {tracker.accountManager.name || tracker.accountManager.email}</p>
+            {!editingAm && (
+              <button
+                onClick={() => { setInlineAm(tracker.accountManager?.id || ''); setEditingAm(true) }}
+                className="text-xs text-indigo-400 hover:text-indigo-600"
+                title="Change account manager"
+              >
+                ✎
+              </button>
+            )}
           </div>
-        )}
+          {editingAm ? (
+            <div className="flex items-center gap-1.5">
+              <select
+                value={inlineAm}
+                onChange={e => setInlineAm(e.target.value)}
+                className="border border-gray-300 rounded-lg px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white flex-1"
+              >
+                <option value="">— none —</option>
+                {staffUsers.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.name || u.email}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => assignAmMutation.mutate(inlineAm)}
+                disabled={assignAmMutation.isPending}
+                className="px-2 py-1 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+              >
+                {assignAmMutation.isPending ? '…' : '✓'}
+              </button>
+              <button
+                onClick={() => setEditingAm(false)}
+                className="px-2 py-1 rounded-lg text-xs border border-gray-200 text-gray-500 hover:bg-gray-50"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <p className="font-medium text-gray-700 text-sm">
+              {tracker.accountManager
+                ? `⭐ ${tracker.accountManager.name || tracker.accountManager.email}`
+                : <span className="text-gray-300 italic">Not assigned</span>
+              }
+            </p>
+          )}
+        </div>
       </div>
 
       {/* ── Clickable Phase Stepper ─────────────────────────────────────────── */}
+      {!isChurned && (
       <div>
         <p className="text-xs text-gray-400 mb-3 uppercase tracking-wider">Click any stage to move the account</p>
         <div className="flex items-start gap-0 overflow-x-auto pb-1">
@@ -431,6 +516,7 @@ export default function OnboardingDetailPage() {
           })}
         </div>
       </div>
+      )}
 
       {/* ── Move Confirmation Card ──────────────────────────────────────────── */}
       {pendingPhase && (
@@ -548,25 +634,27 @@ export default function OnboardingDetailPage() {
         </div>
       )}
 
-      {/* ── Quick nav buttons ───────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3">
-        {prevPhase && (
-          <button onClick={() => setPendingPhase({ phase: prevPhase, idx: currentPhaseIdx - 1 })}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors">
-            ← {PHASE_LABELS[prevPhase]}
-          </button>
-        )}
-        <div className="flex-1" />
-        {nextPhase && (
-          <button onClick={() => setPendingPhase({ phase: nextPhase, idx: currentPhaseIdx + 1 })}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors ${
-              allCurrentDone ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-amber-500 hover:bg-amber-600'
-            }`}>
-            {!allCurrentDone && '⚠️ '}
-            {PHASE_LABELS[nextPhase]} →
-          </button>
-        )}
-      </div>
+      {/* ── Quick nav buttons (hidden when churned) ─────────────────────────── */}
+      {!isChurned && (
+        <div className="flex items-center gap-3">
+          {prevPhase && (
+            <button onClick={() => setPendingPhase({ phase: prevPhase, idx: currentPhaseIdx - 1 })}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors">
+              ← {PHASE_LABELS[prevPhase]}
+            </button>
+          )}
+          <div className="flex-1" />
+          {nextPhase && (
+            <button onClick={() => setPendingPhase({ phase: nextPhase, idx: currentPhaseIdx + 1 })}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors ${
+                allCurrentDone ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-amber-500 hover:bg-amber-600'
+              }`}>
+              {!allCurrentDone && '⚠️ '}
+              {PHASE_LABELS[nextPhase]} →
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Task sections by phase ──────────────────────────────────────────── */}
       <div className="space-y-4">

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/roleGuard'
-import { getOnboardingTracker, advancePhase, setPhase, updateNotes } from '@/lib/db/onboarding'
+import { getOnboardingTracker, advancePhase, setPhase, updateNotes, assignAccountManager } from '@/lib/db/onboarding'
 
 export async function GET(request, { params }) {
   const { error } = await requireAuth('read')
@@ -41,7 +41,12 @@ export async function PATCH(request, { params }) {
       return NextResponse.json(tracker)
     }
 
-    return NextResponse.json({ error: 'action must be advance, setPhase, or notes' }, { status: 400 })
+    if (body.action === 'assign') {
+      const tracker = await assignAccountManager(id, body.accountManagerId)
+      return NextResponse.json(tracker)
+    }
+
+    return NextResponse.json({ error: 'action must be advance, setPhase, assign, or notes' }, { status: 400 })
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 400 })
   }

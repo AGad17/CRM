@@ -407,6 +407,7 @@ enum OnboardingPhase {
   Training          // Stage 3 — Onboarding Team
   Incubation        // Stage 4 — Onboarding Team (2-week max)
   AccountManagement // Stage 5 — Customer Success Team
+  Churned           // Terminal — account has churned
 }
 
 // ─── Operations: Onboarding Tracker ──────────────────────────────────────────
