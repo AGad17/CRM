@@ -63,6 +63,7 @@ export default function AccountsPage() {
     { key: 'numberOfBranches', label: 'Branches' },
     { key: 'contractCount', label: 'Contracts' },
     { key: 'totalMRR', label: 'Total MRR', render: (r) => `USD ${(r.totalMRR || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}` },
+    { key: 'accountManager', label: 'Account Manager', render: (r) => r.accountManager ? (r.accountManager.name || r.accountManager.email) : <span className="text-gray-300">—</span> },
     { key: 'status', label: 'Status', render: (r) => <Badge value={r.status} /> },
     { key: 'churnDate', label: 'Churn Date', render: (r) => r.churnDate ? new Date(r.churnDate).toLocaleDateString() : '—' },
     { key: 'actions', label: '', sortable: false, render: (r) => (
