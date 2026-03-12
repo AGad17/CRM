@@ -1,18 +1,55 @@
 @import "tailwindcss";
 
+/* ─── Brand tokens ─────────────────────────────────────────────────────────── */
 :root {
-  --sidebar-width: 240px;
+  --brand-deep:    #2E1065;
+  --brand-purple:  #3F2182;
+  --brand-accent:  #5061F6;
+  --brand-light:   #AAB3FA;
+  --brand-pale:    #C2B4FB;
+  --brand-teal:    #49B697;
+  --brand-yellow:  #F4BF1D;
+  --brand-surface: #F5F2FF;
 }
 
+/* ─── Typography ───────────────────────────────────────────────────────────── */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #f9fafb;
-  color: #111827;
+  font-family: var(--font-mulish, 'Mulish'), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--brand-surface);
+  color: #1a1a2e;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* RTL support for Arabic names in LTR tables */
+h1, h2, h3, h4, h5 {
+  font-family: var(--font-jakarta, 'Plus Jakarta Sans'), var(--font-mulish, 'Mulish'), sans-serif;
+}
+
+/* ─── Scrollbars ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar            { width: 5px; height: 5px; }
+::-webkit-scrollbar-track      { background: transparent; }
+::-webkit-scrollbar-thumb      { background: #C2B4FB; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover{ background: #9B8BE8; }
+
+/* Sidebar uses white-tinted scrollbar */
+aside ::-webkit-scrollbar-thumb      { background: rgba(255,255,255,0.15); }
+aside ::-webkit-scrollbar-thumb:hover{ background: rgba(255,255,255,0.28); }
+
+/* ─── RTL support for Arabic names in LTR tables ───────────────────────────── */
 [dir="rtl"], .rtl-text {
   unicode-bidi: embed;
   direction: rtl;
   text-align: right;
+}
+
+/* ─── Responsive tables — horizontal scroll on small screens ───────────────── */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ─── Focus ring ───────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
 }
