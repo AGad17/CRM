@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { requireAuth } from '@/lib/roleGuard'
-import { getOnboardingTracker, advancePhase, setPhase, updateNotes, assignAccountManager } from '@/lib/db/onboarding'
+import { getOnboardingTracker, advancePhase, setPhase, addNote, assignAccountManager } from '@/lib/db/onboarding'
 
 export async function GET(request, { params }) {
   const { error } = await requireAuth('read')
@@ -37,8 +39,12 @@ export async function PATCH(request, { params }) {
     }
 
     if (body.action === 'notes') {
-      const tracker = await updateNotes(id, body.notes)
-      return NextResponse.json(tracker)
+      if (!body.content?.trim()) return NextResponse.json({ error: 'content is required' }, { status: 400 })
+      // Capture the author name from the current session
+      const session = await getServerSession(authOptions)
+      const author  = session?.user?.name || session?.user?.email || null
+      const note    = await addNote(id, body.content.trim(), author)
+      return NextResponse.json(note)
     }
 
     if (body.action === 'assign') {

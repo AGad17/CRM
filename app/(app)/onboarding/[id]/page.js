@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 
@@ -70,7 +70,7 @@ export default function OnboardingDetailPage() {
   const { id } = useParams()
   const router  = useRouter()
   const qc      = useQueryClient()
-  const notesRef = useRef(null)
+  const [newNote, setNewNote] = useState('')
 
   const [pendingPhase, setPendingPhase]   = useState(null)
   const [csatOpen,     setCsatOpen]       = useState(null) // csatId
@@ -153,12 +153,16 @@ export default function OnboardingDetailPage() {
   })
 
   const notesMutation = useMutation({
-    mutationFn: (notes) =>
+    mutationFn: (content) =>
       fetch(`/api/onboarding/${id}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ action: 'notes', notes }),
+        body:    JSON.stringify({ action: 'notes', content }),
       }).then(r => r.json()),
+    onSuccess: () => {
+      setNewNote('')
+      qc.invalidateQueries({ queryKey: ['onboarding', id] })
+    },
   })
 
   const assignAmMutation = useMutation({
@@ -812,24 +816,66 @@ export default function OnboardingDetailPage() {
 
       {/* ── Notes ──────────────────────────────────────────────────────────── */}
       <div>
-        <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
+        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
           Internal Notes
-        </label>
-        <textarea
-          ref={notesRef}
-          defaultValue={tracker.notes || ''}
-          onBlur={handleNotesBlur}
-          placeholder="Add notes about this account's customer journey…"
-          rows={4}
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
-        />
-        <p className="text-xs text-gray-400 mt-1">Notes are saved automatically when you click away.</p>
+        </p>
+
+        {/* Note log — chronological, oldest at top */}
+        <div className="space-y-3 mb-4">
+          {(tracker.noteEntries?.length ?? 0) === 0 ? (
+            <p className="text-sm text-gray-300 italic px-1">No notes yet. Add the first one below.</p>
+          ) : (
+            tracker.noteEntries.map((note) => {
+              const d = new Date(note.createdAt)
+              const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+              const timeStr = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+              return (
+                <div key={note.id} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className="text-xs font-semibold text-gray-700">{dateStr}</span>
+                    <span className="text-gray-300 text-xs">·</span>
+                    <span className="text-xs text-gray-400">{timeStr}</span>
+                    {note.author && (
+                      <>
+                        <span className="text-gray-300 text-xs">·</span>
+                        <span className="text-xs font-medium text-indigo-500">{note.author}</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{note.content}</p>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* New note input */}
+        <div className="flex flex-col gap-2">
+          <textarea
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && newNote.trim()) {
+                notesMutation.mutate(newNote.trim())
+              }
+            }}
+            placeholder="Write a note… (Cmd/Ctrl + Enter to save)"
+            rows={3}
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+          />
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-400">Each note is stamped with the date, time, and your name.</p>
+            <button
+              onClick={() => { if (newNote.trim()) notesMutation.mutate(newNote.trim()) }}
+              disabled={!newNote.trim() || notesMutation.isPending}
+              className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {notesMutation.isPending ? 'Saving…' : 'Add Note'}
+            </button>
+          </div>
+        </div>
       </div>
 
     </div>
   )
-
-  function handleNotesBlur() {
-    notesMutation.mutate(notesRef.current?.value ?? '')
-  }
 }

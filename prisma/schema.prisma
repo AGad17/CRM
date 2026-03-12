@@ -428,16 +428,29 @@ model OnboardingTracker {
   trainingSpecialistId   String?
   accountManagerId       String?
 
-  account              Account          @relation(fields: [accountId], references: [id])
-  deal                 Deal?            @relation(fields: [dealId], references: [id])
+  account              Account            @relation(fields: [accountId], references: [id])
+  deal                 Deal?              @relation(fields: [dealId], references: [id])
   tasks                OnboardingTask[]
+  noteEntries          OnboardingNote[]
   csatRecords          CsatRecord[]
   npsRecords           NpsRecord[]
-  onboardingSpecialist User?            @relation("ObSpecialist", fields: [onboardingSpecialistId], references: [id])
-  trainingSpecialist   User?            @relation("TrSpecialist", fields: [trainingSpecialistId],   references: [id])
-  accountManager       User?            @relation("AccManager",   fields: [accountManagerId],       references: [id])
+  onboardingSpecialist User?              @relation("ObSpecialist", fields: [onboardingSpecialistId], references: [id])
+  trainingSpecialist   User?              @relation("TrSpecialist", fields: [trainingSpecialistId],   references: [id])
+  accountManager       User?              @relation("AccManager",   fields: [accountManagerId],       references: [id])
 
   @@map("onboarding_trackers")
+}
+
+model OnboardingNote {
+  id        Int               @id @default(autoincrement())
+  trackerId Int
+  content   String
+  author    String?           // display name / email captured from session at write time
+  createdAt DateTime          @default(now())
+
+  tracker OnboardingTracker @relation(fields: [trackerId], references: [id], onDelete: Cascade)
+
+  @@map("onboarding_notes")
 }
 
 model OnboardingTask {
