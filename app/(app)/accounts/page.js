@@ -64,6 +64,21 @@ export default function AccountsPage() {
     { key: 'contractCount', label: 'Contracts' },
     { key: 'totalMRR', label: 'Total MRR', render: (r) => `USD ${(r.totalMRR || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}` },
     { key: 'accountManager', label: 'Account Manager', render: (r) => r.accountManager ? (r.accountManager.name || r.accountManager.email) : <span className="text-gray-300">—</span> },
+    { key: 'journey', label: 'Journey Stage', render: (r) => {
+      const phase = r.onboarding?.phase
+      const map = {
+        DealClosure:       { label: 'Deal Closure',      cls: 'bg-sky-100 text-sky-700'     },
+        Onboarding:        { label: 'Onboarding',        cls: 'bg-yellow-100 text-yellow-700'},
+        Training:          { label: 'Training',          cls: 'bg-purple-100 text-purple-700'},
+        Incubation:        { label: 'Incubation',        cls: 'bg-orange-100 text-orange-700'},
+        AccountManagement: { label: 'Account Mgmt',      cls: 'bg-green-100 text-green-700'  },
+        Churned:           { label: 'Churned',           cls: 'bg-gray-100 text-gray-500'    },
+      }
+      const p = map[phase]
+      return p
+        ? <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${p.cls}`}>{p.label}</span>
+        : <span className="text-gray-300">—</span>
+    }},
     { key: 'status', label: 'Status', render: (r) => <Badge value={r.status} /> },
     { key: 'churnDate', label: 'Churn Date', render: (r) => r.churnDate ? new Date(r.churnDate).toLocaleDateString() : '—' },
     { key: 'actions', label: '', sortable: false, render: (r) => (
