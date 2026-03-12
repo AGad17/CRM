@@ -1,0 +1,13 @@
+import { NextResponse } from 'next/server'
+import { getMRRWaterfall } from '@/lib/db/analytics'
+
+export async function GET(req) {
+  const { searchParams } = new URL(req.url)
+  const filters = {}
+  const country = searchParams.get('country')
+  const leadSource = searchParams.get('leadSource')
+  if (country) filters.country = country
+  if (leadSource) filters.leadSource = leadSource
+  const data = await getMRRWaterfall(filters)
+  return NextResponse.json(data)
+}

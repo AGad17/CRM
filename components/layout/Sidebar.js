@@ -102,13 +102,19 @@ const NAV = [
   {
     label: 'Analytics', icon: IcAnalytics,
     children: [
-      { href: '/analytics/yoy',   label: 'Year over Year'       },
-      { href: '/analytics/qoq',   label: 'Quarter over Quarter' },
-      { href: '/analytics/mom',   label: 'Month over Month'     },
-      { href: '/segments',        label: 'Segments'             },
-      { href: '/churn',           label: 'Churn Analysis'       },
-      { href: '/revenue-quality', label: 'Revenue Quality'      },
-      { href: '/cohorts',         label: 'Cohort Retention'     },
+      { href: '/analytics/yoy',        label: 'Year over Year'        },
+      { href: '/analytics/qoq',        label: 'Quarter over Quarter'  },
+      { href: '/analytics/mom',        label: 'Month over Month'      },
+      { href: '/segments',             label: 'Segments'              },
+      { href: '/churn',                label: 'Churn Analysis'        },
+      { href: '/revenue-quality',      label: 'Revenue Quality'       },
+      { href: '/cohorts',              label: 'Cohort Retention'      },
+      { href: '/renewal-pipeline',     label: 'Renewal Pipeline'      },
+      { href: '/mrr-waterfall',        label: 'MRR Waterfall'         },
+      { href: '/account-health',       label: 'Account Health'        },
+      { href: '/lead-source-analysis', label: 'Lead Source Analysis'  },
+      { href: '/win-loss',             label: 'Win / Loss'            },
+      { href: '/nrr-breakdown',        label: 'NRR Breakdown'         },
     ],
   },
   {
@@ -284,7 +290,7 @@ export function Sidebar() {
                   {!collapsed && (
                     <div className={clsx(
                       'overflow-hidden transition-all duration-200 ease-in-out',
-                      isOpen ? 'max-h-96 opacity-100 mt-0.5' : 'max-h-0 opacity-0',
+                      isOpen ? 'max-h-[600px] opacity-100 mt-0.5' : 'max-h-0 opacity-0',
                     )}>
                       <ul className="ml-4 pl-3 border-l border-white/[0.08] space-y-0.5 pb-1">
                         {item.children.map(child => {
