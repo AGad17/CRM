@@ -208,6 +208,41 @@ export async function POST(request, { params }) {
         })
       }
 
+      // 4b. Create Handover Document
+      const h = body.handover || {}
+      await tx.handoverDocument.create({
+        data: {
+          dealId:                 deal.id,
+          accountId:              account.id,
+          clientName:             h.clientName             || body.accountName.trim(),
+          contractStart:          h.contractStart          ? new Date(h.contractStart) : new Date(body.startDate),
+          contractDuration:       h.contractDuration       || null,
+          commercialModel:        h.commercialModel        || null,
+          clientPoc:              h.clientPoc              || null,
+          clientPocRole:          h.clientPocRole          || null,
+          clientEmail:            h.clientEmail            || null,
+          clientPhone:            h.clientPhone            || null,
+          escalationContact:      h.escalationContact      || null,
+          acquisitionOwner:       h.acquisitionOwner       || null,
+          assignedCsManager:      h.assignedCsManager      || null,
+          primaryObjectives:      h.primaryObjectives      || null,
+          successMetrics:         h.successMetrics         || null,
+          shortTermPriorities:    h.shortTermPriorities    || null,
+          longTermPriorities:     h.longTermPriorities     || null,
+          howTheyOperate:         h.howTheyOperate         || null,
+          orderWorkflowSummary:   h.orderWorkflowSummary   || null,
+          locationsOperatingHours:h.locationsOperatingHours|| null,
+          keyNeeds:               h.keyNeeds               || null,
+          topPainPoints:          h.topPainPoints          || null,
+          currentSystemsUsed:     h.currentSystemsUsed     || null,
+          requiredIntegrations:   h.requiredIntegrations   || null,
+          inScope:                h.inScope                || null,
+          outOfScope:             h.outOfScope             || null,
+          dependenciesFromClient: h.dependenciesFromClient || null,
+          highlights:             h.highlights             || null,
+        },
+      })
+
       // 5. Create Contract + ContractItems (locks annual unit prices at signing time)
       const CONTRACT_TYPE_MAP = { New: 'New', Renewal: 'Renewal', Upsell: 'Expansion', Expansion: 'Expansion' }
       const contractType = CONTRACT_TYPE_MAP[body.dealType] || 'New'

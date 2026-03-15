@@ -43,6 +43,24 @@ const EMPTY_LINE_DISCOUNTS = {
   inventory: '', ck: '', warehouse: '', accMain: '', accExtra: '', butchering: '', ai: '',
 }
 
+const EMPTY_HANDOVER = {
+  // Section 1 — pre-filled at runtime
+  clientName: '', contractStart: '', contractDuration: '', commercialModel: '',
+  // Section 2
+  clientPoc: '', clientPocRole: '', clientEmail: '', clientPhone: '',
+  escalationContact: '', acquisitionOwner: '', assignedCsManager: '',
+  // Section 3
+  primaryObjectives: '', successMetrics: '', shortTermPriorities: '', longTermPriorities: '',
+  // Section 4
+  howTheyOperate: '', orderWorkflowSummary: '', locationsOperatingHours: '',
+  // Section 5
+  keyNeeds: '', topPainPoints: '',
+  // Section 6
+  currentSystemsUsed: '', requiredIntegrations: '',
+  // Section 7
+  inScope: '', outOfScope: '', dependenciesFromClient: '', highlights: '',
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmt(n, currency = '') {
@@ -98,6 +116,7 @@ export default function CloseDealPage() {
   const [account, setAccount]             = useState(EMPTY_ACCOUNT)
   const [deal, setDeal]                   = useState(EMPTY_DEAL)
   const [lineDiscounts, setLineDiscounts] = useState(EMPTY_LINE_DISCOUNTS)
+  const [handover, setHandover]           = useState(EMPTY_HANDOVER)
   const [errors, setErrors]               = useState({})
   const [modal, setModal]                 = useState(null)
   const [prefilled, setPrefilled]         = useState(false)
@@ -137,9 +156,28 @@ export default function CloseDealPage() {
         ...(oppType === 'Expansion' && { dealType: 'Expansion' }),
         ...(oppType === 'Renewal'   && { dealType: 'Renewal' }),
       }))
+      // Pre-fill handover from lead data
+      setHandover((prev) => ({
+        ...prev,
+        clientName:      accountName,
+        contractStart:   new Date().toISOString().slice(0, 10),
+        clientPoc:       lead.contactName  || '',
+        clientEmail:     lead.contactEmail || '',
+        clientPhone:     lead.contactPhone || '',
+        acquisitionOwner: lead.owner?.name || lead.owner?.email || '',
+      }))
       setPrefilled(true)
     }
   }, [lead, prefilled, session])
+
+  // ── Sync acquisition owner when agent changes ──
+  useEffect(() => {
+    if (!deal.agentId || !agents.length) return
+    const agent = agents.find((a) => a.id === deal.agentId)
+    if (agent) {
+      setHandover((p) => ({ ...p, acquisitionOwner: agent.name || agent.email || '' }))
+    }
+  }, [deal.agentId, agents])
 
   // ── Derived ──
   const countries       = pricing?.countries || []
@@ -190,6 +228,7 @@ export default function CloseDealPage() {
     if (errors[key]) setErrors((p) => ({ ...p, [key]: undefined }))
   }
   const setLD = (key) => (v) => setLineDiscounts((p) => ({ ...p, [key]: v }))
+  const setH  = (key) => (e) => setHandover((p) => ({ ...p, [key]: e.target.value }))
 
   // ── Validation ──
   function validate() {
@@ -262,6 +301,34 @@ export default function CloseDealPage() {
         accExtra:   Number(lineDiscounts.accExtra)   || 0,
         butchering: Number(lineDiscounts.butchering) || 0,
         ai:         Number(lineDiscounts.ai)         || 0,
+      },
+      handover: {
+        clientName:             handover.clientName             || account.accountName.trim(),
+        contractStart:          handover.contractStart          || deal.startDate || null,
+        contractDuration:       handover.contractDuration       || null,
+        commercialModel:        handover.commercialModel        || null,
+        clientPoc:              handover.clientPoc              || null,
+        clientPocRole:          handover.clientPocRole          || null,
+        clientEmail:            handover.clientEmail            || null,
+        clientPhone:            handover.clientPhone            || null,
+        escalationContact:      handover.escalationContact      || null,
+        acquisitionOwner:       handover.acquisitionOwner       || null,
+        assignedCsManager:      handover.assignedCsManager      || null,
+        primaryObjectives:      handover.primaryObjectives      || null,
+        successMetrics:         handover.successMetrics         || null,
+        shortTermPriorities:    handover.shortTermPriorities    || null,
+        longTermPriorities:     handover.longTermPriorities     || null,
+        howTheyOperate:         handover.howTheyOperate         || null,
+        orderWorkflowSummary:   handover.orderWorkflowSummary   || null,
+        locationsOperatingHours:handover.locationsOperatingHours|| null,
+        keyNeeds:               handover.keyNeeds               || null,
+        topPainPoints:          handover.topPainPoints          || null,
+        currentSystemsUsed:     handover.currentSystemsUsed     || null,
+        requiredIntegrations:   handover.requiredIntegrations   || null,
+        inScope:                handover.inScope                || null,
+        outOfScope:             handover.outOfScope             || null,
+        dependenciesFromClient: handover.dependenciesFromClient || null,
+        highlights:             handover.highlights             || null,
       },
     })
   }
@@ -555,6 +622,171 @@ export default function CloseDealPage() {
               </div>
             </Section>
           )}
+
+          {/* ── Internal Handover Document ─────────────── */}
+          <div className="bg-white border border-indigo-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="px-5 py-4 bg-indigo-50 border-b border-indigo-100">
+              <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wider">Internal Handover Document</p>
+              <p className="text-xs text-indigo-500 mt-0.5">Pre-filled from the opportunity. Complete remaining fields before closing.</p>
+            </div>
+
+            <div className="p-5 space-y-6">
+
+              {/* 1 — Deal Summary */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">1. Deal Summary</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Client Name</label>
+                    <input className={fc('hClientName')} value={handover.clientName} onChange={setH('clientName')} placeholder="Account name" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Contract Start</label>
+                    <input type="date" className={fc('hContractStart')} value={handover.contractStart} onChange={setH('contractStart')} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Contract Duration</label>
+                    <input className={fc('hContractDuration')} value={handover.contractDuration} onChange={setH('contractDuration')} placeholder="e.g. 12 months – Annual" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Commercial Model</label>
+                    <input className={fc('hCommercialModel')} value={handover.commercialModel} onChange={setH('commercialModel')} placeholder="e.g. Operations – 3 branches" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 2 — Key Contacts */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">2. Key Contacts</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Client POC</label>
+                    <input className={fc('hClientPoc')} value={handover.clientPoc} onChange={setH('clientPoc')} placeholder="Name" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">POC Role / Title</label>
+                    <input className={fc('hClientPocRole')} value={handover.clientPocRole} onChange={setH('clientPocRole')} placeholder="e.g. Operations Manager" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Client Email</label>
+                    <input type="email" className={fc('hClientEmail')} value={handover.clientEmail} onChange={setH('clientEmail')} placeholder="poc@client.com" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Client Phone</label>
+                    <input className={fc('hClientPhone')} value={handover.clientPhone} onChange={setH('clientPhone')} placeholder="+966 5x xxx xxxx" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Escalation Contact</label>
+                    <input className={fc('hEscalation')} value={handover.escalationContact} onChange={setH('escalationContact')} placeholder="Name & phone / email" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Acquisition Owner</label>
+                    <input className={fc('hAcqOwner')} value={handover.acquisitionOwner} onChange={setH('acquisitionOwner')} placeholder="Sales agent name" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Assigned CS Manager</label>
+                    <input className={fc('hCsManager')} value={handover.assignedCsManager} onChange={setH('assignedCsManager')} placeholder="CS team member" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 3 — Objectives & Success Criteria */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">3. Objectives & Success Criteria</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Primary Objectives</label>
+                    <textarea rows={2} className={`${fc('hPrimaryObj')} resize-none`} value={handover.primaryObjectives} onChange={setH('primaryObjectives')} placeholder="What are the client's main goals with ShopBrain?" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Success Metrics</label>
+                    <textarea rows={2} className={`${fc('hSuccessMetrics')} resize-none`} value={handover.successMetrics} onChange={setH('successMetrics')} placeholder="How will success be measured? (e.g. inventory accuracy ≥95%)" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Short-Term Priorities</label>
+                    <textarea rows={2} className={`${fc('hST')} resize-none`} value={handover.shortTermPriorities} onChange={setH('shortTermPriorities')} placeholder="First 30–90 days" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Long-Term Priorities</label>
+                    <textarea rows={2} className={`${fc('hLT')} resize-none`} value={handover.longTermPriorities} onChange={setH('longTermPriorities')} placeholder="3–12 months" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 — Client Operations Snapshot */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">4. Client Operations Snapshot</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">How They Operate</label>
+                    <textarea rows={2} className={`${fc('hOperate')} resize-none`} value={handover.howTheyOperate} onChange={setH('howTheyOperate')} placeholder="Business model, service type, ordering process..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Order / Workflow Summary</label>
+                    <textarea rows={2} className={`${fc('hWorkflow')} resize-none`} value={handover.orderWorkflowSummary} onChange={setH('orderWorkflowSummary')} placeholder="How orders flow from branch to warehouse / supplier..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Locations & Operating Hours</label>
+                    <input className={fc('hLocations')} value={handover.locationsOperatingHours} onChange={setH('locationsOperatingHours')} placeholder="e.g. 3 branches in Riyadh – 9am to 11pm" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 5 — Pain Points & Needs */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">5. Pain Points & Needs</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Key Needs</label>
+                    <textarea rows={3} className={`${fc('hNeeds')} resize-none`} value={handover.keyNeeds} onChange={setH('keyNeeds')} placeholder="What does the client urgently need from us?" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Top Pain Points</label>
+                    <textarea rows={3} className={`${fc('hPainPoints')} resize-none`} value={handover.topPainPoints} onChange={setH('topPainPoints')} placeholder="Current frustrations with existing systems..." />
+                  </div>
+                </div>
+              </div>
+
+              {/* 6 — Existing Systems */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">6. Existing Systems</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Current Systems Used</label>
+                    <textarea rows={2} className={`${fc('hSystems')} resize-none`} value={handover.currentSystemsUsed} onChange={setH('currentSystemsUsed')} placeholder="POS, ERP, accounting software, spreadsheets..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Required Integrations</label>
+                    <textarea rows={2} className={`${fc('hIntegrations')} resize-none`} value={handover.requiredIntegrations} onChange={setH('requiredIntegrations')} placeholder="APIs, connectors needed (e.g. Foodics POS sync)" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 7 — Scope & Critical Notes */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">7. Scope & Critical Notes</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">In-Scope</label>
+                    <textarea rows={2} className={`${fc('hInScope')} resize-none`} value={handover.inScope} onChange={setH('inScope')} placeholder="What is included in this contract..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Out-of-Scope</label>
+                    <textarea rows={2} className={`${fc('hOutScope')} resize-none`} value={handover.outOfScope} onChange={setH('outOfScope')} placeholder="Explicitly excluded items..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Dependencies from Client</label>
+                    <textarea rows={2} className={`${fc('hDeps')} resize-none`} value={handover.dependenciesFromClient} onChange={setH('dependenciesFromClient')} placeholder="What the client needs to provide/prepare..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Highlights / Critical Notes</label>
+                    <textarea rows={2} className={`${fc('hHighlights')} resize-none`} value={handover.highlights} onChange={setH('highlights')} placeholder="Key commitments, special agreements, sensitivities..." />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
 
           <button
             onClick={handleReview}

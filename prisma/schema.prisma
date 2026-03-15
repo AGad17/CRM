@@ -124,6 +124,7 @@ model Account {
   leads      Lead[]
   deals      Deal[]
   onboarding OnboardingTracker?
+  handovers  HandoverDocument[]
 
   @@map("accounts")
 }
@@ -365,6 +366,7 @@ model Deal {
   invoices   Invoice[]
   account    Account?           @relation(fields: [accountId], references: [id])
   onboarding OnboardingTracker?
+  handover   HandoverDocument?
 
   @@map("deals")
 }
@@ -531,4 +533,60 @@ model Lead {
   updatedAt         DateTime    @updatedAt
 
   @@map("leads")
+}
+
+// ─── Internal Handover Document ───────────────────────────────────────────────
+
+model HandoverDocument {
+  id        Int      @id @default(autoincrement())
+  dealId    Int      @unique
+  accountId Int
+
+  // Section 1 — Deal Summary (pre-filled from deal data)
+  clientName         String
+  contractStart      DateTime?
+  contractDuration   String?
+  commercialModel    String?
+
+  // Section 2 — Key Contacts
+  clientPoc          String?
+  clientPocRole      String?
+  clientEmail        String?
+  clientPhone        String?
+  escalationContact  String?
+  acquisitionOwner   String?
+  assignedCsManager  String?
+
+  // Section 3 — Objectives & Success Criteria
+  primaryObjectives  String?
+  successMetrics     String?
+  shortTermPriorities String?
+  longTermPriorities  String?
+
+  // Section 4 — Client Operations Snapshot
+  howTheyOperate         String?
+  orderWorkflowSummary   String?
+  locationsOperatingHours String?
+
+  // Section 5 — Pain Points & Needs
+  keyNeeds      String?
+  topPainPoints String?
+
+  // Section 6 — Existing Systems
+  currentSystemsUsed    String?
+  requiredIntegrations  String?
+
+  // Section 7 — Scope & Critical Notes
+  inScope               String?
+  outOfScope            String?
+  dependenciesFromClient String?
+  highlights            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deal    Deal    @relation(fields: [dealId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@map("handover_documents")
 }

@@ -1,17 +1,44 @@
 'use client'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
 
+function HandoverField({ label, value }) {
+  if (!value) return null
+  return (
+    <div>
+      <p className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
+      <p className="text-sm text-gray-700 whitespace-pre-wrap">{value}</p>
+    </div>
+  )
+}
+
+function HandoverSection({ title, children }) {
+  return (
+    <div className="border-t border-gray-100 pt-4">
+      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wider mb-3">{title}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>
+    </div>
+  )
+}
+
 export default function AccountDetailPage() {
   const { id } = useParams()
   const router = useRouter()
+  const [showHandover, setShowHandover] = useState(false)
 
   const { data: account, isLoading } = useQuery({
     queryKey: ['account', id],
     queryFn: () => fetch(`/api/accounts/${id}`).then((r) => r.json()),
+  })
+
+  const { data: handover } = useQuery({
+    queryKey: ['account-handover', id],
+    queryFn: () => fetch(`/api/accounts/${id}/handover`).then((r) => r.ok ? r.json() : null),
+    enabled: !!id,
   })
 
   if (isLoading) return <div className="animate-pulse h-64 bg-gray-200 rounded-2xl" />
@@ -151,6 +178,77 @@ export default function AccountDetailPage() {
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Handover Document */}
+      {handover && !handover.error && (
+        <div className="border border-indigo-200 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setShowHandover((v) => !v)}
+            className="w-full flex items-center justify-between px-5 py-4 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-indigo-700">Internal Handover Document</span>
+              <span className="text-xs text-indigo-400">· created {new Date(handover.createdAt).toLocaleDateString()}</span>
+            </div>
+            <svg className={`w-4 h-4 text-indigo-500 transition-transform ${showHandover ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showHandover && (
+            <div className="p-5 bg-white space-y-4">
+
+              <HandoverSection title="1. Deal Summary">
+                <HandoverField label="Client Name"        value={handover.clientName} />
+                <HandoverField label="Contract Start"     value={handover.contractStart ? new Date(handover.contractStart).toLocaleDateString() : null} />
+                <HandoverField label="Contract Duration"  value={handover.contractDuration} />
+                <HandoverField label="Commercial Model"   value={handover.commercialModel} />
+              </HandoverSection>
+
+              <HandoverSection title="2. Key Contacts">
+                <HandoverField label="Client POC"          value={handover.clientPoc} />
+                <HandoverField label="POC Role"            value={handover.clientPocRole} />
+                <HandoverField label="Client Email"        value={handover.clientEmail} />
+                <HandoverField label="Client Phone"        value={handover.clientPhone} />
+                <HandoverField label="Escalation Contact"  value={handover.escalationContact} />
+                <HandoverField label="Acquisition Owner"   value={handover.acquisitionOwner} />
+                <HandoverField label="Assigned CS Manager" value={handover.assignedCsManager} />
+              </HandoverSection>
+
+              <HandoverSection title="3. Objectives & Success Criteria">
+                <div className="sm:col-span-2"><HandoverField label="Primary Objectives"    value={handover.primaryObjectives} /></div>
+                <div className="sm:col-span-2"><HandoverField label="Success Metrics"       value={handover.successMetrics} /></div>
+                <HandoverField label="Short-Term Priorities" value={handover.shortTermPriorities} />
+                <HandoverField label="Long-Term Priorities"  value={handover.longTermPriorities} />
+              </HandoverSection>
+
+              <HandoverSection title="4. Client Operations Snapshot">
+                <div className="sm:col-span-2"><HandoverField label="How They Operate"           value={handover.howTheyOperate} /></div>
+                <div className="sm:col-span-2"><HandoverField label="Order / Workflow Summary"    value={handover.orderWorkflowSummary} /></div>
+                <div className="sm:col-span-2"><HandoverField label="Locations & Operating Hours" value={handover.locationsOperatingHours} /></div>
+              </HandoverSection>
+
+              <HandoverSection title="5. Pain Points & Needs">
+                <HandoverField label="Key Needs"      value={handover.keyNeeds} />
+                <HandoverField label="Top Pain Points" value={handover.topPainPoints} />
+              </HandoverSection>
+
+              <HandoverSection title="6. Existing Systems">
+                <HandoverField label="Current Systems Used"   value={handover.currentSystemsUsed} />
+                <HandoverField label="Required Integrations"  value={handover.requiredIntegrations} />
+              </HandoverSection>
+
+              <HandoverSection title="7. Scope & Critical Notes">
+                <HandoverField label="In-Scope"                 value={handover.inScope} />
+                <HandoverField label="Out-of-Scope"             value={handover.outOfScope} />
+                <HandoverField label="Dependencies from Client" value={handover.dependenciesFromClient} />
+                <div className="sm:col-span-2"><HandoverField label="Highlights / Critical Notes" value={handover.highlights} /></div>
+              </HandoverSection>
+
+            </div>
+          )}
         </div>
       )}
     </div>
