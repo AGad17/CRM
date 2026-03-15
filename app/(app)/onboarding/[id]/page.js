@@ -712,7 +712,10 @@ export default function OnboardingDetailPage() {
 
               {/* Task list */}
               <ul className="space-y-2">
-                {tasks.map((task, taskIdx) => (
+                {tasks.map((task, taskIdx) => {
+                  const isHandoverTask = phase === 'DealClosure' &&
+                    task.title.toLowerCase().includes('handover document')
+                  return (
                   <li key={task.id} className="flex items-start gap-3">
                     <button
                       disabled={!isCurrent || toggleMutation.isPending}
@@ -740,6 +743,14 @@ export default function OnboardingDetailPage() {
                           ↻ {task.recurrenceDays === 30 ? 'Monthly' : task.recurrenceDays === 90 ? 'Quarterly' : `Every ${task.recurrenceDays}d`}
                         </span>
                       )}
+                      {isHandoverTask && tracker.account?.id && (
+                        <a
+                          href={`/accounts/${tracker.account.id}#handover`}
+                          className="ml-2 text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                        >
+                          View Document →
+                        </a>
+                      )}
                     </span>
                     <div className="flex-shrink-0 flex flex-col items-end gap-0.5">
                       {!task.completed && isCurrent && task.overdue && (
@@ -763,7 +774,8 @@ export default function OnboardingDetailPage() {
                       )}
                     </div>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             </div>
           )

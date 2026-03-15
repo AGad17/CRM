@@ -197,8 +197,9 @@ export async function POST(request, { params }) {
       })
 
       // 4. Create Onboarding Tracker (new accounts only — existing accounts are already onboarded)
+      let trackerId = null
       if (!isExistingAccount) {
-        await tx.onboardingTracker.create({
+        const tracker = await tx.onboardingTracker.create({
           data: {
             accountId: account.id,
             dealId:    deal.id,
@@ -206,6 +207,29 @@ export async function POST(request, { params }) {
             tasks:     { create: DEFAULT_TASKS },
           },
         })
+        trackerId = tracker.id
+      } else {
+        // Find the existing tracker for this account
+        const existing = await tx.onboardingTracker.findUnique({ where: { accountId: account.id } })
+        if (existing) trackerId = existing.id
+      }
+
+      // 4a. Auto-complete the "handover document" task in DealClosure phase (agent just filled it in)
+      if (trackerId) {
+        const handoverTask = await tx.onboardingTask.findFirst({
+          where: {
+            trackerId,
+            phase: 'DealClosure',
+            title: { contains: 'handover document', mode: 'insensitive' },
+            completed: false,
+          },
+        })
+        if (handoverTask) {
+          await tx.onboardingTask.update({
+            where: { id: handoverTask.id },
+            data:  { completed: true, completedAt: new Date() },
+          })
+        }
       }
 
       // 4b. Create Handover Document

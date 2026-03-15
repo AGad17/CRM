@@ -28,7 +28,9 @@ function HandoverSection({ title, children }) {
 export default function AccountDetailPage() {
   const { id } = useParams()
   const router = useRouter()
-  const [showHandover, setShowHandover] = useState(false)
+  const [showHandover, setShowHandover] = useState(
+    typeof window !== 'undefined' && window.location.hash === '#handover'
+  )
 
   const { data: account, isLoading } = useQuery({
     queryKey: ['account', id],
@@ -183,7 +185,7 @@ export default function AccountDetailPage() {
 
       {/* Handover Document */}
       {handover && !handover.error && (
-        <div className="border border-indigo-200 rounded-xl overflow-hidden">
+        <div id="handover" className="border border-indigo-200 rounded-xl overflow-hidden">
           <button
             onClick={() => setShowHandover((v) => !v)}
             className="w-full flex items-center justify-between px-5 py-4 bg-indigo-50 hover:bg-indigo-100 transition-colors"
