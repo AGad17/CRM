@@ -535,6 +535,25 @@ model Lead {
   @@map("leads")
 }
 
+// ─── Activity Log ─────────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id        Int      @id @default(autoincrement())
+  entity    String   // 'Lead', 'Deal', 'Tracker', 'Invoice'
+  entityId  Int
+  accountId Int?     // denormalized for fast account-timeline queries
+  action    String   // 'stage_changed', 'closed_won', 'phase_changed', 'status_changed'
+  actorId   String?  // User.id (nullable for system actions)
+  actorName String?  // display name at time of action
+  meta      Json?    // { from, to, notes, ... }
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([accountId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
 // ─── Internal Handover Document ───────────────────────────────────────────────
 
 model HandoverDocument {

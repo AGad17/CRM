@@ -43,6 +43,12 @@ export default function AccountDetailPage() {
     enabled: !!id,
   })
 
+  const { data: activityLog = [] } = useQuery({
+    queryKey: ['account-activity', id],
+    queryFn: () => fetch(`/api/accounts/${id}/activity`).then((r) => r.json()),
+    enabled: !!id,
+  })
+
   if (isLoading) return <div className="animate-pulse h-64 bg-gray-200 rounded-2xl" />
   if (!account || account.error) return <div className="text-red-500">Account not found</div>
 
@@ -179,6 +185,47 @@ export default function AccountDetailPage() {
                 {new Date(account.onboarding.startDate).toLocaleDateString()}
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activity History */}
+      {activityLog.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Activity History</h3>
+          <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+            {activityLog.map((log) => {
+              const ACTION_LABELS = {
+                stage_changed: 'Lead stage changed',
+                closed_won:    'Deal closed — won',
+                created:       'Deal created',
+                phase_advanced:'Onboarding phase advanced',
+                phase_changed: 'Onboarding phase changed',
+                status_changed:'Invoice status changed',
+              }
+              const label = ACTION_LABELS[log.action] || log.action
+              const meta  = log.meta || {}
+              return (
+                <div key={log.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50">
+                  <div className="mt-0.5 w-2 h-2 rounded-full bg-indigo-400 flex-shrink-0 mt-2" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 font-medium">{label}</p>
+                    {(meta.from || meta.to) && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {meta.from && <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{meta.from}</span>}
+                        {meta.from && meta.to && <span className="mx-1 text-gray-400">→</span>}
+                        {meta.to && <span className="bg-indigo-50 px-1.5 py-0.5 rounded text-indigo-600">{meta.to}</span>}
+                      </p>
+                    )}
+                    {meta.lostReason && <p className="text-xs text-gray-500 mt-0.5">Reason: {meta.lostReason}</p>}
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xs text-gray-400">{new Date(log.createdAt).toLocaleDateString('en-GB')}</p>
+                    {log.actorName && <p className="text-xs text-gray-400">{log.actorName}</p>}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

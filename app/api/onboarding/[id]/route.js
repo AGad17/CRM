@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { requireAuth } from '@/lib/roleGuard'
 import { getOnboardingTracker, advancePhase, setPhase, addNote, assignAccountManager } from '@/lib/db/onboarding'
+import { logActivity } from '@/lib/activityLog'
 
 export async function GET(request, { params }) {
   const { error } = await requireAuth('read')
@@ -21,20 +22,35 @@ export async function PATCH(request, { params }) {
   const { id } = await params
   const body = await request.json()
 
+  const session = await getServerSession(authOptions)
+  const actor = { actorId: session?.user?.id, actorName: session?.user?.name || session?.user?.email }
+
   try {
     if (body.action === 'advance') {
+      const before  = await getOnboardingTracker(id)
       const tracker = await advancePhase(id)
+      await logActivity({
+        entity: 'Tracker', entityId: Number(id), accountId: before?.accountId, action: 'phase_advanced',
+        ...actor,
+        meta: { from: before?.phase, to: tracker.phase },
+      })
       return NextResponse.json(tracker)
     }
 
     if (body.action === 'setPhase') {
       if (!body.phase) return NextResponse.json({ error: 'phase is required' }, { status: 400 })
+      const before = await getOnboardingTracker(id)
       const assignments = {
         onboardingSpecialistId: body.onboardingSpecialistId,
         trainingSpecialistId:   body.trainingSpecialistId,
         accountManagerId:       body.accountManagerId,
       }
       const tracker = await setPhase(id, body.phase, assignments)
+      await logActivity({
+        entity: 'Tracker', entityId: Number(id), accountId: before?.accountId, action: 'phase_changed',
+        ...actor,
+        meta: { from: before?.phase, to: body.phase },
+      })
       return NextResponse.json(tracker)
     }
 

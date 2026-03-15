@@ -86,9 +86,16 @@ function TrackerCard({ tracker, phase, onClick }) {
       onClick={onClick}
       className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer space-y-2.5"
     >
-      <p className="font-semibold text-sm text-gray-900 leading-tight truncate">
-        {tracker.account?.name || '—'}
-      </p>
+      <div className="flex items-start justify-between gap-1">
+        <p className="font-semibold text-sm text-gray-900 leading-tight truncate">
+          {tracker.account?.name || '—'}
+        </p>
+        {tracker.overdueCount > 0 && (
+          <span className="flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">
+            {tracker.overdueCount} late
+          </span>
+        )}
+      </div>
 
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-gray-400 truncate">
@@ -221,6 +228,12 @@ export default function OnboardingPage() {
       ),
     },
     {
+      key: 'overdue', label: 'Overdue Tasks',
+      render: (r) => r.overdueCount > 0
+        ? <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">{r.overdueCount} late</span>
+        : <span className="text-xs text-gray-300">—</span>,
+    },
+    {
       key: 'country', label: 'Country',
       render: (r) => r.account?.country?.name || '—',
     },
@@ -276,14 +289,21 @@ export default function OnboardingPage() {
       {/* Stage summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {PHASES.map((p) => {
-          const count  = trackers.filter((t) => t.phase === p.key).length
-          const active = phase === p.key
+          const phaseTrackers = trackers.filter((t) => t.phase === p.key)
+          const count    = phaseTrackers.length
+          const overdue  = phaseTrackers.filter((t) => t.overdueCount > 0).length
+          const active   = phase === p.key
           return (
             <button key={p.key} onClick={() => setPhase(active ? '' : p.key)}
               className={`rounded-xl border p-3 text-left transition-all ${active ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
               <p className="text-xs text-gray-400 uppercase tracking-wider">{p.icon} {p.label}</p>
               <p className="text-2xl font-bold text-gray-800 mt-1">{count}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{p.team}</p>
+              <div className="flex items-center justify-between mt-0.5">
+                <p className="text-xs text-gray-400">{p.team}</p>
+                {overdue > 0 && (
+                  <span className="text-xs font-semibold text-red-500">{overdue} late</span>
+                )}
+              </div>
             </button>
           )
         })}

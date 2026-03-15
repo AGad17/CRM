@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { requireAuth } from '@/lib/roleGuard'
 import { getLead, updateLead, updateLeadStage, deleteLead, linkLeadToAccount } from '@/lib/db/pipeline'
+import { logActivity } from '@/lib/activityLog'
 
 export async function GET(request, { params }) {
   const { error } = await requireAuth('read')
@@ -44,6 +47,8 @@ export async function PATCH(request, { params }) {
 
   const { id } = await params
   const body = await request.json()
+  const session = await getServerSession(authOptions)
+  const actor = { actorId: session?.user?.id, actorName: session?.user?.name || session?.user?.email }
 
   // action=link: associate an existing Account with this lead
   if (body.action === 'link') {
@@ -63,7 +68,13 @@ export async function PATCH(request, { params }) {
   }
 
   try {
+    const existing = await getLead(id)
     const lead = await updateLeadStage(id, body.stage, body)
+    await logActivity({
+      entity: 'Lead', entityId: Number(id), accountId: existing?.accountId || null, action: 'stage_changed',
+      ...actor,
+      meta: { from: existing?.stage, to: body.stage, lostReason: body.lostReason || undefined },
+    })
     return NextResponse.json(lead)
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 400 })

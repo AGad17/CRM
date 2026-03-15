@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { requireAuth } from '@/lib/roleGuard'
 import { prisma } from '@/lib/prisma'
 import { getPricingConfig } from '@/lib/db/invoicing'
 import { calcDealSummary, calcInvoiceDates, getQuarterNumber, generateInvoiceNumber } from '@/lib/invoicingCalc'
 import { DEFAULT_TASKS } from '@/lib/db/onboarding'
+import { logActivity } from '@/lib/activityLog'
 
 export async function POST(request, { params }) {
   const { error } = await requireAuth('write')
@@ -11,6 +14,8 @@ export async function POST(request, { params }) {
 
   const { id } = await params
   const body = await request.json()
+  const session = await getServerSession(authOptions)
+  const actor = { actorId: session?.user?.id, actorName: session?.user?.name || session?.user?.email }
 
   // Validate required fields
   const required = ['accountName', 'country', 'posSystem', 'package', 'paymentType', 'startDate', 'agentId']
@@ -398,6 +403,16 @@ export async function POST(request, { params }) {
       return { account, deal }
     })
 
+    await logActivity({
+      entity: 'Lead', entityId: Number(id), accountId: result.account.id, action: 'closed_won',
+      ...actor,
+      meta: { dealId: result.deal.id, accountName: body.accountName },
+    })
+    await logActivity({
+      entity: 'Deal', entityId: result.deal.id, accountId: result.account.id, action: 'created',
+      ...actor,
+      meta: { totalMRR: Number(result.deal.totalMRR), package: body.package },
+    })
     return NextResponse.json(result, { status: 201 })
   } catch (err) {
     console.error('[close-deal]', err)
