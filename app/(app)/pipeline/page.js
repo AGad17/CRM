@@ -1,11 +1,12 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
 import { Modal } from '@/components/ui/Modal'
+import { calcDealSummary } from '@/lib/invoicingCalc'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ const OPP_COLORS = {
 const EMPTY_FORM = {
   companyName: '', contactName: '', contactEmail: '', contactPhone: '',
   channel: '', countryCode: '', estimatedValue: '', packageInterest: '',
-  expectedCloseDate: '', notes: '', ownerId: '',
+  branches: '', expectedCloseDate: '', notes: '', ownerId: '',
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -118,9 +119,42 @@ function ChannelBadge({ channel }) {
 
 // ─── Lead Form ───────────────────────────────────────────────────────────────
 
-function LeadForm({ form, setForm, errors, agents }) {
+function LeadForm({ form, setForm, errors, agents, pricing }) {
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }))
   const cls = (k) => `w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${errors[k] ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white'}`
+
+  // Auto-calculate estimated value from branches + package + country + channel
+  const estSummary = useMemo(() => {
+    if (!pricing || !form.countryCode || !form.channel || !form.packageInterest || !form.branches) return null
+    const country = (pricing.countries || []).find((c) => c.code === form.countryCode)
+    if (!country) return null
+    try {
+      return calcDealSummary({
+        normalBranches:          Number(form.branches) || 0,
+        centralKitchens:         0, warehouses: 0,
+        hasAccounting:           false, extraAccountingBranches: 0,
+        hasButchering:           false, aiAgentUsers: 0,
+        countryCode:             form.countryCode,
+        salesChannel:            form.channel,
+        package:                 form.packageInterest,
+        paymentType:             'Annual', contractYears: 1,
+        vatRate:                 Number(country.vatRate || 0),
+        discount:                0, lineDiscounts: {},
+        inventoryPricing:        pricing.inventoryPricing || [],
+        addOnPricing:            pricing.addOnPricing || [],
+      })
+    } catch { return null }
+  }, [pricing, form.countryCode, form.channel, form.packageInterest, form.branches])
+
+  // Sync calculated value to estimatedValue form field
+  useEffect(() => {
+    if (estSummary) {
+      setForm((p) => ({ ...p, estimatedValue: String(Math.round(estSummary.effectiveAnnual)) }))
+    }
+  }, [estSummary, setForm])
+
+  const currency = COUNTRY_CURRENCY[form.countryCode] || ''
+  const canCalc  = form.countryCode && form.channel && form.packageInterest && form.branches
 
   return (
     <div className="space-y-4">
@@ -165,8 +199,34 @@ function LeadForm({ form, setForm, errors, agents }) {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Est. Value ({COUNTRY_CURRENCY[form.countryCode] || 'Local'})</label>
-          <input className={cls('estimatedValue')} type="number" min="0" value={form.estimatedValue} onChange={set('estimatedValue')} placeholder="0" />
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Est. Branches</label>
+          <input className={cls('branches')} type="number" min="0" value={form.branches} onChange={set('branches')} placeholder="0" />
+        </div>
+        {/* Deal value: auto-calculated card or manual fallback */}
+        <div className="col-span-2">
+          {estSummary ? (
+            <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-0.5">Auto-calculated Deal Value</p>
+                <p className="text-base font-bold text-indigo-700">
+                  {currency} {Math.round(estSummary.effectiveAnnual).toLocaleString('en-US')}
+                  <span className="text-xs font-normal text-indigo-400 ml-1">/ year excl. VAT</span>
+                </p>
+                <p className="text-xs text-indigo-400 mt-0.5">
+                  MRR {currency} {Math.round(estSummary.totalMRR).toLocaleString('en-US')} · {form.branches} branch{Number(form.branches) !== 1 ? 'es' : ''} · {form.packageInterest}
+                </p>
+              </div>
+              <span className="text-indigo-200 text-3xl font-light">≈</span>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                Est. Value {currency ? `(${currency})` : ''}
+                {!canCalc && <span className="text-gray-300 font-normal ml-1 normal-case">· set country, channel, package & branches to auto-calculate</span>}
+              </label>
+              <input className={cls('estimatedValue')} type="number" min="0" value={form.estimatedValue} onChange={set('estimatedValue')} placeholder="0" />
+            </div>
+          )}
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Expected Close Date</label>
@@ -329,6 +389,12 @@ export default function PipelinePage() {
     queryFn: () => fetch('/api/accounts?selector=true').then((r) => r.json()),
   })
 
+  const { data: pricing } = useQuery({
+    queryKey: ['invoicing-pricing'],
+    queryFn: () => fetch('/api/invoicing/pricing').then((r) => r.json()),
+    staleTime: 60_000,
+  })
+
   // ── Mutations ──
   const invalidate = () => qc.invalidateQueries({ queryKey: ['pipeline-leads'] })
 
@@ -412,6 +478,8 @@ export default function PipelinePage() {
       channel:          lead.channel,
       countryCode:      lead.countryCode      || '',
       estimatedValue:   lead.estimatedValue   != null ? String(lead.estimatedValue) : '',
+      numberOfBranches: lead.numberOfBranches != null ? String(lead.numberOfBranches) : '',
+      branches:         lead.numberOfBranches != null ? String(lead.numberOfBranches) : '',
       packageInterest:  lead.packageInterest  || '',
       expectedCloseDate: lead.expectedCloseDate ? new Date(lead.expectedCloseDate).toISOString().slice(0, 10) : '',
       notes:            lead.notes            || '',
@@ -437,7 +505,8 @@ export default function PipelinePage() {
     const isExpRen = oppType === 'Expansion' || oppType === 'Renewal'
     const payload = {
       ...formData,
-      opportunityType: oppType || 'New',
+      opportunityType:  oppType || 'New',
+      numberOfBranches: Number(formData.branches) || null,
       ...(isExpRen && selectedAccount && {
         companyName: selectedAccount.name,
         countryCode: selectedAccount.country?.code || formData.countryCode,
@@ -447,7 +516,7 @@ export default function PipelinePage() {
     if (modal === 'create') {
       createM.mutate(payload)
     } else if (modal?.edit) {
-      updateM.mutate({ id: modal.edit.id, data: formData })
+      updateM.mutate({ id: modal.edit.id, data: { ...formData, numberOfBranches: Number(formData.branches) || null } })
     }
   }
 
@@ -755,7 +824,7 @@ export default function PipelinePage() {
                 </div>
               ) : (
                 /* New: standard lead form */
-                <LeadForm form={formData} setForm={setFormData} errors={formErrors} agents={agents} />
+                <LeadForm form={formData} setForm={setFormData} errors={formErrors} agents={agents} pricing={pricing} />
               )}
 
               {(createM.data?.error) && (
@@ -775,7 +844,7 @@ export default function PipelinePage() {
       {/* Edit Lead */}
       <Modal isOpen={!!modal?.edit} onClose={() => setModal(null)} title="Edit Opportunity">
         <div className="space-y-5">
-          <LeadForm form={formData} setForm={setFormData} errors={formErrors} agents={agents} />
+          <LeadForm form={formData} setForm={setFormData} errors={formErrors} agents={agents} pricing={pricing} />
           {updateM.data?.error && (
             <p className="text-sm text-red-500">{updateM.data.error}</p>
           )}
