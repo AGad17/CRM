@@ -60,7 +60,7 @@ export default function WinLossPage() {
   const byLostReason = data?.byLostReason || []
 
   const channelCols = [
-    { key: 'channel', label: 'Channel', render: (r) => label(r.channel) },
+    { key: 'channel', label: 'Lead Source', render: (r) => label(r.channel) },
     { key: 'total', label: 'Total Leads' },
     { key: 'won', label: 'Won' },
     { key: 'lost', label: 'Lost' },
@@ -132,7 +132,7 @@ export default function WinLossPage() {
         {/* Won vs Lost by channel */}
         {chartData.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 pt-5 pb-4">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">Won vs Lost by Channel</p>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">Won vs Lost by Lead Source</p>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={chartData} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
@@ -169,7 +169,7 @@ export default function WinLossPage() {
       <div>
         <div className="flex items-center gap-2 mb-3">
           <div className="w-1 h-4 rounded-full bg-[#5061F6]" />
-          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Win/Loss by Channel</h2>
+          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Win/Loss by Lead Source</h2>
         </div>
         <DataTable columns={channelCols} data={byChannel} exportFilename="win-loss.csv" />
       </div>

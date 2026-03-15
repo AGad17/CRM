@@ -105,6 +105,10 @@ export async function POST(request, { params }) {
       amountInclVAT,
       eligibleCollectionDate,
       status:                 'Pending',
+      // Save Foodics invoice number on the first invoice (index 0) if provided
+      ...(i === 0 && body.foodicsInvoiceNumber
+        ? { foodicsInvoiceNumber: body.foodicsInvoiceNumber }
+        : {}),
     }
   })
 

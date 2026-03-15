@@ -5,7 +5,8 @@ import { updateInvoice } from '@/lib/db/invoicing'
 export async function PATCH(request, { params }) {
   const { error } = await requireAuth('write')
   if (error) return error
+  const { id } = await params
   const body = await request.json()
-  const invoice = await updateInvoice(params.id, body)
+  const invoice = await updateInvoice(id, body)
   return NextResponse.json(invoice)
 }

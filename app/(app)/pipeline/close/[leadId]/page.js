@@ -35,7 +35,8 @@ const EMPTY_DEAL = {
   normalBranches: 0, centralKitchens: 0, warehouses: 0,
   hasAccounting: false, extraAccountingBranches: 0,
   hasButchering: false, aiAgentUsers: 0, notes: '',
-  discount: '',  // overall deal discount %
+  discount: '',         // overall deal discount %
+  foodicsInvoiceNumber: '', // first Foodics invoice # (Foodics deals only)
 }
 
 const EMPTY_LINE_DISCOUNTS = {
@@ -252,6 +253,7 @@ export default function CloseDealPage() {
       aiAgentUsers:            Number(deal.aiAgentUsers)            || 0,
       notes:                   deal.notes,
       discount:                Number(deal.discount) || 0,
+      foodicsInvoiceNumber:    deal.foodicsInvoiceNumber?.trim() || null,
       lineDiscounts: {
         inventory:  Number(lineDiscounts.inventory)  || 0,
         ck:         Number(lineDiscounts.ck)         || 0,
@@ -533,6 +535,26 @@ export default function CloseDealPage() {
               onChange={setD('notes')}
             />
           </Section>
+
+          {/* Foodics Invoice Number (Foodics deals only) */}
+          {deal.posSystem === 'Foodics' && (
+            <Section title="Foodics Invoice">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Foodics Invoice # <span className="text-gray-400 font-normal">(optional — can be added later)</span>
+                </label>
+                <input
+                  className={fc('foodicsInvoiceNumber')}
+                  value={deal.foodicsInvoiceNumber}
+                  onChange={setD('foodicsInvoiceNumber')}
+                  placeholder="e.g. INV-2025-00123"
+                />
+                <p className="text-xs text-gray-400 mt-1.5">
+                  Saved on the first invoice. Additional invoices can be updated from the Invoicing page.
+                </p>
+              </div>
+            </Section>
+          )}
 
           <button
             onClick={handleReview}
