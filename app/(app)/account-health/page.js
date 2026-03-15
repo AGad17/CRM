@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { KPICard } from '@/components/ui/KPICard'
 
 const PHASES = ['DealClosure', 'Onboarding', 'Training', 'Incubation', 'AccountManagement', 'Churned']
@@ -33,6 +33,18 @@ export default function AccountHealthPage() {
   const [country, setCountry] = useState('')
   const [phase, setPhase] = useState('')
   const [sort, setSort] = useState('asc') // 'asc' = worst first
+  const [snapshotMsg, setSnapshotMsg] = useState(null)
+
+  const queryClient = useQueryClient()
+
+  const snapshotMutation = useMutation({
+    mutationFn: () => fetch('/api/analytics/health-snapshot', { method: 'POST' }).then((r) => r.json()),
+    onSuccess: (data) => {
+      setSnapshotMsg(`Snapshot saved for ${data.count} accounts`)
+      setTimeout(() => setSnapshotMsg(null), 4000)
+      queryClient.invalidateQueries({ queryKey: ['account-health'] })
+    },
+  })
 
   const { data: countries = [] } = useQuery({
     queryKey: ['countries'],
@@ -101,6 +113,16 @@ export default function AccountHealthPage() {
         </div>
         {hasFilters && <button onClick={() => { setCountry(''); setPhase('') }}
           className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">Clear all</button>}
+        <div className="ml-auto flex items-center gap-2">
+          {snapshotMsg && <span className="text-xs text-emerald-600 font-medium">{snapshotMsg}</span>}
+          <button
+            onClick={() => snapshotMutation.mutate()}
+            disabled={snapshotMutation.isPending}
+            className="text-xs bg-[#5061F6] hover:bg-[#3b4cc4] disabled:opacity-50 text-white font-semibold px-3 py-2 rounded-xl transition-colors"
+          >
+            {snapshotMutation.isPending ? 'Saving…' : 'Take Snapshot'}
+          </button>
+        </div>
       </div>
 
       {/* KPI Strip */}
@@ -140,7 +162,11 @@ export default function AccountHealthPage() {
                 const { text, bg, text_, border } = scoreLabel(r.healthScore)
                 return (
                   <tr key={r.trackerId} className="hover:bg-[#F5F2FF]/40 transition-colors">
-                    <td className="px-4 py-3 font-semibold text-gray-800 sticky left-0 bg-white whitespace-nowrap">{r.accountName}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-800 sticky left-0 bg-white whitespace-nowrap">
+                      {r.accountId ? (
+                        <a href={`/accounts/${r.accountId}`} className="hover:text-[#5061F6] hover:underline">{r.accountName}</a>
+                      ) : r.accountName}
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{r.countryName || r.country}</td>
                     <td className="px-4 py-3">
                       <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-[#F5F2FF] text-[#5061F6]">

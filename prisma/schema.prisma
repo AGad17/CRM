@@ -119,12 +119,13 @@ model Account {
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 
-  contracts  Contract[]
-  country    Country            @relation(fields: [countryId], references: [id])
-  leads      Lead[]
-  deals      Deal[]
-  onboarding OnboardingTracker?
-  handovers  HandoverDocument[]
+  contracts       Contract[]
+  country         Country                @relation(fields: [countryId], references: [id])
+  leads           Lead[]
+  deals           Deal[]
+  onboarding      OnboardingTracker?
+  handovers       HandoverDocument[]
+  healthSnapshots AccountHealthSnapshot[]
 
   @@map("accounts")
 }
@@ -145,6 +146,7 @@ model Contract {
 
   account Account        @relation(fields: [accountId], references: [id])
   items   ContractItem[]
+  deals   Deal[]
 
   @@map("contracts")
 }
@@ -359,12 +361,14 @@ model Deal {
   contractValue         Decimal        @db.Decimal(14, 2)
   contractValueInclVAT  Decimal        @db.Decimal(14, 2)
 
-  accountId Int?
-  createdAt DateTime @default(now())
+  accountId  Int?
+  contractId Int?     // direct link to the Contract record created for this deal
+  createdAt  DateTime @default(now())
 
   agent      User?              @relation(fields: [agentId], references: [id])
   invoices   Invoice[]
   account    Account?           @relation(fields: [accountId], references: [id])
+  contract   Contract?          @relation(fields: [contractId], references: [id])
   onboarding OnboardingTracker?
   handover   HandoverDocument?
 
@@ -552,6 +556,24 @@ model ActivityLog {
   @@index([accountId])
   @@index([createdAt])
   @@map("activity_logs")
+}
+
+// ─── Account Health Snapshot ──────────────────────────────────────────────────
+
+model AccountHealthSnapshot {
+  id         Int      @id @default(autoincrement())
+  accountId  Int
+  score      Decimal  @db.Decimal(5, 2)   // 0–100
+  label      String                        // 'Healthy' | 'Watch' | 'At Risk'
+  csatScore  Decimal? @db.Decimal(5, 2)
+  npsScore   Decimal? @db.Decimal(5, 2)
+  taskPct    Decimal? @db.Decimal(5, 2)
+  snappedAt  DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, snappedAt])
+  @@map("account_health_snapshots")
 }
 
 // ─── Internal Handover Document ───────────────────────────────────────────────

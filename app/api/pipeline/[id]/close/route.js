@@ -389,7 +389,7 @@ export async function POST(request, { params }) {
         })
       }
 
-      await tx.contract.create({
+      const contract = await tx.contract.create({
         data: {
           accountId:     account.id,
           contractValue: summary.contractValue,
@@ -398,6 +398,12 @@ export async function POST(request, { params }) {
           type:          contractType,
           items:         { create: items },
         },
+      })
+
+      // Link deal → contract directly for traceability
+      await tx.deal.update({
+        where: { id: deal.id },
+        data:  { contractId: contract.id },
       })
 
       return { account, deal }

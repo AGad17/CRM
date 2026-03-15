@@ -112,6 +112,7 @@ const NAV = [
       { href: '/renewal-pipeline',     label: 'Renewal Pipeline'      },
       { href: '/mrr-waterfall',        label: 'MRR Waterfall'         },
       { href: '/account-health',       label: 'Account Health'        },
+      { href: '/cs-performance',       label: 'CS Performance'        },
       { href: '/lead-source-analysis', label: 'Lead Source Analysis'  },
       { href: '/win-loss',             label: 'Win / Loss'            },
       { href: '/nrr-breakdown',        label: 'NRR Breakdown'         },

@@ -49,6 +49,12 @@ export default function AccountDetailPage() {
     enabled: !!id,
   })
 
+  const { data: surveys } = useQuery({
+    queryKey: ['account-surveys', id],
+    queryFn: () => fetch(`/api/accounts/${id}/surveys`).then((r) => r.json()),
+    enabled: !!id,
+  })
+
   if (isLoading) return <div className="animate-pulse h-64 bg-gray-200 rounded-2xl" />
   if (!account || account.error) return <div className="text-red-500">Account not found</div>
 
@@ -185,6 +191,69 @@ export default function AccountDetailPage() {
                 {new Date(account.onboarding.startDate).toLocaleDateString()}
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Survey Scores */}
+      {surveys && (surveys.csat?.length > 0 || surveys.nps?.length > 0) && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Survey History</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* CSAT */}
+            {surveys.csat?.length > 0 && (
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="bg-gray-50 border-b border-gray-100 px-4 py-2.5 flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">CSAT</span>
+                  <span className="text-xs text-gray-400">avg {(surveys.csat.filter(r => r.score != null).reduce((s, r) => s + r.score, 0) / (surveys.csat.filter(r => r.score != null).length || 1)).toFixed(1)} / 5</span>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {surveys.csat.slice(0, 8).map((r) => (
+                    <div key={r.id} className="flex items-center gap-3 px-4 py-2.5">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                        r.score >= 4 ? 'bg-emerald-50 text-emerald-700' : r.score >= 3 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'
+                      }`}>
+                        {r.score ?? '—'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-600 truncate">
+                          {r.fromPhase?.replace(/([A-Z])/g, ' $1').trim()}
+                          {r.toPhase ? <span className="text-gray-400"> → {r.toPhase.replace(/([A-Z])/g, ' $1').trim()}</span> : null}
+                        </p>
+                        {r.notes && <p className="text-xs text-gray-400 truncate mt-0.5">{r.notes}</p>}
+                      </div>
+                      <span className="text-xs text-gray-400 flex-shrink-0">{new Date(r.createdAt).toLocaleDateString('en-GB')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* NPS */}
+            {surveys.nps?.length > 0 && (
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="bg-gray-50 border-b border-gray-100 px-4 py-2.5 flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">NPS</span>
+                  <span className="text-xs text-gray-400">avg {(surveys.nps.filter(r => r.score != null).reduce((s, r) => s + r.score, 0) / (surveys.nps.filter(r => r.score != null).length || 1)).toFixed(1)} / 10</span>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {surveys.nps.slice(0, 8).map((r) => (
+                    <div key={r.id} className="flex items-center gap-3 px-4 py-2.5">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                        r.score >= 9 ? 'bg-emerald-50 text-emerald-700' : r.score >= 7 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'
+                      }`}>
+                        {r.score ?? '—'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-600">{r.quarter || r.phase?.replace(/([A-Z])/g, ' $1').trim() || '—'}</p>
+                        {r.notes && <p className="text-xs text-gray-400 truncate mt-0.5">{r.notes}</p>}
+                      </div>
+                      <span className="text-xs text-gray-400 flex-shrink-0">{new Date(r.createdAt).toLocaleDateString('en-GB')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
