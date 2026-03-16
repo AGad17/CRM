@@ -120,7 +120,7 @@ export default function LeadSourceAnalysisPage() {
           subLabel={topByMRR ? `${label(topByMRR.leadSource)} — ${usd(topByMRR.mrr)}` : '—'} accent="#49B697" />
         <KPICard label="Top Source by Count" value={null} format="number"
           subLabel={topByCount ? `${label(topByCount.leadSource)} — ${topByCount.totalAccounts} accts` : '—'} accent="#F4BF1D" />
-      </div>
+      </div>}
 
       {/* Charts */}
       {bySource.length > 0 && (
