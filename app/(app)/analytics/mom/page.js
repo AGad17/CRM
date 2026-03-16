@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts'
 import { AnalyticsTable } from '../_components/AnalyticsTable'
+import { PageError } from '@/components/ui/PageError'
 
 function MRRTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
@@ -26,12 +27,15 @@ export default function MoMPage() {
     queryFn: () => fetch('/api/countries').then((r) => r.json()),
   })
 
-  const { data = [], isLoading } = useQuery({
+  const { data = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['analytics-mom', country],
     queryFn: () => {
       const p = new URLSearchParams()
       if (country) p.set('country', country)
-      return fetch(`/api/analytics/mom?${p}`).then((r) => r.json())
+      return fetch(`/api/analytics/mom?${p}`).then((r) => {
+        if (!r.ok) throw new Error('Failed to load month-over-month data')
+        return r.json()
+      })
     },
   })
 
@@ -47,6 +51,8 @@ export default function MoMPage() {
 
   const hasFilters = country || yearFrom || yearTo
   const chartData = filtered.filter((r) => r.totalMRRSigned != null)
+
+  if (isError) return <PageError onRetry={refetch} />
 
   return (
     <div className="space-y-5">

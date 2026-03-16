@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { KPICard } from '@/components/ui/KPICard'
+import { PageError } from '@/components/ui/PageError'
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -135,9 +136,12 @@ function RepCard({ rep }) {
 }
 
 export default function CSPerformancePage() {
-  const { data = [], isLoading } = useQuery({
+  const { data = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['cs-performance'],
-    queryFn: () => fetch('/api/analytics/cs-performance').then((r) => r.json()),
+    queryFn: () => fetch('/api/analytics/cs-performance').then((r) => {
+      if (!r.ok) throw new Error('Failed to load CS performance data')
+      return r.json()
+    }),
     refetchInterval: 60_000,
   })
 
@@ -147,6 +151,8 @@ export default function CSPerformancePage() {
     ? data.filter((r) => r.avgHealthScore !== null).reduce((s, r) => s + r.avgHealthScore, 0) /
       data.filter((r) => r.avgHealthScore !== null).length : null
   const totalAtRisk     = data.reduce((s, r) => s + r.accountsAtRisk, 0)
+
+  if (isError) return <PageError onRetry={refetch} />
 
   return (
     <div className="space-y-6">

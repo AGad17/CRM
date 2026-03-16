@@ -7,6 +7,7 @@ import {
 } from 'recharts'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
+import { PageError } from '@/components/ui/PageError'
 
 function pct(v) { return v != null ? `${(v * 100).toFixed(1)}%` : '—' }
 function usd(v) { return v != null ? `USD ${Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—' }
@@ -45,12 +46,15 @@ export default function WinLossPage() {
     queryFn: () => fetch('/api/countries').then((r) => r.json()),
   })
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['win-loss', country],
     queryFn: () => {
       const p = new URLSearchParams()
       if (country) p.set('country', country)
-      return fetch(`/api/analytics/win-loss?${p}`).then((r) => r.json())
+      return fetch(`/api/analytics/win-loss?${p}`).then((r) => {
+        if (!r.ok) throw new Error('Failed to load win/loss data')
+        return r.json()
+      })
     },
   })
 
@@ -96,6 +100,8 @@ export default function WinLossPage() {
   const chartData = byChannel.map((r) => ({ name: label(r.channel), won: r.won, lost: r.lost }))
   const chartQuarter = byQuarter.filter((r) => r.winRate != null)
 
+  if (isError) return <PageError onRetry={refetch} />
+
   if (isLoading) return (
     <div className="animate-pulse space-y-6">
       <div className="h-14 bg-gray-100 rounded-2xl" />
@@ -127,52 +133,63 @@ export default function WinLossPage() {
         <KPICard label="Avg Days to Close" value={summary.avgVelocity} format="number" subLabel="days (won deals)" accent="#F4BF1D" />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Won vs Lost by channel */}
-        {chartData.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 pt-5 pb-4">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">Won vs Lost by Lead Source</p>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={chartData} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<BarTooltip />} cursor={{ fill: '#F5F2FF' }} />
-                <Legend iconType="circle" iconSize={8}
-                  formatter={(v) => <span className="text-xs text-gray-600 font-medium">{v}</span>} />
-                <Bar dataKey="won" name="Won" fill="#49B697" radius={[4, 4, 0, 0]} maxBarSize={24} />
-                <Bar dataKey="lost" name="Lost" fill="#fca5a5" radius={[4, 4, 0, 0]} maxBarSize={24} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-        {/* Win rate trend */}
-        {chartQuarter.length > 1 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 pt-5 pb-4">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">Win Rate Trend by Quarter</p>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={chartQuarter} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="quarter" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={40} />
-                <Tooltip content={<LineTooltip />} />
-                <Line type="monotone" dataKey="winRate" stroke="#5061F6" strokeWidth={2.5}
-                  dot={{ fill: '#5061F6', r: 4, strokeWidth: 0 }}
-                  activeDot={{ r: 6, fill: '#5061F6', stroke: '#F5F2FF', strokeWidth: 2 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-
-      {/* Channel table */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-1 h-4 rounded-full bg-[#5061F6]" />
-          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Win/Loss by Lead Source</h2>
+      {/* Empty state */}
+      {byChannel.length === 0 && (
+        <div className="bg-white rounded-2xl border border-dashed border-gray-200 px-6 py-14 text-center">
+          <p className="text-sm text-gray-400">No win/loss data found{country ? ' for the selected country' : ''}. Close some leads to see results.</p>
         </div>
-        <DataTable columns={channelCols} data={byChannel} exportFilename="win-loss.csv" />
-      </div>
+      )}
+
+      {/* Charts + tables — only when there's data */}
+      {byChannel.length > 0 && (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Won vs Lost by channel */}
+            {chartData.length > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 pt-5 pb-4">
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">Won vs Lost by Lead Source</p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={chartData} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
+                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<BarTooltip />} cursor={{ fill: '#F5F2FF' }} />
+                    <Legend iconType="circle" iconSize={8}
+                      formatter={(v) => <span className="text-xs text-gray-600 font-medium">{v}</span>} />
+                    <Bar dataKey="won" name="Won" fill="#49B697" radius={[4, 4, 0, 0]} maxBarSize={24} />
+                    <Bar dataKey="lost" name="Lost" fill="#fca5a5" radius={[4, 4, 0, 0]} maxBarSize={24} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            {/* Win rate trend */}
+            {chartQuarter.length > 1 && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 pt-5 pb-4">
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">Win Rate Trend by Quarter</p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={chartQuarter} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                    <XAxis dataKey="quarter" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={40} />
+                    <Tooltip content={<LineTooltip />} />
+                    <Line type="monotone" dataKey="winRate" stroke="#5061F6" strokeWidth={2.5}
+                      dot={{ fill: '#5061F6', r: 4, strokeWidth: 0 }}
+                      activeDot={{ r: 6, fill: '#5061F6', stroke: '#F5F2FF', strokeWidth: 2 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          {/* Channel table */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-4 rounded-full bg-[#5061F6]" />
+              <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Win/Loss by Lead Source</h2>
+            </div>
+            <DataTable columns={channelCols} data={byChannel} exportFilename="win-loss.csv" />
+          </div>
+        </>
+      )}
 
       {/* Lost reasons */}
       {byLostReason.length > 0 && (

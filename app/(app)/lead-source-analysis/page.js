@@ -7,6 +7,7 @@ import {
 } from 'recharts'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
+import { PageError } from '@/components/ui/PageError'
 
 const COLORS = ['#5061F6', '#49B697', '#F4BF1D', '#C2B4FB', '#AAB3FA', '#f97316', '#ec4899', '#06b6d4']
 
@@ -43,12 +44,15 @@ export default function LeadSourceAnalysisPage() {
     queryFn: () => fetch('/api/countries').then((r) => r.json()),
   })
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['lead-source', country],
     queryFn: () => {
       const p = new URLSearchParams()
       if (country) p.set('country', country)
-      return fetch(`/api/analytics/lead-source?${p}`).then((r) => r.json())
+      return fetch(`/api/analytics/lead-source?${p}`).then((r) => {
+        if (!r.ok) throw new Error('Failed to load lead source data')
+        return r.json()
+      })
     },
   })
 
@@ -76,6 +80,8 @@ export default function LeadSourceAnalysisPage() {
     { key: 'percentOfAccounts', label: '% of Accounts', render: (r) => pct(r.percentOfAccounts) },
   ]
 
+  if (isError) return <PageError onRetry={refetch} />
+
   if (isLoading) return (
     <div className="animate-pulse space-y-6">
       <div className="h-14 bg-gray-100 rounded-2xl" />
@@ -99,8 +105,15 @@ export default function LeadSourceAnalysisPage() {
           className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">Clear</button>}
       </div>
 
+      {/* Empty state */}
+      {bySource.length === 0 && (
+        <div className="bg-white rounded-2xl border border-dashed border-gray-200 px-6 py-14 text-center">
+          <p className="text-sm text-gray-400">No lead source data found{country ? ' for the selected country' : ''}.</p>
+        </div>
+      )}
+
       {/* KPI Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {bySource.length > 0 && <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPICard label="Total MRR" value={totalMRR} format="currency" accent="#5061F6" />
         <KPICard label="Total Accounts" value={totalAccounts} format="integer" accent="#C2B4FB" />
         <KPICard label="Top Source by MRR" value={null} format="number"
@@ -147,13 +160,15 @@ export default function LeadSourceAnalysisPage() {
       )}
 
       {/* Table */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-1 h-4 rounded-full bg-[#5061F6]" />
-          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Detailed Breakdown</h2>
+      {bySource.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-1 h-4 rounded-full bg-[#5061F6]" />
+            <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Detailed Breakdown</h2>
+          </div>
+          <DataTable columns={tableCols} data={bySource} exportFilename="lead-source-analysis.csv" />
         </div>
-        <DataTable columns={tableCols} data={bySource} exportFilename="lead-source-analysis.csv" />
-      </div>
+      )}
     </div>
   )
 }
