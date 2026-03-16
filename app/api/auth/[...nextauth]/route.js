@@ -1,5 +1,5 @@
-import NextAuth from 'next-auth'
-import { authOptions } from '@/lib/auth'
+// next-auth v4 ships as CJS; the interop fix lives in lib/auth.js
+// Import the already-constructed handler from there instead of calling NextAuth() again.
+import handler from '@/lib/auth'
 
-const handler = NextAuth(authOptions)
 export { handler as GET, handler as POST }
