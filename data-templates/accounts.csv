@@ -1,0 +1,15 @@
+account_name,country,lead_source,brands,branches,cost_centres,external_code
+# ─── INSTRUCTIONS ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# account_name   REQUIRED  — Full legal / trade name of the client company (must be unique)
+# country        REQUIRED  — One of: Egypt | KSA | UAE | Bahrain | Jordan
+# lead_source    REQUIRED  — One of: Foodics | EmployeeReferral | CustomerReferral | PartnerReferral | Website | AmbassadorReferral | DirectSales | Sonic | Historical
+# brands                  — Number of distinct brands this account operates (default: 1)
+# branches                — Total number of branches/outlets (default: 1)
+# cost_centres            — Number of cost centres (optional, leave blank if unknown)
+# external_code           — Your internal ERP/CRM reference code (optional)
+# ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# ── EXAMPLE ROWS (delete before importing) ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Al Baik,KSA,Foodics,1,25,,ACC-001
+Hardee's Egypt,Egypt,EmployeeReferral,1,12,,
+The Coffee Club,UAE,DirectSales,1,8,,UAE-042
+Kout Food Group,Kuwait,PartnerReferral,4,60,,

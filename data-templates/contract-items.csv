@@ -1,0 +1,27 @@
+account_name,contract_start_date,description,quantity,unit_price,payment_plan,discount_pct
+# ─── INSTRUCTIONS ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# account_name          REQUIRED — Must match the account_name in contracts.csv
+# contract_start_date   REQUIRED — Must match the start_date of the contract in contracts.csv (YYYY-MM-DD)
+#                                  This is how the importer links items to the correct contract.
+# description           REQUIRED — Free-text line item label (e.g. "Enterprise Plan", "Warehouse Module")
+# quantity              REQUIRED — Number of units (e.g. number of branches for per-branch pricing)
+# unit_price            REQUIRED — Price per unit per period (in local currency, per the payment_plan period)
+#                                  If payment_plan = Yearly  → price per YEAR
+#                                  If payment_plan = Quarterly → price per QUARTER
+#                                  If payment_plan = OneTime  → one-off total price
+# payment_plan          REQUIRED — One of: Yearly | Quarterly | OneTime
+# discount_pct                   — Percentage discount on this line (e.g. 10 = 10%). Leave blank for no discount.
+# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# ── TIP: line_total is auto-calculated ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# line_total = quantity × unit_price × (1 − discount_pct / 100)
+# For MRR analytics the system uses:
+#   Yearly:    line_total / 12   = monthly MRR contribution
+#   Quarterly: line_total / 3    = monthly MRR contribution
+#   OneTime:   line_total        = recorded as contract value only (no MRR)
+# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# ── EXAMPLE ROWS (delete before importing) ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Al Baik,2024-01-01,Foodics Enterprise Plan,25,3000,Yearly,
+Al Baik,2024-01-01,Warehouse Module,2,1800,Yearly,10
+Al Baik,2026-01-01,Foodics Enterprise Plan,25,3200,Yearly,
+Hardee's Egypt,2024-06-01,Foodics Operations Plan,12,1000,Yearly,
+The Coffee Club,2023-03-01,Foodics Essential Plan,8,600,Yearly,

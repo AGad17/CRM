@@ -1,0 +1,22 @@
+account_name,contract_type,start_date,end_date,contract_value,usd_rate,cancellation_date
+# ─── INSTRUCTIONS ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# account_name       REQUIRED — Must match exactly the account_name in accounts.csv
+# contract_type      REQUIRED — One of: New | Renewal | Expansion
+# start_date         REQUIRED — Contract start date  (YYYY-MM-DD)
+# end_date           REQUIRED — Contract end date    (YYYY-MM-DD)
+# contract_value     REQUIRED — Total contract value in the account's LOCAL currency (e.g. SAR, EGP, AED)
+#                               This is the sum of all line-item line totals for the full contract period.
+# usd_rate                    — Exchange rate to USD at signing (e.g. 3.75 for SAR→USD).
+#                               Leave blank to skip USD conversion on analytics.
+# cancellation_date           — If the contract was churned/cancelled, enter the date (YYYY-MM-DD).
+#                               Leave BLANK for active contracts.
+# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# ── TIP: Contract Value ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# For a 12-month contract with monthly MRR of 1,000 SAR → contract_value = 12,000
+# For a 24-month contract with monthly MRR of 1,500 AED → contract_value = 36,000
+# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# ── EXAMPLE ROWS (delete before importing) ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Al Baik,New,2024-01-01,2025-12-31,90000,3.75,
+Al Baik,Renewal,2026-01-01,2027-12-31,96000,3.75,
+Hardee's Egypt,New,2024-06-01,2025-05-31,144000,50.00,
+The Coffee Club,New,2023-03-01,2025-02-28,57600,3.67,2024-11-30

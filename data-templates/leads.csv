@@ -1,0 +1,27 @@
+company_name,contact_name,contact_email,contact_phone,channel,country,estimated_value,branches,package_interest,stage,lost_reason,expected_close_date,owner_email,opportunity_type,notes,account_name
+# ─── INSTRUCTIONS ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# company_name       REQUIRED — Prospect or existing client company name
+# contact_name                — Primary contact person name
+# contact_email               — Primary contact email
+# contact_phone               — Primary contact phone
+# channel            REQUIRED — Lead source: Foodics | EmployeeReferral | CustomerReferral | PartnerReferral | Website | AmbassadorReferral | DirectSales | Sonic | Historical
+# country                     — One of: Egypt | KSA | UAE | Bahrain | Jordan  (leave blank if unknown)
+# estimated_value             — Estimated monthly MRR in local currency
+# branches                    — Estimated number of branches
+# package_interest            — One of: Essential | Operations | Enterprise
+# stage                       — One of: Lead | Qualified | ClosedWon | ClosedLost  (default: Lead)
+# lost_reason                 — Required if stage = ClosedLost (e.g. "Competitor", "Budget", "No Decision")
+# expected_close_date         — Target close date (YYYY-MM-DD)
+# owner_email        REQUIRED — Email address of the CRM user who owns this lead
+#                               Must match an existing user in Settings → Team.
+#                               (default admin: admin@shopbrain.com)
+# opportunity_type            — One of: New | Renewal | Upsell | Expansion (default: New)
+# notes                       — Any free-text notes about the lead
+# account_name                — If this lead is linked to an existing account, enter the account_name
+#                               exactly as it appears in accounts.csv. Leave blank for new prospects.
+# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# ── EXAMPLE ROWS (delete before importing) ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Pizza Hut KSA,Mohammed Al-Rashid,m.rashid@pizzahut.sa,+966501234567,Foodics,KSA,5000,18,Enterprise,Qualified,,2026-04-30,admin@shopbrain.com,New,Very interested in warehouse module,
+Burger King Egypt,Sara Hassan,sara@bk.eg,+201001234567,DirectSales,Egypt,2400,10,Operations,Lead,,2026-05-15,admin@shopbrain.com,New,,
+Old client - Chilis,Ahmed Nasser,,+971501234567,CustomerReferral,UAE,1200,5,Essential,ClosedLost,Budget,,admin@shopbrain.com,New,Went with competitor,,
+Al Baik,Khalid Al-Otaibi,k.otaibi@albaik.com,,Foodics,KSA,3200,25,Enterprise,Qualified,,2026-04-01,admin@shopbrain.com,Renewal,Renewal discussion in progress,Al Baik
