@@ -35,6 +35,25 @@ const BUCKET_CONFIG = {
   '90+':     { label: '90+ days',  color: 'bg-red-200 text-red-800' },
 }
 
+function exportCsv(rows, filename) {
+  function cell(v) {
+    const s = v === null || v === undefined ? '' : String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? '"' + s.replace(/"/g, '""') + '"' : s
+  }
+  const headers = ['Account', 'Invoice #', 'POS', 'Status', 'Eligible Date', 'Age Bucket', 'Days Overdue', 'Amount (incl. VAT)']
+  const csvRows = rows.map((r) => [
+    r.accountName, r.invoiceNumber, r.posSystem, r.status,
+    r.eligibleCollectionDate ? new Date(r.eligibleCollectionDate).toLocaleDateString('en-GB') : '',
+    r.ageBucket, r.daysOverdue ?? '', Number(r.amountInclVAT || 0).toFixed(2),
+  ].map(cell).join(','))
+  const csv = [headers.map(cell).join(','), ...csvRows].join('\n')
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click()
+  URL.revokeObjectURL(a.href)
+}
+
 export default function ARReportPage() {
   const [bucket, setBucket]   = useState('')
   const [posFilter, setPosFilter] = useState('')
@@ -86,7 +105,20 @@ export default function ARReportPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Outstanding Invoices</h2>
-              <span className="text-xs text-gray-400">{filtered.length} of {agingRows.length}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-400">{filtered.length} of {agingRows.length}</span>
+                {filtered.length > 0 && (
+                  <button
+                    onClick={() => exportCsv(filtered, 'ar-report.csv')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#5061F6] bg-white border border-[#5061F6]/20 rounded-lg hover:bg-[#F5F2FF] transition-colors"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} aria-hidden>
+                      <path strokeLinecap="round" d="M12 3v13M7 11l5 5 5-5M3 21h18" />
+                    </svg>
+                    Export CSV
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Bucket filter chips */}

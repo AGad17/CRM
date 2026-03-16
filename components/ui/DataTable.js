@@ -27,16 +27,26 @@ export function DataTable({ columns, data, pageSize = 50, exportFilename }) {
     setPage(0)
   }
 
+  function csvCell(val) {
+    const s = val === null || val === undefined ? '' : String(val)
+    // Wrap in quotes if the value contains commas, double-quotes, or newlines
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return '"' + s.replace(/"/g, '""') + '"'
+    }
+    return s
+  }
+
   function handleExport() {
-    const header = columns.map((c) => c.label).join(',')
+    const exportCols = columns.filter((c) => c.exportable !== false && c.label !== '')
+    const header = exportCols.map((c) => csvCell(c.label)).join(',')
     const rows = data.map((row) =>
-      columns.map((c) => {
+      exportCols.map((c) => {
         const val = c.getValue ? c.getValue(row) : row[c.key]
-        return val === null || val === undefined ? '' : String(val)
+        return csvCell(val)
       }).join(',')
     )
     const csv = [header, ...rows].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = exportFilename || 'export.csv'; a.click()

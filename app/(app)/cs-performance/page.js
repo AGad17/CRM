@@ -135,6 +135,29 @@ function RepCard({ rep }) {
   )
 }
 
+function exportRepsCsv(reps) {
+  function cell(v) {
+    const s = v === null || v === undefined ? '' : String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? '"' + s.replace(/"/g, '""') + '"' : s
+  }
+  const headers = ['Name', 'Email', 'Role', 'Accounts', 'Avg Health', 'Healthy', 'Watch', 'At Risk', 'Avg CSAT', 'Avg NPS', 'Overdue Tasks']
+  const rows = reps.map((r) => [
+    r.userName, r.userEmail, r.userRole?.replace(/_/g, ' '),
+    r.accountsManaged,
+    r.avgHealthScore !== null ? Number(r.avgHealthScore).toFixed(1) : '',
+    r.accountsHealthy, r.accountsWatch, r.accountsAtRisk,
+    r.avgCSAT !== null ? Number(r.avgCSAT).toFixed(1) : '',
+    r.avgNPS !== null ? Number(r.avgNPS).toFixed(1) : '',
+    r.totalOverdueTasks,
+  ].map(cell).join(','))
+  const csv = [headers.map(cell).join(','), ...rows].join('\n')
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob); a.download = 'cs-performance.csv'; a.click()
+  URL.revokeObjectURL(a.href)
+}
+
 export default function CSPerformancePage() {
   const { data = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['cs-performance'],
@@ -156,9 +179,22 @@ export default function CSPerformancePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">CS Rep Performance</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Health scores, task completion, and account status per account manager.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">CS Rep Performance</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Health scores, task completion, and account status per account manager.</p>
+        </div>
+        {data.length > 0 && (
+          <button
+            onClick={() => exportRepsCsv(data)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#5061F6] bg-white border border-[#5061F6]/20 rounded-lg hover:bg-[#F5F2FF] transition-colors shrink-0"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} aria-hidden>
+              <path strokeLinecap="round" d="M12 3v13M7 11l5 5 5-5M3 21h18" />
+            </svg>
+            Export CSV
+          </button>
+        )}
       </div>
 
       {isLoading ? (

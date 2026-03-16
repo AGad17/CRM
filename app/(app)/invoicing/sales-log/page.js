@@ -28,11 +28,13 @@ export default function SalesLogPage() {
       key: 'id',
       label: '#',
       render: (r) => <span className="text-xs text-gray-400 font-mono">#{r.id}</span>,
+      getValue: (r) => r.id,
     },
     {
       key: 'startDate',
       label: 'Deal Date',
       render: (r) => new Date(r.startDate).toLocaleDateString(),
+      getValue: (r) => r.startDate ? new Date(r.startDate).toLocaleDateString('en-GB') : '',
     },
     {
       key: 'accountName',
@@ -44,6 +46,7 @@ export default function SalesLogPage() {
       key: 'agent',
       label: 'Agent',
       render: (r) => r.agent?.name || r.agent?.email || '—',
+      getValue: (r) => r.agent?.name || r.agent?.email || '',
     },
     {
       key: 'countryCode',
@@ -54,26 +57,31 @@ export default function SalesLogPage() {
       key: 'package',
       label: 'Package',
       render: (r) => <Badge value={r.package} />,
+      getValue: (r) => r.package,
     },
     {
       key: 'posSystem',
       label: 'POS',
       render: (r) => <Badge value={r.posSystem} />,
+      getValue: (r) => r.posSystem,
     },
     {
       key: 'paymentType',
       label: 'Payment',
       render: (r) => <Badge value={r.paymentType} />,
+      getValue: (r) => r.paymentType,
     },
     {
       key: 'totalMRR',
       label: 'MRR (excl. VAT)',
       render: (r) => `${r.countryCode} ${Number(r.totalMRR).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      getValue: (r) => Number(r.totalMRR || 0).toFixed(2),
     },
     {
       key: 'contractValue',
       label: 'Contract Value',
       render: (r) => `${r.countryCode} ${Number(r.contractValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      getValue: (r) => Number(r.contractValue || 0).toFixed(2),
     },
     {
       key: 'invoices',
@@ -84,6 +92,7 @@ export default function SalesLogPage() {
           {r.invoices?.length || 0} invoice{r.invoices?.length !== 1 ? 's' : ''}
         </span>
       ),
+      getValue: (r) => r.invoices?.length || 0,
     },
   ]
 

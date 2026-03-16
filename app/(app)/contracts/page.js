@@ -47,17 +47,17 @@ export default function ContractsPage() {
   }, [contracts, search])
 
   const columns = [
-    { key: 'id', label: '#', render: (r) => <span className="text-xs text-gray-400 font-mono">#{r.id}</span> },
-    { key: 'accountName', label: 'Account', rtl: true, render: (r) => <span className="font-medium">{r.account?.name}</span> },
-    { key: 'country', label: 'Country', render: (r) => r.account?.countryCode },
-    { key: 'type', label: 'Type', render: (r) => <Badge value={r.type} /> },
-    { key: 'startDate', label: 'Start', render: (r) => new Date(r.startDate).toLocaleDateString() },
-    { key: 'endDate', label: 'End', render: (r) => new Date(r.endDate).toLocaleDateString() },
-    { key: 'contractValue', label: 'Value', render: (r) => `USD ${Number(r.contractValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-    { key: 'mrr', label: 'MRR', render: (r) => `USD ${(r.mrr || 0).toFixed(2)}` },
-    { key: 'contractStatus', label: 'Status', render: (r) => <Badge value={r.contractStatus} /> },
-    { key: 'churnFlag', label: 'Churn', render: (r) => <Badge value={r.churnFlag} /> },
-    { key: 'actions', label: '', sortable: false, render: (r) => (
+    { key: 'id', label: '#', render: (r) => <span className="text-xs text-gray-400 font-mono">#{r.id}</span>, getValue: (r) => r.id },
+    { key: 'accountName', label: 'Account', rtl: true, render: (r) => <span className="font-medium">{r.account?.name}</span>, getValue: (r) => r.account?.name || '' },
+    { key: 'country', label: 'Country', render: (r) => r.account?.countryCode, getValue: (r) => r.account?.countryCode || '' },
+    { key: 'type', label: 'Type', render: (r) => <Badge value={r.type} />, getValue: (r) => r.type },
+    { key: 'startDate', label: 'Start', render: (r) => new Date(r.startDate).toLocaleDateString(), getValue: (r) => r.startDate ? new Date(r.startDate).toLocaleDateString('en-GB') : '' },
+    { key: 'endDate', label: 'End', render: (r) => new Date(r.endDate).toLocaleDateString(), getValue: (r) => r.endDate ? new Date(r.endDate).toLocaleDateString('en-GB') : '' },
+    { key: 'contractValue', label: 'Value', render: (r) => `USD ${Number(r.contractValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, getValue: (r) => Number(r.contractValue || 0).toFixed(2) },
+    { key: 'mrr', label: 'MRR', render: (r) => `USD ${(r.mrr || 0).toFixed(2)}`, getValue: (r) => (r.mrr || 0).toFixed(2) },
+    { key: 'contractStatus', label: 'Status', render: (r) => <Badge value={r.contractStatus} />, getValue: (r) => r.contractStatus },
+    { key: 'churnFlag', label: 'Churn', render: (r) => <Badge value={r.churnFlag} />, getValue: (r) => r.churnFlag },
+    { key: 'actions', label: '', sortable: false, exportable: false, render: (r) => (
       <div className="flex items-center gap-1 justify-end">
         <button onClick={() => setEditTarget(r)} className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100">Edit</button>
         {r.churnFlag === 'Active' ? (
@@ -86,7 +86,6 @@ export default function ContractsPage() {
           className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white w-52"
         />
         <div className="flex-1" />
-        <a href="/api/export/csv?type=contracts" className="text-xs text-gray-500 border border-gray-200 bg-white px-3 py-2 rounded-xl hover:bg-gray-50">↓ Export</a>
       </div>
 
       {isLoading ? <div className="animate-pulse h-64 bg-gray-200 rounded-2xl" /> : (
