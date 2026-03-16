@@ -15,7 +15,9 @@
     "seed:backfill": "node scripts/backfill-usd-rates.js",
     "data:reset": "node scripts/reset-data.js",
     "data:import": "node scripts/import-data.js",
-    "data:import:dry": "node scripts/import-data.js --dry-run"
+    "data:import:dry": "node scripts/import-data.js --dry-run",
+    "data:import:excel": "node scripts/import-from-excel.js",
+    "data:import:excel:dry": "node scripts/import-from-excel.js --dry-run"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

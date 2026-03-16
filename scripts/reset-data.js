@@ -45,6 +45,7 @@ async function main() {
     // ── Derived / child tables first ──────────────────────────────────────
     ['Activity logs',       () => prisma.activityLog.deleteMany()],
     ['Health snapshots',    () => prisma.accountHealthSnapshot.deleteMany()],
+    ['Account brands',      () => prisma.accountBrand.deleteMany()],
     ['Account notes',       () => prisma.accountNote.deleteMany()],
     ['Handover docs',       () => prisma.handoverDocument.deleteMany()],
     ['Invoices',            () => prisma.invoice.deleteMany()],

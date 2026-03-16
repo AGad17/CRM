@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
@@ -58,6 +58,37 @@ export default function AccountDetailPage() {
 
   const qc = useQueryClient()
   const [noteText, setNoteText] = useState('')
+  const [brandInput, setBrandInput] = useState('')
+  const brandInputRef = useRef(null)
+
+  const { data: brands = [] } = useQuery({
+    queryKey: ['account-brands', id],
+    queryFn: () => fetch(`/api/accounts/${id}/brands`).then((r) => r.json()),
+    enabled: !!id,
+  })
+
+  const addBrand = useMutation({
+    mutationFn: (name) =>
+      fetch(`/api/accounts/${id}/brands`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      }).then((r) => r.json()),
+    onSuccess: () => {
+      setBrandInput('')
+      qc.invalidateQueries({ queryKey: ['account-brands', id] })
+      qc.invalidateQueries({ queryKey: ['account', id] })
+    },
+  })
+
+  const deleteBrand = useMutation({
+    mutationFn: (brandId) =>
+      fetch(`/api/accounts/${id}/brands?brandId=${brandId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['account-brands', id] })
+      qc.invalidateQueries({ queryKey: ['account', id] })
+    },
+  })
 
   const { data: notes = [] } = useQuery({
     queryKey: ['account-notes', id],
@@ -134,6 +165,58 @@ export default function AccountDetailPage() {
         <KPICard label="Branches" value={account.numberOfBranches} format="integer" />
         <KPICard label="Brands" value={account.brands} format="integer" />
       </div>
+
+      {/* Brand Names */}
+      {(brands.length > 0 || account.brands > 1) && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Brand Names</h3>
+            <span className="text-xs text-gray-400">{brands.length} brand{brands.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="flex flex-wrap gap-2 items-center">
+            {brands.map((b) => (
+              <span
+                key={b.id}
+                className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 text-sm rounded-full border border-indigo-100 group"
+              >
+                {b.name}
+                <button
+                  onClick={() => deleteBrand.mutate(b.id)}
+                  className="opacity-0 group-hover:opacity-100 text-indigo-300 hover:text-red-500 transition-all leading-none ml-0.5"
+                  title="Remove brand"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            {/* Inline add */}
+            <div className="flex items-center gap-1">
+              <input
+                ref={brandInputRef}
+                value={brandInput}
+                onChange={(e) => setBrandInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && brandInput.trim()) {
+                    addBrand.mutate(brandInput.trim())
+                  }
+                  if (e.key === 'Escape') setBrandInput('')
+                }}
+                placeholder="Add brand…"
+                className="text-sm border border-gray-200 rounded-full px-3 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 w-28 focus:w-40 transition-all"
+              />
+              {brandInput.trim() && (
+                <button
+                  onClick={() => addBrand.mutate(brandInput.trim())}
+                  disabled={addBrand.isPending}
+                  className="text-xs px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full transition-colors disabled:opacity-40"
+                >
+                  Add
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pipeline Origin */}
       {account.lead ? (

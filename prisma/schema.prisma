@@ -127,6 +127,7 @@ model Account {
   handovers       HandoverDocument[]
   healthSnapshots AccountHealthSnapshot[]
   notes           AccountNote[]
+  brandNames      AccountBrand[]
 
   @@map("accounts")
 }
@@ -631,6 +632,19 @@ model HandoverDocument {
   account Account @relation(fields: [accountId], references: [id])
 
   @@map("handover_documents")
+}
+
+// ─── Account Brands ───────────────────────────────────────────────────────────
+
+model AccountBrand {
+  id        Int      @id @default(autoincrement())
+  accountId Int
+  name      String
+  createdAt DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("account_brands")
 }
 
 // ─── Account Notes ────────────────────────────────────────────────────────────
