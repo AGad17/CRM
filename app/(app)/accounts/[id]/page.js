@@ -1,10 +1,11 @@
 'use client'
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
+import { Breadcrumb } from '@/components/ui/Breadcrumb'
 
 function HandoverField({ label, value }) {
   if (!value) return null
@@ -55,6 +56,34 @@ export default function AccountDetailPage() {
     enabled: !!id,
   })
 
+  const qc = useQueryClient()
+  const [noteText, setNoteText] = useState('')
+
+  const { data: notes = [] } = useQuery({
+    queryKey: ['account-notes', id],
+    queryFn: () => fetch(`/api/accounts/${id}/notes`).then((r) => r.json()),
+    enabled: !!id,
+  })
+
+  const addNote = useMutation({
+    mutationFn: (content) =>
+      fetch(`/api/accounts/${id}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      }).then((r) => r.json()),
+    onSuccess: () => {
+      setNoteText('')
+      qc.invalidateQueries({ queryKey: ['account-notes', id] })
+    },
+  })
+
+  const deleteNote = useMutation({
+    mutationFn: (noteId) =>
+      fetch(`/api/accounts/${id}/notes?noteId=${noteId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['account-notes', id] }),
+  })
+
   if (isLoading) return <div className="animate-pulse h-64 bg-gray-200 rounded-2xl" />
   if (!account || account.error) return <div className="text-red-500">Account not found</div>
 
@@ -92,8 +121,8 @@ export default function AccountDetailPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[{ label: 'Accounts', href: '/accounts' }, { label: account.name }]} />
       <div className="flex items-center gap-3">
-        <button onClick={() => router.back()} className="text-sm text-gray-400 hover:text-gray-700">← Back</button>
         <h2 className="text-xl font-bold text-gray-900">{account.name}</h2>
         <Badge value={account.status} />
         <span className="text-sm text-gray-400">#{account.id} · {account.countryName || account.countryCode} · {account.leadSource?.replace(/([A-Z])/g, ' $1').trim()}</span>
@@ -257,6 +286,56 @@ export default function AccountDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Account Notes */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Notes</h3>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <textarea
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && noteText.trim()) {
+                  addNote.mutate(noteText)
+                }
+              }}
+              placeholder="Add a note… (Cmd+Enter to save)"
+              rows={2}
+              className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            />
+            <button
+              onClick={() => noteText.trim() && addNote.mutate(noteText)}
+              disabled={!noteText.trim() || addNote.isPending}
+              className="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl transition-colors self-end"
+            >
+              Save
+            </button>
+          </div>
+          {notes.length > 0 && (
+            <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-50">
+              {notes.map((note) => (
+                <div key={note.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 group">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.content}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {note.authorName && <span>{note.authorName} · </span>}
+                      {new Date(note.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => deleteNote.mutate(note.id)}
+                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all text-xs mt-0.5 flex-shrink-0"
+                    title="Delete note"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Activity History */}
       {activityLog.length > 0 && (

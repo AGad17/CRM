@@ -14,6 +14,12 @@ export async function PATCH(request, { params }) {
   const actor = { actorId: session?.user?.id, actorName: session?.user?.name || session?.user?.email }
 
   const before = await getInvoiceById(id)
+
+  // Auto-stamp collectionDate when first marked Collected
+  if (body.status === 'Collected' && !before?.collectionDate && !body.collectionDate) {
+    body.collectionDate = new Date().toISOString().slice(0, 10)
+  }
+
   const invoice = await updateInvoice(id, body)
 
   if (body.status && body.status !== before?.status) {

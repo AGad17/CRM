@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
+import { Breadcrumb } from '@/components/ui/Breadcrumb'
 
 const PHASE_ORDER = ['DealClosure', 'Onboarding', 'Training', 'Incubation', 'AccountManagement']
 
@@ -211,10 +212,8 @@ export default function OnboardingDetailPage() {
     <div className="space-y-6 max-w-4xl">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <Breadcrumb items={[{ label: 'Customer Journey', href: '/onboarding' }, { label: tracker.account?.name }]} />
       <div className="flex items-center gap-3 flex-wrap">
-        <button onClick={() => router.push('/onboarding')} className="text-sm text-gray-400 hover:text-gray-700">
-          ← Customer Journey
-        </button>
         <h2 className="text-xl font-bold text-gray-900">{tracker.account?.name}</h2>
         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${currentColors.badge}`}>
           {PHASE_ICONS[tracker.phase]} {PHASE_LABELS[tracker.phase]}

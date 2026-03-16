@@ -179,6 +179,15 @@ export default function CloseDealPage() {
     }
   }, [deal.agentId, agents])
 
+  // ── Warn before leaving with unsaved form data ──
+  useEffect(() => {
+    // Only warn once the form has been pre-filled and before submission succeeds
+    if (!prefilled || closeMutation.isSuccess) return
+    const handler = (e) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [prefilled, closeMutation.isSuccess])
+
   // ── Derived ──
   const countries       = pricing?.countries || []
   const selectedCountry = countries.find((c) => c.code === deal.countryCode)
