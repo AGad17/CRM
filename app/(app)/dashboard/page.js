@@ -3,6 +3,10 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { KPICard } from '@/components/ui/KPICard'
 import { DeltaBadge } from '@/components/ui/DeltaBadge'
+import { PageError } from '@/components/ui/PageError'
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+} from 'recharts'
 
 function fmt(v, type = 'number') {
   if (v === null || v === undefined) return '—'
@@ -22,6 +26,30 @@ function SectionHeader({ label, color = '#5061F6' }) {
   )
 }
 
+function MRRChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const total = payload.reduce((s, p) => s + (p.value || 0), 0)
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl shadow-lg px-3 py-2 text-xs min-w-[160px]">
+      <p className="font-bold text-gray-700 mb-1">{label}</p>
+      {payload.map((p) => (
+        <div key={p.dataKey} className="flex justify-between gap-4">
+          <span style={{ color: p.color }}>{p.name}</span>
+          <span className="font-semibold text-gray-700">
+            {Number(p.value).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+          </span>
+        </div>
+      ))}
+      <div className="flex justify-between gap-4 border-t border-gray-100 mt-1 pt-1">
+        <span className="text-gray-500">Total</span>
+        <span className="font-bold text-gray-800">
+          {Number(total).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const [filters, setFilters] = useState({ country: '', leadSource: '' })
 
@@ -30,21 +58,33 @@ export default function DashboardPage() {
     queryFn: () => fetch('/api/countries').then((r) => r.json()),
   })
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['dashboard', filters],
     queryFn: () => {
       const p = new URLSearchParams()
       if (filters.country) p.set('country', filters.country)
       if (filters.leadSource) p.set('leadSource', filters.leadSource)
-      return fetch(`/api/analytics/dashboard?${p}`).then((r) => r.json())
+      return fetch(`/api/analytics/dashboard?${p}`).then((r) => {
+        if (!r.ok) throw new Error('Failed to load dashboard')
+        return r.json()
+      })
     },
   })
 
   if (isLoading) return <LoadingSkeleton />
-  if (error || !data) return <div className="text-red-500 text-sm">Failed to load dashboard</div>
+  if (isError || !data) return <PageError onRetry={refetch} />
 
-  const { snapshot, recentMonths, priorMonth } = data
+  const { snapshot, recentMonths, priorMonth, atRiskAccounts = [] } = data
   const hasFilters = filters.country || filters.leadSource
+
+  // MRR chart: oldest → newest left → right
+  const chartData = [...recentMonths].reverse().map((m) => ({
+    label: m.label,
+    'New MRR': Math.round(m.newMRR),
+    'Expansion': Math.round(m.expansionMRR),
+    'Renewal': Math.round(m.renewalMRR),
+    'Churned': Math.round(m.churnedMRR),
+  }))
 
   return (
     <div className="space-y-8">
@@ -100,6 +140,31 @@ export default function DashboardPage() {
           <KPICard label="Churned Accounts" value={snapshot.churnedAccounts} format="integer" accent="#ef4444" />
           <KPICard label="Overall Churn Rate" value={snapshot.overallChurnRate} format="percent" accent="#F4BF1D" />
         </div>
+
+        {/* At-Risk Accounts Strip */}
+        {atRiskAccounts.length > 0 && (
+          <div className="mt-4 bg-red-50 border border-red-100 rounded-2xl px-4 py-3">
+            <div className="flex items-center gap-2 mb-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth={2.5} className="shrink-0">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+              <span className="text-xs font-bold text-red-600 uppercase tracking-widest">At-Risk Accounts (Health &lt; 40)</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {atRiskAccounts.map((acc) => (
+                <a
+                  key={acc.accountId}
+                  href={`/accounts/${acc.accountId}`}
+                  className="inline-flex items-center gap-2 bg-white border border-red-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-red-400 hover:text-red-700 transition-colors"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                  {acc.accountName}
+                  <span className="text-red-500 tabular-nums">{acc.score.toFixed(0)}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* — Revenue Section — */}
@@ -113,6 +178,37 @@ export default function DashboardPage() {
           <KPICard label="ARPA" value={snapshot.arpa} format="currency" subLabel="per active account" accent="#49B697" />
           <KPICard label="Avg ACV" value={snapshot.avgACV} format="currency" subLabel="per active contract" accent="#49B697" />
           <KPICard label="Avg MRR / Contract" value={snapshot.avgMRRPerContract} format="currency" subLabel="active contracts only" accent="#49B697" />
+        </div>
+
+        {/* MRR Composition Chart */}
+        {chartData.length > 0 && (
+          <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm px-5 pt-5 pb-4">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">MRR Composition — Last 3 Months</p>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={chartData} margin={{ top: 4, right: 16, bottom: 0, left: 0 }} barSize={32}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false}
+                  tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+                <Tooltip content={<MRRChartTooltip />} cursor={{ fill: '#F5F2FF' }} />
+                <Legend iconType="circle" iconSize={8}
+                  formatter={(v) => <span className="text-xs text-gray-600 font-medium">{v}</span>} />
+                <Bar dataKey="New MRR"  stackId="mrr" fill="#5061F6"  radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Expansion" stackId="mrr" fill="#49B697"  radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Renewal"  stackId="mrr" fill="#C2B4FB"  radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Churned"  fill="#fca5a5" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </section>
+
+      {/* — Operations — */}
+      <section>
+        <SectionHeader label="Operations" color="#F97316" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <KPICard label="Open Tasks" value={snapshot.openTasksCount} format="integer" accent="#F97316" subLabel="across all accounts" />
+          <KPICard label="Overdue Tasks" value={snapshot.overdueTasksCount} format="integer" accent="#ef4444" subLabel="past due date" />
         </div>
       </section>
 
@@ -198,6 +294,7 @@ function LoadingSkeleton() {
       {[
         { n: 4, color: '#5061F6' },
         { n: 7, color: '#49B697' },
+        { n: 2, color: '#F97316' },
         { n: 6, color: '#F4BF1D' },
         { n: 3, color: '#C2B4FB' },
       ].map(({ n, color }, si) => (
