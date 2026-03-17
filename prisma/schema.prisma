@@ -50,6 +50,7 @@ enum LeadStage {
   Lead
   Qualified
   ClosedWon
+  Expired
   ClosedLost
   Churned
 }

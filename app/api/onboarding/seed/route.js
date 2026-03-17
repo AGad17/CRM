@@ -1,16 +1,20 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/roleGuard'
-import { seedMissingTrackers } from '@/lib/db/onboarding'
+import { seedMissingTrackers, syncExpiredTrackers } from '@/lib/db/onboarding'
 
 // POST /api/onboarding/seed
-// Creates OnboardingTracker records for every Account that does not have one yet.
+// Creates OnboardingTracker records for every Account that does not have one yet,
+// then auto-advances active trackers to Expired phase when contracts have lapsed.
 export async function POST(request) {
   const { error } = await requireAuth('ops')
   if (error) return error
 
   try {
-    const result = await seedMissingTrackers()
-    return NextResponse.json(result)
+    const [seeded, synced] = await Promise.all([
+      seedMissingTrackers(),
+      syncExpiredTrackers(),
+    ])
+    return NextResponse.json({ created: seeded.count, expiredSynced: synced.synced })
   } catch (err) {
     console.error('[onboarding/seed]', err)
     return NextResponse.json({ error: err.message }, { status: 500 })

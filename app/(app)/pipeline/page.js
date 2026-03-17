@@ -11,11 +11,12 @@ import { calcDealSummary } from '@/lib/invoicingCalc'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STAGES = [
-  { key: 'Lead',       label: 'Lead',        color: 'bg-slate-100 text-slate-700',   dot: 'bg-slate-400'   },
-  { key: 'Qualified',  label: 'Qualified',   color: 'bg-blue-100 text-blue-700',     dot: 'bg-blue-500'    },
-  { key: 'ClosedWon',  label: 'Closed Won',  color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
-  { key: 'ClosedLost', label: 'Closed Lost', color: 'bg-red-100 text-red-600',       dot: 'bg-red-400'     },
-  { key: 'Churned',    label: 'Churned',     color: 'bg-amber-100 text-amber-700',   dot: 'bg-amber-500'   },
+  { key: 'Lead',       label: 'Lead',        color: 'bg-slate-100 text-slate-700',     dot: 'bg-slate-400'    },
+  { key: 'Qualified',  label: 'Qualified',   color: 'bg-blue-100 text-blue-700',       dot: 'bg-blue-500'     },
+  { key: 'ClosedWon',  label: 'Closed Won',  color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500'  },
+  { key: 'Expired',    label: 'Expired',     color: 'bg-orange-100 text-orange-700',   dot: 'bg-orange-500'   },
+  { key: 'ClosedLost', label: 'Closed Lost', color: 'bg-red-100 text-red-600',         dot: 'bg-red-400'      },
+  { key: 'Churned',    label: 'Churned',     color: 'bg-amber-100 text-amber-700',     dot: 'bg-amber-500'    },
 ]
 
 const CHANNEL_COLORS = {
@@ -308,7 +309,7 @@ function LeadCard({ lead, onStageAction, onEdit, isAdmin }) {
            className="text-xs text-indigo-600 hover:underline truncate block">
           🏢 {lead.account.name}
         </a>
-      ) : (lead.stage === 'ClosedWon' || lead.stage === 'Churned') ? (
+      ) : (lead.stage === 'ClosedWon' || lead.stage === 'Churned' || lead.stage === 'Expired') ? (
         <span className="text-xs text-gray-300 italic">No account linked</span>
       ) : null}
 
@@ -335,7 +336,14 @@ function CardActions({ lead, onStageAction, isAdmin }) {
   )
   if (stage === 'ClosedWon') return (
     <div className="flex gap-1.5 pt-1 border-t border-gray-100">
-      <button onClick={() => onStageAction(lead, 'Churned')} className="w-full text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg px-2 py-1.5 font-medium transition-colors">Mark as Churned</button>
+      <button onClick={() => onStageAction(lead, 'Expired')} className="flex-1 text-xs bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg px-2 py-1.5 font-medium transition-colors">⏰ Expired</button>
+      <button onClick={() => onStageAction(lead, 'Churned')} className="flex-1 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg px-2 py-1.5 font-medium transition-colors">Churned</button>
+    </div>
+  )
+  if (stage === 'Expired') return (
+    <div className="flex gap-1.5 pt-1 border-t border-gray-100">
+      <button onClick={() => onStageAction(lead, 'ClosedWon')} className="flex-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg px-2 py-1.5 font-medium transition-colors">✓ Renewed</button>
+      <button onClick={() => onStageAction(lead, 'Churned')} className="flex-1 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg px-2 py-1.5 font-medium transition-colors">Churned</button>
     </div>
   )
   // ClosedLost & Churned: terminal — no stage actions
@@ -457,7 +465,8 @@ export default function PipelinePage() {
     const totalClosed  = leads.filter((l) => l.stage === 'ClosedWon' || l.stage === 'ClosedLost').length
     const totalWon     = leads.filter((l) => l.stage === 'ClosedWon').length
     const winRate      = totalClosed > 0 ? totalWon / totalClosed : null
-    return { inPipeline, pipelineVal, wonThisMonth, winRate }
+    const expiredCount = leads.filter((l) => l.stage === 'Expired').length
+    return { inPipeline, pipelineVal, wonThisMonth, winRate, expiredCount }
   }, [leads])
 
   // ── At-risk count ──
@@ -545,6 +554,11 @@ export default function PipelinePage() {
 
   function handleStageAction(lead, action) {
     if (action === 'ClosedWon') {
+      // Renewal: Expired → ClosedWon is a direct transition (deal/invoice handled in Invoicing)
+      if (lead.stage === 'Expired') {
+        stageM.mutate({ id: lead.id, stage: 'ClosedWon' })
+        return
+      }
       // Gate: required lead fields must be filled before opening the close deal page
       const missing = []
       if (!lead.contactName?.trim())                          missing.push('Contact Name')
@@ -561,7 +575,7 @@ export default function PipelinePage() {
     }
     if (action === 'ClosedLost') { setModal({ confirmLoss:  lead }); setLostReason(''); return }
     if (action === 'Churned')    { setModal({ confirmChurn: lead }); return }
-    // Direct transitions (Qualify, back to Lead)
+    // Direct transitions (Qualify, back to Lead, Expired)
     stageM.mutate({ id: lead.id, stage: action })
   }
 
@@ -601,7 +615,10 @@ export default function PipelinePage() {
           {r.stage === 'Lead'      && <button onClick={() => handleStageAction(r, 'Qualified')}  className="text-xs text-blue-600 hover:text-blue-800 font-medium">Qualify</button>}
           {r.stage === 'Qualified' && <button onClick={() => handleStageAction(r, 'ClosedWon')}  className="text-xs text-emerald-600 hover:text-emerald-800 font-medium">Won</button>}
           {(r.stage === 'Lead' || r.stage === 'Qualified') && <button onClick={() => handleStageAction(r, 'ClosedLost')} className="text-xs text-red-500 hover:text-red-700 font-medium">Lost</button>}
-          {r.stage === 'ClosedWon' && <button onClick={() => handleStageAction(r, 'Churned')} className="text-xs text-amber-600 hover:text-amber-800 font-medium">Churned</button>}
+          {r.stage === 'ClosedWon' && <button onClick={() => handleStageAction(r, 'Expired')}  className="text-xs text-orange-600 hover:text-orange-800 font-medium">⏰ Expired</button>}
+          {r.stage === 'ClosedWon' && <button onClick={() => handleStageAction(r, 'Churned')}  className="text-xs text-amber-600 hover:text-amber-800 font-medium">Churned</button>}
+          {r.stage === 'Expired'   && <button onClick={() => handleStageAction(r, 'ClosedWon')} className="text-xs text-emerald-600 hover:text-emerald-800 font-medium">✓ Renewed</button>}
+          {r.stage === 'Expired'   && <button onClick={() => handleStageAction(r, 'Churned')}  className="text-xs text-amber-600 hover:text-amber-800 font-medium">Churned</button>}
           {isAdmin && <button onClick={() => { if (confirm('Delete this lead?')) deleteM.mutate(r.id) }} className="text-xs text-gray-400 hover:text-red-500 font-medium">Delete</button>}
         </div>
       ),
@@ -662,10 +679,11 @@ export default function PipelinePage() {
 
       {/* KPIs (leads tab only) */}
       {tab === 'leads' && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <KPICard label="In Pipeline"     value={kpis.inPipeline}   format="integer" subLabel="Lead + Qualified" />
           <KPICard label="Pipeline Value"  value={kpis.pipelineVal}  format="number"  subLabel="Qualified stage" />
           <KPICard label="Won This Month"  value={kpis.wonThisMonth} format="integer" subLabel="Closed Won" />
+          <KPICard label="Expired"         value={kpis.expiredCount} format="integer" subLabel="Awaiting renewal" trend={kpis.expiredCount > 0 ? 'down' : null} />
           <KPICard label="Win Rate"        value={kpis.winRate}      format="percent" subLabel="Won ÷ (Won + Lost)" />
         </div>
       )}
@@ -715,7 +733,7 @@ export default function PipelinePage() {
         isLoading ? (
           <div className="animate-pulse h-64 bg-gray-100 rounded-xl" />
         ) : (
-          <div className="grid grid-cols-5 gap-4 items-start">
+          <div className="grid grid-cols-6 gap-4 items-start">
             {STAGES.map((s) => {
               const col = byStage(s.key)
               const colVal = col.reduce((sum, l) => sum + (l.estimatedValue || 0), 0)

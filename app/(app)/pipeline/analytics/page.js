@@ -13,6 +13,7 @@ const STAGE_COLORS = {
   Lead:       '#94a3b8',
   Qualified:  '#6366f1',
   ClosedWon:  '#10b981',
+  Expired:    '#f97316',
   ClosedLost: '#ef4444',
   Churned:    '#f59e0b',
 }
@@ -178,6 +179,10 @@ export default function PipelineAnalyticsPage() {
                   <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.15} />
                   <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                 </linearGradient>
+                <linearGradient id="colorExpired" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#f97316" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="label" tick={{ fontSize: 10 }} />
@@ -187,6 +192,7 @@ export default function PipelineAnalyticsPage() {
               <Area type="monotone" dataKey="created" name="Created" stroke="#6366f1" fill="url(#colorCreated)" strokeWidth={2} dot={false} />
               <Area type="monotone" dataKey="won"     name="Won"     stroke="#10b981" fill="url(#colorWon)"     strokeWidth={2} dot={false} />
               <Area type="monotone" dataKey="lost"    name="Lost"    stroke="#ef4444" fill="url(#colorLost)"    strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="expired" name="Expired" stroke="#f97316" fill="url(#colorExpired)" strokeWidth={2} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
