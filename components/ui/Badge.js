@@ -2,6 +2,7 @@
 
 const variants = {
   Active: 'bg-emerald-100 text-emerald-700',
+  Expired: 'bg-amber-100 text-amber-700',
   Churned: 'bg-red-100 text-red-600',
   Inactive: 'bg-gray-100 text-gray-500',
   'No Contract': 'bg-orange-100 text-orange-600',

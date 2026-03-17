@@ -350,7 +350,10 @@ export default function PipelinePage() {
   const { data: session } = useSession()
   const isAdmin  = session?.user?.role === 'CCO_ADMIN'
 
-  // View toggle
+  // Top-level tab: 'leads' | 'expired'
+  const [tab, setTab] = useState('leads')
+
+  // View toggle (leads tab)
   const [view, setView] = useState('kanban')
 
   // Filters
@@ -367,6 +370,7 @@ export default function PipelinePage() {
   const [formData, setFormData] = useState(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState({})
   const [migrateResult, setMigrateResult] = useState(null)
+  const [expiredChurnTarget, setExpiredChurnTarget] = useState(null)
 
   // New Opportunity flow
   const [oppType, setOppType] = useState(null)           // null | 'New' | 'Expansion' | 'Renewal'
@@ -393,6 +397,25 @@ export default function PipelinePage() {
     queryKey: ['invoicing-pricing'],
     queryFn: () => fetch('/api/invoicing/pricing').then((r) => r.json()),
     staleTime: 60_000,
+  })
+
+  // Expired Accounts tab data
+  const { data: allAccounts = [], isLoading: expiredLoading } = useQuery({
+    queryKey: ['all-accounts-expired-tab'],
+    queryFn: () => fetch('/api/accounts').then((r) => r.json()),
+    enabled: tab === 'expired',
+  })
+  const expiredAccounts = useMemo(
+    () => allAccounts.filter((a) => a.status === 'Expired'),
+    [allAccounts]
+  )
+  const expiredChurnM = useMutation({
+    mutationFn: (id) => fetch(`/api/accounts/${id}/churn`, { method: 'POST' }).then((r) => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['all-accounts-expired-tab'] })
+      qc.invalidateQueries({ queryKey: ['pipeline-leads'] })
+      setExpiredChurnTarget(null)
+    },
   })
 
   // ── Mutations ──
@@ -603,24 +626,52 @@ export default function PipelinePage() {
               ⚠ {atRiskCount} at risk
             </button>
           )}
-          {/* View toggle */}
-          <div className="flex items-center bg-gray-100 rounded-xl p-1">
-            <button onClick={() => setView('kanban')} className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${view === 'kanban' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>⬛ Kanban</button>
-            <button onClick={() => setView('table')}  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${view === 'table'  ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>☰ Table</button>
-          </div>
-          <button onClick={openCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">+ New Opportunity</button>
+          {/* View toggle (leads tab only) */}
+          {tab === 'leads' && (
+            <div className="flex items-center bg-gray-100 rounded-xl p-1">
+              <button onClick={() => setView('kanban')} className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${view === 'kanban' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>⬛ Kanban</button>
+              <button onClick={() => setView('table')}  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${view === 'table'  ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>☰ Table</button>
+            </div>
+          )}
+          {tab === 'leads' && (
+            <button onClick={openCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">+ New Opportunity</button>
+          )}
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <KPICard label="In Pipeline"     value={kpis.inPipeline}   format="integer" subLabel="Lead + Qualified" />
-        <KPICard label="Pipeline Value"  value={kpis.pipelineVal}  format="number"  subLabel="Qualified stage" />
-        <KPICard label="Won This Month"  value={kpis.wonThisMonth} format="integer" subLabel="Closed Won" />
-        <KPICard label="Win Rate"        value={kpis.winRate}      format="percent" subLabel="Won ÷ (Won + Lost)" />
+      {/* ── Tab toggle ── */}
+      <div className="flex items-center border-b border-gray-200 -mb-2">
+        <button
+          onClick={() => setTab('leads')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === 'leads' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+        >
+          📋 Leads Pipeline
+        </button>
+        <button
+          onClick={() => setTab('expired')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${tab === 'expired' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+        >
+          ⏰ Expired Accounts
+          {expiredAccounts.length > 0 && (
+            <span className={`text-xs font-bold rounded-full px-1.5 py-0.5 ${tab === 'expired' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+              {expiredAccounts.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Filters */}
+      {/* KPIs (leads tab only) */}
+      {tab === 'leads' && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <KPICard label="In Pipeline"     value={kpis.inPipeline}   format="integer" subLabel="Lead + Qualified" />
+          <KPICard label="Pipeline Value"  value={kpis.pipelineVal}  format="number"  subLabel="Qualified stage" />
+          <KPICard label="Won This Month"  value={kpis.wonThisMonth} format="integer" subLabel="Closed Won" />
+          <KPICard label="Win Rate"        value={kpis.winRate}      format="percent" subLabel="Won ÷ (Won + Lost)" />
+        </div>
+      )}
+
+      {/* Filters (leads tab only) */}
+      {tab === 'leads' && (
       <div className="flex flex-wrap items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
         <input
           type="text" placeholder="Search company, contact…"
@@ -657,9 +708,10 @@ export default function PipelinePage() {
         )}
         <span className="ml-auto text-xs text-gray-400">{filtered.length} leads</span>
       </div>
+      )}
 
       {/* ── KANBAN VIEW ── */}
-      {view === 'kanban' && (
+      {tab === 'leads' && view === 'kanban' && (
         isLoading ? (
           <div className="animate-pulse h-64 bg-gray-100 rounded-xl" />
         ) : (
@@ -700,7 +752,7 @@ export default function PipelinePage() {
       )}
 
       {/* ── TABLE VIEW ── */}
-      {view === 'table' && (
+      {tab === 'leads' && view === 'table' && (
         isLoading ? (
           <div className="animate-pulse h-64 bg-gray-100 rounded-xl" />
         ) : (
@@ -709,7 +761,7 @@ export default function PipelinePage() {
       )}
 
       {/* ── Admin: Import Existing Accounts ── */}
-      {isAdmin && (
+      {tab === 'leads' && isAdmin && (
         <div className="border border-dashed border-gray-200 rounded-xl p-4 flex items-center justify-between bg-gray-50">
           <div>
             <p className="text-sm font-medium text-gray-700">Import Existing Accounts</p>
@@ -718,6 +770,108 @@ export default function PipelinePage() {
           <button onClick={() => setModal('migrate')} className="text-sm bg-white border border-gray-200 hover:border-indigo-400 hover:text-indigo-600 text-gray-600 font-medium px-4 py-2 rounded-xl transition-colors">
             🔄 Import Accounts
           </button>
+        </div>
+      )}
+
+      {/* ── EXPIRED ACCOUNTS TAB ── */}
+      {tab === 'expired' && (
+        <div className="space-y-4">
+          {expiredLoading ? (
+            <div className="animate-pulse h-64 bg-gray-100 rounded-xl" />
+          ) : expiredAccounts.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-4xl mb-3">🎉</p>
+              <p className="font-semibold text-gray-600 text-lg">No expired accounts</p>
+              <p className="text-sm text-gray-400 mt-1">All accounts are active or have already been resolved.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {expiredAccounts.map((account) => {
+                const allContracts = account.contracts || []
+                const pendingContracts = allContracts.filter((c) => !c.cancellationDate)
+                const lastEndDate = allContracts.length
+                  ? new Date(Math.max(...allContracts.map((c) => new Date(c.endDate).getTime())))
+                  : null
+                const daysExpired = lastEndDate
+                  ? Math.floor((Date.now() - lastEndDate.getTime()) / 86400000)
+                  : null
+                const phase = account.onboarding?.phase
+                const phaseLabel = {
+                  DealClosure: 'Deal Closure', Onboarding: 'Onboarding', Training: 'Training',
+                  Incubation: 'Incubation', AccountManagement: 'Account Mgmt', Expired: 'Expired', Churned: 'Churned',
+                }[phase] || phase || '—'
+                const phaseCls = {
+                  AccountManagement: 'bg-green-100 text-green-700',
+                  Expired: 'bg-amber-100 text-amber-700',
+                  Churned: 'bg-gray-100 text-gray-500',
+                }[phase] || 'bg-gray-100 text-gray-500'
+                return (
+                  <div key={account.id} className="bg-white border border-amber-200 rounded-2xl p-4 shadow-sm space-y-3 hover:shadow-md transition-shadow">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm leading-tight truncate">{account.name}</p>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 mt-1">{account.countryCode}</span>
+                      </div>
+                      <span className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${phaseCls}`}>{phaseLabel}</span>
+                    </div>
+
+                    {/* Expiry info */}
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                      <p className="text-xs font-medium text-amber-700">
+                        ⏰ {daysExpired != null
+                          ? (daysExpired === 0 ? 'Expired today' : `Expired ${daysExpired}d ago`)
+                          : 'Contracts expired'}
+                      </p>
+                      {lastEndDate && (
+                        <p className="text-xs text-amber-500 mt-0.5">Last end date: {lastEndDate.toLocaleDateString()}</p>
+                      )}
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="flex items-center justify-between text-sm">
+                      <div>
+                        <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Last MRR</p>
+                        <p className="font-semibold text-gray-800 text-sm">
+                          USD {(account.totalMRR || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Contracts</p>
+                        <p className="font-semibold text-gray-800 text-sm">{pendingContracts.length}</p>
+                      </div>
+                    </div>
+
+                    {/* CS Owner */}
+                    {account.accountManager && (
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-[10px]">
+                          {(account.accountManager.name || account.accountManager.email || '?').substring(0, 2).toUpperCase()}
+                        </span>
+                        <span>{account.accountManager.name || account.accountManager.email}</span>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-1 border-t border-gray-100">
+                      <button
+                        onClick={() => router.push(`/accounts/${account.id}`)}
+                        className="flex-1 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg py-1.5 hover:bg-indigo-50 transition-colors"
+                      >
+                        View Account
+                      </button>
+                      <button
+                        onClick={() => setExpiredChurnTarget(account)}
+                        className="flex-1 text-xs font-medium text-red-600 border border-red-200 rounded-lg py-1.5 hover:bg-red-50 transition-colors"
+                      >
+                        🚫 Churn
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -930,6 +1084,47 @@ export default function PipelinePage() {
                 ✎ Edit Lead
               </button>
               <button onClick={() => setModal(null)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors text-sm">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Expired Account → Churn */}
+      <Modal isOpen={!!expiredChurnTarget} onClose={() => setExpiredChurnTarget(null)} title="Churn Expired Account">
+        {expiredChurnTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              You are about to churn <strong>{expiredChurnTarget.name}</strong>. All renewal options have been exhausted.
+            </p>
+            <div className="bg-red-50 border border-red-100 rounded-xl p-4 grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <p className="text-xs text-red-400 font-medium uppercase tracking-wide mb-1">Last MRR</p>
+                <p className="text-xl font-bold text-red-700">
+                  USD {(expiredChurnTarget.totalMRR || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-red-400 font-medium uppercase tracking-wide mb-1">Contracts to Close</p>
+                <p className="text-xl font-bold text-red-700">
+                  {(expiredChurnTarget.contracts || []).filter((c) => !c.cancellationDate).length}
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">This will officially mark the account as Churned and set today as the cancellation date on all open contracts.</p>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => expiredChurnM.mutate(expiredChurnTarget.id)}
+                disabled={expiredChurnM.isPending}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {expiredChurnM.isPending ? 'Churning…' : 'Yes, Churn Account'}
+              </button>
+              <button
+                onClick={() => setExpiredChurnTarget(null)}
+                className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors"
+              >
                 Cancel
               </button>
             </div>

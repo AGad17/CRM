@@ -111,9 +111,10 @@ export default function DashboardPage() {
       {/* — Accounts Section — */}
       <section>
         <SectionHeader label="Accounts" color="#5061F6" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <KPICard label="Total Accounts" value={snapshot.totalAccounts} format="integer" accent="#5061F6" />
           <KPICard label="Active Accounts" value={snapshot.activeAccounts} format="integer" accent="#49B697" />
+          <KPICard label="Expired Accounts" value={snapshot.expiredAccounts} format="integer" accent="#F59E0B" />
           <KPICard label="Churned Accounts" value={snapshot.churnedAccounts} format="integer" accent="#ef4444" />
           <KPICard label="Overall Churn Rate" value={snapshot.overallChurnRate} format="percent" accent="#F4BF1D" />
         </div>

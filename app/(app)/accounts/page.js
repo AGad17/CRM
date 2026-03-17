@@ -72,6 +72,7 @@ export default function AccountsPage() {
         Training:          { label: 'Training',          cls: 'bg-purple-100 text-purple-700'},
         Incubation:        { label: 'Incubation',        cls: 'bg-orange-100 text-orange-700'},
         AccountManagement: { label: 'Account Mgmt',      cls: 'bg-green-100 text-green-700'  },
+        Expired:           { label: 'Expired',           cls: 'bg-amber-100 text-amber-700'  },
         Churned:           { label: 'Churned',           cls: 'bg-gray-100 text-gray-500'    },
       }
       const p = map[phase]
@@ -84,7 +85,7 @@ export default function AccountsPage() {
     { key: 'actions', label: '', sortable: false, render: (r) => (
       <div className="flex items-center gap-1 justify-end">
         <button onClick={() => setModal({ edit: r })} className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100">Edit</button>
-        {r.status !== 'Churned' && r.status !== 'No Contract' && (
+        {(r.status === 'Active' || r.status === 'Expired') && (
           <button
             onClick={() => setChurnTarget(r)}
             className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 font-medium"

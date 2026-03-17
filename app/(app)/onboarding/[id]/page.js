@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 
-const PHASE_ORDER = ['DealClosure', 'Onboarding', 'Training', 'Incubation', 'AccountManagement']
+const PHASE_ORDER = ['DealClosure', 'Onboarding', 'Training', 'Incubation', 'AccountManagement', 'Expired']
 
 const PHASE_LABELS = {
   DealClosure:       'Deal Closure',
@@ -12,6 +12,7 @@ const PHASE_LABELS = {
   Training:          'Training',
   Incubation:        'Incubation',
   AccountManagement: 'Account Management',
+  Expired:           'Expired',
 }
 
 const PHASE_ICONS = {
@@ -20,6 +21,7 @@ const PHASE_ICONS = {
   Training:          '📚',
   Incubation:        '🔍',
   AccountManagement: '⭐',
+  Expired:           '⏰',
 }
 
 const PHASE_TEAMS = {
@@ -28,6 +30,7 @@ const PHASE_TEAMS = {
   Training:          'Onboarding Team',
   Incubation:        'Onboarding Team',
   AccountManagement: 'Customer Success Team',
+  Expired:           'Customer Success Team',
 }
 
 const PHASE_COLORS = {
@@ -36,6 +39,7 @@ const PHASE_COLORS = {
   Training:          { badge: 'bg-purple-100 text-purple-700', section: 'border-purple-200 bg-purple-50', heading: 'text-purple-700', bar: 'bg-purple-500', ring: 'ring-purple-400', btn: 'bg-purple-600 hover:bg-purple-700' },
   Incubation:        { badge: 'bg-orange-100 text-orange-700', section: 'border-orange-200 bg-orange-50', heading: 'text-orange-700', bar: 'bg-orange-500', ring: 'ring-orange-400', btn: 'bg-orange-600 hover:bg-orange-700' },
   AccountManagement: { badge: 'bg-green-100 text-green-700',   section: 'border-green-200 bg-green-50',   heading: 'text-green-700',  bar: 'bg-green-500',  ring: 'ring-green-400',  btn: 'bg-green-600 hover:bg-green-700'  },
+  Expired:           { badge: 'bg-amber-100 text-amber-700',   section: 'border-amber-200 bg-amber-50',   heading: 'text-amber-700',  bar: 'bg-amber-500',  ring: 'ring-amber-400',  btn: 'bg-amber-600 hover:bg-amber-700'  },
   Churned:           { badge: 'bg-gray-100 text-gray-500',     section: 'border-gray-200 bg-gray-50',     heading: 'text-gray-500',   bar: 'bg-gray-400',   ring: 'ring-gray-300',   btn: 'bg-gray-500 hover:bg-gray-600'    },
 }
 
@@ -184,6 +188,7 @@ export default function OnboardingDetailPage() {
   if (!tracker || tracker.error) return <div className="text-red-500">Tracker not found</div>
 
   const isChurned         = tracker.phase === 'Churned'
+  const isExpired         = tracker.phase === 'Expired'
   const currentPhaseIdx   = PHASE_ORDER.indexOf(tracker.phase)
   const currentColors     = PHASE_COLORS[tracker.phase] || PHASE_COLORS.DealClosure
   const currentTasks      = tracker.tasksByPhase?.[tracker.phase] || []
@@ -241,6 +246,25 @@ export default function OnboardingDetailPage() {
             className="flex-shrink-0 px-4 py-1.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors"
           >
             ↩ Reactivate
+          </button>
+        </div>
+      )}
+
+      {/* ── Expired banner ──────────────────────────────────────────────────── */}
+      {isExpired && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span className="text-lg">⏰</span>
+            <div>
+              <p className="font-semibold text-sm text-amber-800">This account's contracts have expired</p>
+              <p className="text-xs text-amber-600 mt-0.5">Renewal in progress. Mark as Churned once all options are exhausted.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setPendingPhase({ phase: 'Churned', idx: -1 })}
+            className="flex-shrink-0 px-4 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors"
+          >
+            🚫 Mark as Churned
           </button>
         </div>
       )}
@@ -539,11 +563,15 @@ export default function OnboardingDetailPage() {
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <p className={`font-semibold text-sm ${pendingColors.heading}`}>
-                {pendingDirection === 'backward' ? '← Move back to' : 'Move forward to →'}{' '}
-                {PHASE_ICONS[pendingPhase.phase]} {PHASE_LABELS[pendingPhase.phase]}
+                {pendingPhase.phase === 'Churned'
+                  ? '🚫 Mark account as officially Churned'
+                  : pendingDirection === 'backward'
+                    ? `← Move back to ${PHASE_ICONS[pendingPhase.phase] ?? ''} ${PHASE_LABELS[pendingPhase.phase]}`
+                    : `Move forward to → ${PHASE_ICONS[pendingPhase.phase] ?? ''} ${PHASE_LABELS[pendingPhase.phase]}`
+                }
               </p>
               <p className="text-xs text-gray-500 mt-0.5">Responsible: {PHASE_TEAMS[pendingPhase.phase]}</p>
-              {pendingDirection === 'forward' && !allCurrentDone && (
+              {pendingDirection === 'forward' && !allCurrentDone && !isChurned && (
                 <div className="mt-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 space-y-1">
                   <p className="text-xs font-semibold text-red-700">
                     🚫 Complete all {incompleteCurrent} task{incompleteCurrent !== 1 ? 's' : ''} in {PHASE_LABELS[tracker.phase]} before advancing:
@@ -558,13 +586,16 @@ export default function OnboardingDetailPage() {
                   </ul>
                 </div>
               )}
-              {pendingDirection === 'forward' && allCurrentDone && (
+              {pendingDirection === 'forward' && allCurrentDone && pendingPhase.phase !== 'Churned' && (
                 <p className="text-xs text-indigo-600 mt-1 font-medium">
                   A CSAT survey will be automatically created for this transition.
                 </p>
               )}
-              {pendingDirection === 'backward' && (
+              {pendingDirection === 'backward' && pendingPhase.phase !== 'Churned' && (
                 <p className="text-xs text-gray-500 mt-1.5">Completed tasks will not be reset.</p>
+              )}
+              {pendingPhase.phase === 'Churned' && (
+                <p className="text-xs text-gray-500 mt-1.5">The account will be officially marked as churned. This can be reversed by reactivating to Account Management.</p>
               )}
             </div>
           </div>
@@ -648,14 +679,14 @@ export default function OnboardingDetailPage() {
                 trainingSpecialistId:   assignTr || undefined,
                 accountManagerId:       assignAm || undefined,
               })}
-              disabled={setPhaseMutation.isPending || !assignmentComplete || (pendingDirection === 'forward' && !allCurrentDone)}
+              disabled={setPhaseMutation.isPending || !assignmentComplete || (pendingDirection === 'forward' && !allCurrentDone && !isChurned && pendingPhase?.phase !== 'Churned')}
               title={
-                pendingDirection === 'forward' && !allCurrentDone
+                pendingDirection === 'forward' && !allCurrentDone && !isChurned && pendingPhase?.phase !== 'Churned'
                   ? `Complete all tasks in ${PHASE_LABELS[tracker.phase]} first`
                   : !assignmentComplete ? 'Please assign required staff before confirming' : undefined
               }
               className={`px-4 py-1.5 rounded-lg text-sm font-medium text-white transition-colors ${
-                assignmentComplete && (pendingDirection !== 'forward' || allCurrentDone) ? pendingColors.btn : 'bg-gray-300 cursor-not-allowed'
+                assignmentComplete && (pendingPhase?.phase === 'Churned' || isChurned || pendingDirection !== 'forward' || allCurrentDone) ? pendingColors.btn : 'bg-gray-300 cursor-not-allowed'
               }`}>
               {setPhaseMutation.isPending ? 'Moving…' : 'Confirm'}
             </button>
