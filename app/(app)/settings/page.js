@@ -227,7 +227,7 @@ export default function SettingsPage() {
             <>
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-500">
-                  Custom roles are reusable permission templates you can assign to team members. They override the system role defaults for module access.
+                  Custom roles define what each team member can access. Assign a role to a user in the Team tab — their permissions take effect immediately.
                 </p>
                 <button
                   onClick={() => setRoleModal('create')}
@@ -319,54 +319,42 @@ export default function SettingsPage() {
                 <thead><tr className="border-b border-gray-100">
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">System Role</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Custom Role</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Overrides</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                   <th className="px-4 py-3" />
                 </tr></thead>
                 <tbody className="divide-y divide-gray-50">
                   {(Array.isArray(users) ? users : []).map((u) => {
-                    const overrideCount = countOverrides(u.role, u.permissions || {})
                     const isCCOAdmin = u.role === 'CCO_ADMIN'
+                    const basePerms = getBasePerms(u)
+                    const overrideCount = countOverrides(basePerms, u.permissions || {})
                     return (
                       <tr key={u.id}>
                         <td className="px-5 py-3 font-medium text-gray-900">{u.name || '\u2014'}</td>
                         <td className="px-4 py-3 text-gray-600 text-xs">{u.email}</td>
                         <td className="px-4 py-3">
-                          <select
-                            className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white"
-                            value={u.role}
-                            onChange={(e) => updateUser.mutate({ id: u.id, role: e.target.value })}
-                            disabled={!isAdmin}
-                          >
-                            {SYSTEM_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                          </select>
-                        </td>
-                        <td className="px-4 py-3">
                           {isCCOAdmin ? (
-                            <span className="text-xs text-gray-300 italic">N/A</span>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">Admin</span>
                           ) : isAdmin ? (
                             <select
-                              className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white max-w-[160px]"
+                              className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white max-w-[180px]"
                               value={u.customRole?.id || ''}
                               onChange={(e) => updateUser.mutate({ id: u.id, customRoleId: e.target.value || null })}
                             >
-                              <option value="">\u2014 None (system defaults)</option>
+                              <option value="">\u2014 No Role (Read Only)</option>
                               {(Array.isArray(customRoles) ? customRoles : []).map((r) => (
                                 <option key={r.id} value={r.id}>{r.name}</option>
                               ))}
                             </select>
                           ) : (
-                            <span className="text-xs text-gray-500">
-                              {u.customRole ? (
-                                <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">{u.customRole.name}</span>
-                              ) : <span className="text-gray-300 italic">None</span>}
-                            </span>
+                            u.customRole
+                              ? <span className="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-semibold">{u.customRole.name}</span>
+                              : <span className="text-xs text-gray-400 italic">No role</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          {isAdmin ? (
+                          {isAdmin && !isCCOAdmin ? (
                             <button
                               onClick={() => setPermModal(u)}
                               className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
@@ -378,13 +366,13 @@ export default function SettingsPage() {
                                 </span>
                               ) : (
                                 <span className="text-gray-400">
-                                  {u.customRole ? `Base: ${u.customRole.name}` : 'System defaults'}
+                                  {u.customRole ? `Base: ${u.customRole.name}` : 'No overrides'}
                                 </span>
                               )}
                             </button>
                           ) : (
                             <span className="text-xs text-gray-400">
-                              {overrideCount > 0 ? `${overrideCount} override${overrideCount !== 1 ? 's' : ''}` : '—'}
+                              {!isCCOAdmin && overrideCount > 0 ? `${overrideCount} override${overrideCount !== 1 ? 's' : ''}` : '—'}
                             </span>
                           )}
                         </td>
@@ -589,26 +577,22 @@ function RoleModal({ role, onSave, onClose, saving }) {
 // ── User Permissions Override Modal ───────────────────────────────────────────
 
 function PermissionsModal({ user, onSave, onClose, saving }) {
-  const roleDefaults = ROLE_DEFAULTS[user.role] || {}
-  const customRolePerms = user.customRole
-    ? (user.permissions || {})  // overrides on top of custom role
-    : null
-  const currentOverrides = user.permissions || {}
+  // Base = custom role permissions (if assigned) or READ_ONLY system defaults
+  const basePerms = getBasePerms(user)
 
-  // base = custom role permissions if set, else system role defaults
-  const basePermissions = user.customRole
-    ? {} // we'll fetch from the role; but we only have the user object here
-    : roleDefaults
+  const currentOverrides = user.permissions || {}
 
   const [draft, setDraft] = useState(() => {
     const d = {}
     for (const mod of MODULES) {
       d[mod] = {}
       for (const action of ACTIONS) {
+        // Start from base, then apply any saved overrides
+        const baseVal = basePerms[mod]?.[action] === true
         if (currentOverrides[mod]?.[action] !== undefined) {
           d[mod][action] = currentOverrides[mod][action]
         } else {
-          d[mod][action] = roleDefaults[mod]?.[action] === true
+          d[mod][action] = baseVal
         }
       }
     }
@@ -620,7 +604,7 @@ function PermissionsModal({ user, onSave, onClose, saving }) {
   }
 
   function isOverridden(mod, action) {
-    return draft[mod][action] !== (roleDefaults[mod]?.[action] === true)
+    return draft[mod][action] !== (basePerms[mod]?.[action] === true)
   }
 
   function resetToDefaults() {
@@ -628,7 +612,7 @@ function PermissionsModal({ user, onSave, onClose, saving }) {
     for (const mod of MODULES) {
       d[mod] = {}
       for (const action of ACTIONS) {
-        d[mod][action] = roleDefaults[mod]?.[action] === true
+        d[mod][action] = basePerms[mod]?.[action] === true
       }
     }
     setDraft(d)
@@ -638,8 +622,8 @@ function PermissionsModal({ user, onSave, onClose, saving }) {
     const overrides = {}
     for (const mod of MODULES) {
       for (const action of ACTIONS) {
-        const roleVal = roleDefaults[mod]?.[action] === true
-        if (draft[mod][action] !== roleVal) {
+        const baseVal = basePerms[mod]?.[action] === true
+        if (draft[mod][action] !== baseVal) {
           if (!overrides[mod]) overrides[mod] = {}
           overrides[mod][action] = draft[mod][action]
         }
@@ -649,6 +633,7 @@ function PermissionsModal({ user, onSave, onClose, saving }) {
   }
 
   const totalOverrides = MODULES.reduce((sum, mod) => sum + ACTIONS.filter(a => isOverridden(mod, a)).length, 0)
+  const baseLabel = user.customRole ? user.customRole.name : 'Read Only (default)'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -660,30 +645,23 @@ function PermissionsModal({ user, onSave, onClose, saving }) {
             <p className="text-sm text-gray-500 mt-0.5">
               <span className="font-medium text-gray-700">{user.name || user.email}</span>
               {' \u00b7 '}
-              <span className="text-indigo-600">{ROLE_LABELS[user.role]}</span>
-              {user.customRole && (
-                <span className="ml-2 bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-medium">
-                  Custom: {user.customRole.name}
-                </span>
-              )}
+              <span className="text-indigo-600">{user.customRole ? user.customRole.name : 'No Role'}</span>
               {totalOverrides > 0 && (
                 <span className="ml-2 bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">
                   {totalOverrides} override{totalOverrides !== 1 ? 's' : ''}
                 </span>
               )}
             </p>
-            {user.customRole && (
-              <p className="text-xs text-amber-600 mt-1 bg-amber-50 px-3 py-1 rounded-lg inline-block">
-                \u26a0\ufe0f These overrides are applied on top of the &ldquo;{user.customRole.name}&rdquo; custom role. The comparison below uses system role defaults as reference.
-              </p>
-            )}
+            <p className="text-xs text-gray-400 mt-1">
+              Overrides are applied on top of the &ldquo;{baseLabel}&rdquo; base permissions. Green = granted by role, indigo = manually granted, red X = manually revoked.
+            </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">\u2715</button>
         </div>
 
         <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-5 text-xs text-gray-500 flex-wrap">
           <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded border-2 border-indigo-400 bg-indigo-500 inline-block" />Granted (override)</span>
-          <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded border-2 border-emerald-300 bg-emerald-400 inline-block" />Granted (system role default)</span>
+          <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded border-2 border-emerald-300 bg-emerald-400 inline-block" />Granted (role default)</span>
           <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded border-2 border-red-300 bg-red-50 inline-block" />Revoked (override)</span>
           <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded border border-gray-200 bg-white inline-block" />Not granted</span>
         </div>
@@ -741,7 +719,7 @@ function PermissionsModal({ user, onSave, onClose, saving }) {
 
         <div className="flex items-center justify-between p-6 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
           <button onClick={resetToDefaults} className="text-sm text-gray-500 hover:text-gray-700 underline underline-offset-2 transition-colors">
-            Reset to system role defaults
+            Reset to role defaults
           </button>
           <div className="flex gap-3">
             <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors">Cancel</button>
@@ -807,13 +785,19 @@ function RoleDefaultsCard() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function countOverrides(role, perms) {
-  const defaults = ROLE_DEFAULTS[role] || {}
+// Returns the effective base permissions for a user:
+// custom role permissions (if assigned) or READ_ONLY system defaults
+function getBasePerms(user) {
+  if (user.customRole?.permissions) return user.customRole.permissions
+  return ROLE_DEFAULTS[user.role] || ROLE_DEFAULTS.READ_ONLY || {}
+}
+
+function countOverrides(basePerms, perms) {
   let count = 0
   for (const mod of MODULES) {
     if (!perms[mod]) continue
     for (const action of ACTIONS) {
-      if (perms[mod][action] !== undefined && perms[mod][action] !== (defaults[mod]?.[action] === true)) count++
+      if (perms[mod][action] !== undefined && perms[mod][action] !== (basePerms[mod]?.[action] === true)) count++
     }
   }
   return count

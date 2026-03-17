@@ -2,10 +2,8 @@
 import { useState } from 'react'
 
 const ROLES = [
-  { value: 'CCO_ADMIN', label: 'CCO Admin' },
-  { value: 'REVENUE_MANAGER', label: 'Revenue Manager' },
-  { value: 'CUSTOMER_SUCCESS', label: 'Customer Success' },
-  { value: 'READ_ONLY', label: 'Read Only' },
+  { value: 'READ_ONLY', label: 'Member (assign role after creation)' },
+  { value: 'CCO_ADMIN', label: 'Admin (full access)' },
 ]
 
 export function UserForm({ onSubmit, onCancel, loading }) {
