@@ -58,6 +58,16 @@ const PHASES = [
     bar:   'bg-green-500',
   },
   {
+    key:   'Expired',
+    label: 'Expired',
+    team:  'Customer Success',
+    icon:  '⏰',
+    light: 'bg-amber-50 border-amber-200',
+    text:  'text-amber-700',
+    badge: 'bg-amber-100 text-amber-700',
+    bar:   'bg-amber-500',
+  },
+  {
     key:   'Churned',
     label: 'Churned',
     team:  '—',
@@ -162,10 +172,11 @@ export default function OnboardingPage() {
     mutationFn: () => fetch('/api/onboarding/seed', { method: 'POST' }).then(r => r.json()),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['onboarding'] })
-      setSyncMsg(data.count === 0
-        ? 'All accounts are already synced.'
-        : `✓ Added ${data.count} account${data.count !== 1 ? 's' : ''} to the tracker.`)
-      setTimeout(() => setSyncMsg(null), 4000)
+      const msgs = []
+      if (data.created      > 0) msgs.push(`added ${data.created} new account${data.created !== 1 ? 's' : ''}`)
+      if (data.expiredSynced > 0) msgs.push(`moved ${data.expiredSynced} to Expired`)
+      setSyncMsg(msgs.length > 0 ? `✓ ${msgs.map(m => m[0].toUpperCase() + m.slice(1)).join(', ')}.` : '✓ All accounts are already synced.')
+      setTimeout(() => setSyncMsg(null), 5000)
     },
   })
 
@@ -287,7 +298,7 @@ export default function OnboardingPage() {
       )}
 
       {/* Stage summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {PHASES.map((p) => {
           const phaseTrackers = trackers.filter((t) => t.phase === p.key)
           const count    = phaseTrackers.length

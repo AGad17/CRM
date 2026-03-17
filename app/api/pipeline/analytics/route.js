@@ -74,10 +74,10 @@ function computeAnalytics(leads) {
   }
 
   // ── By Stage ─────────────────────────────────────────────────────────────
-  const STAGE_ORDER = ['Lead', 'Qualified', 'ClosedWon', 'Expired', 'ClosedLost', 'Churned']
+  const STAGE_ORDER = ['Lead', 'Qualified', 'ClosedWon', 'ClosedLost', 'Expired', 'Churned']
   const STAGE_LABELS = {
     Lead: 'Lead', Qualified: 'Qualified',
-    ClosedWon: 'Closed Won', Expired: 'Expired', ClosedLost: 'Closed Lost', Churned: 'Churned',
+    ClosedWon: 'Closed Won', ClosedLost: 'Closed Lost', Expired: 'Expired', Churned: 'Churned',
   }
   const byStage = STAGE_ORDER.map(stage => {
     const group = leads.filter(l => l.stage === stage)

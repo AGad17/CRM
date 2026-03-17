@@ -14,8 +14,8 @@ const STAGES = [
   { key: 'Lead',       label: 'Lead',        color: 'bg-slate-100 text-slate-700',     dot: 'bg-slate-400'    },
   { key: 'Qualified',  label: 'Qualified',   color: 'bg-blue-100 text-blue-700',       dot: 'bg-blue-500'     },
   { key: 'ClosedWon',  label: 'Closed Won',  color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500'  },
-  { key: 'Expired',    label: 'Expired',     color: 'bg-orange-100 text-orange-700',   dot: 'bg-orange-500'   },
   { key: 'ClosedLost', label: 'Closed Lost', color: 'bg-red-100 text-red-600',         dot: 'bg-red-400'      },
+  { key: 'Expired',    label: 'Expired',     color: 'bg-orange-100 text-orange-700',   dot: 'bg-orange-500'   },
   { key: 'Churned',    label: 'Churned',     color: 'bg-amber-100 text-amber-700',     dot: 'bg-amber-500'    },
 ]
 
@@ -336,8 +336,7 @@ function CardActions({ lead, onStageAction, isAdmin }) {
   )
   if (stage === 'ClosedWon') return (
     <div className="flex gap-1.5 pt-1 border-t border-gray-100">
-      <button onClick={() => onStageAction(lead, 'Expired')} className="flex-1 text-xs bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg px-2 py-1.5 font-medium transition-colors">⏰ Expired</button>
-      <button onClick={() => onStageAction(lead, 'Churned')} className="flex-1 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg px-2 py-1.5 font-medium transition-colors">Churned</button>
+      <button onClick={() => onStageAction(lead, 'Churned')} className="w-full text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg px-2 py-1.5 font-medium transition-colors">Mark as Churned</button>
     </div>
   )
   if (stage === 'Expired') return (
@@ -615,7 +614,6 @@ export default function PipelinePage() {
           {r.stage === 'Lead'      && <button onClick={() => handleStageAction(r, 'Qualified')}  className="text-xs text-blue-600 hover:text-blue-800 font-medium">Qualify</button>}
           {r.stage === 'Qualified' && <button onClick={() => handleStageAction(r, 'ClosedWon')}  className="text-xs text-emerald-600 hover:text-emerald-800 font-medium">Won</button>}
           {(r.stage === 'Lead' || r.stage === 'Qualified') && <button onClick={() => handleStageAction(r, 'ClosedLost')} className="text-xs text-red-500 hover:text-red-700 font-medium">Lost</button>}
-          {r.stage === 'ClosedWon' && <button onClick={() => handleStageAction(r, 'Expired')}  className="text-xs text-orange-600 hover:text-orange-800 font-medium">⏰ Expired</button>}
           {r.stage === 'ClosedWon' && <button onClick={() => handleStageAction(r, 'Churned')}  className="text-xs text-amber-600 hover:text-amber-800 font-medium">Churned</button>}
           {r.stage === 'Expired'   && <button onClick={() => handleStageAction(r, 'ClosedWon')} className="text-xs text-emerald-600 hover:text-emerald-800 font-medium">✓ Renewed</button>}
           {r.stage === 'Expired'   && <button onClick={() => handleStageAction(r, 'Churned')}  className="text-xs text-amber-600 hover:text-amber-800 font-medium">Churned</button>}
