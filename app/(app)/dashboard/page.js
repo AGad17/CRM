@@ -118,6 +118,10 @@ export default function DashboardPage() {
           <KPICard label="Churned Accounts" value={snapshot.churnedAccounts} format="integer" accent="#ef4444" />
           <KPICard label="Overall Churn Rate" value={snapshot.overallChurnRate} format="percent" accent="#F4BF1D" />
         </div>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <KPICard label="Accumulative Churn" value={snapshot.accumulativeChurn} format="integer" subLabel="Expired + Churned accounts" accent="#ef4444" />
+          <KPICard label="Accumulative Churn %" value={snapshot.accumulativeChurnRate} format="percent" subLabel="of all accounts" accent="#ef4444" />
+        </div>
 
         {/* At-Risk Accounts Strip */}
         {atRiskAccounts.length > 0 && (
@@ -153,6 +157,7 @@ export default function DashboardPage() {
           <KPICard label="Total ARR" value={snapshot.totalARR} format="currency" accent="#49B697" />
           <KPICard label="Total ACV" value={snapshot.acv} format="currency" subLabel="annualized contract value" accent="#49B697" />
           <KPICard label="Total Contract Value" value={snapshot.totalContractValue} format="currency" accent="#49B697" />
+          <KPICard label="Active Contract Value" value={snapshot.activeContractValue} format="currency" subLabel="active contracts only" accent="#49B697" />
           <KPICard label="ARPA" value={snapshot.arpa} format="currency" subLabel="per active account" accent="#49B697" />
           <KPICard label="Avg ACV" value={snapshot.avgACV} format="currency" subLabel="per active contract" accent="#49B697" />
           <KPICard label="Avg MRR / Contract" value={snapshot.avgMRRPerContract} format="currency" subLabel="active contracts only" accent="#49B697" />
