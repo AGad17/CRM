@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/roleGuard'
-import { getOnboardingTrackers, createOnboardingTracker, DEFAULT_TASKS } from '@/lib/db/onboarding'
+import { getOnboardingTrackers, createOnboardingTracker, syncExpiredTrackers, DEFAULT_TASKS } from '@/lib/db/onboarding'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request) {
   const { error } = await requirePermission('onboarding', 'view')
   if (error) return error
+
+  // Auto-advance any active trackers whose account contracts have naturally lapsed
+  await syncExpiredTrackers()
 
   const { searchParams } = new URL(request.url)
   const filters = {

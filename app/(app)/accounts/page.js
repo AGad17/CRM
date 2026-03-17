@@ -62,7 +62,10 @@ export default function AccountsPage() {
     { key: 'leadSource', label: 'Lead Source', render: (r) => r.leadSource?.replace(/([A-Z])/g, ' $1').trim() },
     { key: 'numberOfBranches', label: 'Branches' },
     { key: 'contractCount', label: 'Contracts' },
-    { key: 'totalMRR', label: 'Total MRR', render: (r) => `USD ${(r.totalMRR || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}` },
+    { key: 'totalMRR', label: 'MRR', render: (r) => r.status === 'Active'
+      ? `USD ${(r.totalMRR || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+      : <span className="text-xs text-gray-400">Last: USD {(r.lastMRR || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
+    },
     { key: 'accountManager', label: 'Account Manager', render: (r) => r.accountManager ? (r.accountManager.name || r.accountManager.email) : <span className="text-gray-300">—</span> },
     { key: 'journey', label: 'Journey Stage', render: (r) => {
       const phase = r.onboarding?.phase

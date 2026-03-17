@@ -160,7 +160,11 @@ export default function AccountDetailPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard label="Total MRR" value={account.totalMRR} format="currency" />
+        {account.status === 'Active'
+          ? <KPICard label="Total MRR" value={account.totalMRR} format="currency" />
+          : <KPICard label="Last Active MRR" value={account.lastMRR} format="currency"
+              subLabel="When last active" accent="#f97316" />
+        }
         <KPICard label="Contracts" value={account.contractCount} format="integer" />
         <KPICard label="Branches" value={account.numberOfBranches} format="integer" />
         <KPICard label="Brands" value={account.brands} format="integer" />

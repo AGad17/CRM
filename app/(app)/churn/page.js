@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
 import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
@@ -12,9 +12,13 @@ function pct(v) { return v !== null && v !== undefined ? `${(v * 100).toFixed(1)
 function ChurnTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white border border-gray-100 rounded-xl shadow-lg px-3 py-2 text-xs">
+    <div className="bg-white border border-gray-100 rounded-xl shadow-lg px-3 py-2 text-xs space-y-1">
       <p className="font-bold text-gray-700 mb-1">{label}</p>
-      <p className="text-[#5061F6] font-semibold">Churn Rate: {(payload[0].value * 100).toFixed(1)}%</p>
+      {payload.map((p) => (
+        <p key={p.dataKey} style={{ color: p.color }} className="font-semibold">
+          {p.name}: {(p.value * 100).toFixed(1)}%
+        </p>
+      ))}
     </div>
   )
 }
@@ -51,9 +55,14 @@ export default function ChurnPage() {
 
   // Derived KPIs
   const totalChurnedLogos = byQuarter.reduce((s, r) => s + (r.churnedLogos || 0), 0)
+  const totalExpiredLogos = byQuarter.reduce((s, r) => s + (r.expiredLogos || 0), 0)
+  const totalAccumulativeChurn = totalChurnedLogos + totalExpiredLogos
   const totalNewLogos = byQuarter.reduce((s, r) => s + (r.newLogos || 0), 0)
   const avgChurnRate = byQuarter.length > 0
     ? byQuarter.reduce((s, r) => s + (r.logoChurnRate || 0), 0) / byQuarter.length
+    : 0
+  const avgAccumulativeChurnRate = byQuarter.length > 0
+    ? byQuarter.reduce((s, r) => s + (r.accumulativeChurnRate || 0), 0) / byQuarter.length
     : 0
   const lifespans = byQuarter.filter((r) => r.avgLifespan).map((r) => r.avgLifespan)
   const avgLifespan = lifespans.length > 0 ? lifespans.reduce((a, b) => a + b, 0) / lifespans.length : null
@@ -62,10 +71,18 @@ export default function ChurnPage() {
     { key: 'quarter', label: 'Quarter' },
     { key: 'activeAtStart', label: 'Active at Start', render: (r) => r.activeAtStart?.length ?? 0 },
     { key: 'newLogos', label: 'New Logos' },
-    { key: 'churnedLogos', label: 'Churned Logos' },
+    { key: 'churnedLogos', label: 'Cancelled' },
+    { key: 'expiredLogos', label: 'Expired (Natural)',
+      render: (r) => <span className="text-amber-700 font-medium">{r.expiredLogos ?? 0}</span> },
+    { key: 'accumulativeChurn', label: 'Accumulative Loss',
+      render: (r) => <span className="font-semibold text-gray-800">{r.accumulativeChurn ?? 0}</span> },
     {
-      key: 'logoChurnRate', label: 'Logo Churn Rate',
+      key: 'logoChurnRate', label: 'Churn Rate',
       render: (r) => <ChurnRateBadge value={r.logoChurnRate} />,
+    },
+    {
+      key: 'accumulativeChurnRate', label: 'Accumulative Rate',
+      render: (r) => <ChurnRateBadge value={r.accumulativeChurnRate} />,
     },
     { key: 'avgLifespan', label: 'Avg Lifespan', render: (r) => r.avgLifespan ? `${r.avgLifespan.toFixed(1)} mo` : '—' },
   ]
@@ -74,10 +91,17 @@ export default function ChurnPage() {
     { key: 'leadSource', label: 'Lead Source', render: (r) => r.leadSource?.replace(/([A-Z])/g, ' $1').trim() },
     { key: 'totalAccounts', label: 'Total' },
     { key: 'active', label: 'Active' },
-    { key: 'churned', label: 'Churned' },
+    { key: 'expired', label: 'Expired', render: (r) => <span className="text-amber-600 font-medium">{r.expired ?? 0}</span> },
+    { key: 'churned', label: 'Churned', render: (r) => <span className="text-red-600 font-medium">{r.churned ?? 0}</span> },
+    { key: 'accumulativeChurn', label: 'Accumulative Loss',
+      render: (r) => <span className="font-semibold text-gray-800">{r.accumulativeChurn ?? 0}</span> },
     {
       key: 'churnRate', label: 'Churn Rate',
       render: (r) => <ChurnRateBadge value={r.churnRate} />,
+    },
+    {
+      key: 'accumulativeChurnRate', label: 'Accumulative Rate',
+      render: (r) => <ChurnRateBadge value={r.accumulativeChurnRate} />,
     },
   ]
 
@@ -91,7 +115,6 @@ export default function ChurnPage() {
   )
 
   const hasFilters = country || leadSources.length > 0
-  // Chart data — only quarters that have churn data
   const chartData = byQuarter.filter((r) => r.logoChurnRate !== null && r.logoChurnRate !== undefined)
 
   return (
@@ -110,7 +133,14 @@ export default function ChurnPage() {
       {/* KPI Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPICard label="Avg Quarterly Churn" value={avgChurnRate} format="percent" accent="#ef4444" />
-        <KPICard label="Total Churned Logos" value={totalChurnedLogos} format="integer" accent="#f97316" />
+        <KPICard label="Cancelled Logos" value={totalChurnedLogos} format="integer" accent="#f97316"
+          subLabel="Explicit cancellations" />
+        <KPICard label="Expired Logos" value={totalExpiredLogos} format="integer" accent="#f59e0b"
+          subLabel="Natural contract lapse" />
+        <KPICard label="Accumulative Loss" value={totalAccumulativeChurn} format="integer" accent="#6b7280"
+          subLabel={`${(avgAccumulativeChurnRate * 100).toFixed(1)}% avg quarterly rate`} />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <KPICard label="Total New Logos" value={totalNewLogos} format="integer" accent="#49B697" />
         <KPICard label="Avg Account Lifespan" value={avgLifespan} format="number" subLabel="months" accent="#5061F6" />
       </div>
@@ -118,8 +148,8 @@ export default function ChurnPage() {
       {/* Churn Rate Trend Chart */}
       {chartData.length > 1 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 pt-5 pb-4">
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">Logo Churn Rate Trend (by Quarter)</p>
-          <ResponsiveContainer width="100%" height={220}>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">Churn Rate Trend (by Quarter)</p>
+          <ResponsiveContainer width="100%" height={240}>
             <LineChart data={chartData} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis
@@ -136,13 +166,34 @@ export default function ChurnPage() {
                 width={40}
               />
               <Tooltip content={<ChurnTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, color: '#9ca3af' }} />
               <Line
                 type="monotone"
                 dataKey="logoChurnRate"
+                name="Cancelled"
                 stroke="#5061F6"
                 strokeWidth={2.5}
                 dot={{ fill: '#5061F6', r: 4, strokeWidth: 0 }}
                 activeDot={{ r: 6, fill: '#5061F6', stroke: '#F5F2FF', strokeWidth: 2 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="expiredRate"
+                name="Expired (Natural)"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                strokeDasharray="5 3"
+                dot={{ fill: '#f59e0b', r: 3, strokeWidth: 0 }}
+                activeDot={{ r: 5, fill: '#f59e0b', stroke: '#FFF7ED', strokeWidth: 2 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="accumulativeChurnRate"
+                name="Accumulative"
+                stroke="#ef4444"
+                strokeWidth={2}
+                dot={{ fill: '#ef4444', r: 3, strokeWidth: 0 }}
+                activeDot={{ r: 5, fill: '#ef4444', stroke: '#FEF2F2', strokeWidth: 2 }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -154,7 +205,7 @@ export default function ChurnPage() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-1 h-4 rounded-full bg-[#5061F6]" />
-            <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Logo Churn Rate by Quarter</h2>
+            <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Logo Churn by Quarter</h2>
           </div>
           <DataTable columns={quarterCols} data={byQuarter} exportFilename="churn-quarter.csv" />
         </div>
