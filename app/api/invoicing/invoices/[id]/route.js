@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { updateInvoice, getInvoiceById } from '@/lib/db/invoicing'
 import { logActivity } from '@/lib/activityLog'
 
 export async function PATCH(request, { params }) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('invoicing', 'edit')
   if (error) return error
   const { id } = await params
   const body = await request.json()

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { getLeads, createLead } from '@/lib/db/pipeline'
 
 export async function GET(request) {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('pipeline', 'view')
   if (error) return error
 
   const { searchParams } = new URL(request.url)
@@ -19,7 +19,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('pipeline', 'create')
   if (error) return error
 
   const body = await request.json()

@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { getOnboardingTracker, advancePhase, setPhase, addNote, assignAccountManager } from '@/lib/db/onboarding'
 import { logActivity } from '@/lib/activityLog'
 
 export async function GET(request, { params }) {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('onboarding', 'view')
   if (error) return error
 
   const { id } = await params
@@ -16,7 +16,7 @@ export async function GET(request, { params }) {
 }
 
 export async function PATCH(request, { params }) {
-  const { error } = await requireAuth('ops')
+  const { error } = await requirePermission('onboarding', 'edit')
   if (error) return error
 
   const { id } = await params

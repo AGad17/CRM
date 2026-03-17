@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { getLead, updateLead, updateLeadStage, deleteLead, linkLeadToAccount } from '@/lib/db/pipeline'
 import { logActivity } from '@/lib/activityLog'
 
 export async function GET(request, { params }) {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('pipeline', 'view')
   if (error) return error
 
   const { id } = await params
@@ -16,7 +16,7 @@ export async function GET(request, { params }) {
 }
 
 export async function PUT(request, { params }) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('pipeline', 'edit')
   if (error) return error
 
   const { id } = await params
@@ -42,7 +42,7 @@ export async function PUT(request, { params }) {
 
 // PATCH: stage transition only
 export async function PATCH(request, { params }) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('pipeline', 'edit')
   if (error) return error
 
   const { id } = await params
@@ -82,7 +82,7 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
-  const { error } = await requireAuth('delete')
+  const { error } = await requirePermission('pipeline', 'delete')
   if (error) return error
 
   const { id } = await params

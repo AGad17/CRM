@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { getOnboardingTrackers, createOnboardingTracker, DEFAULT_TASKS } from '@/lib/db/onboarding'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request) {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('onboarding', 'view')
   if (error) return error
 
   const { searchParams } = new URL(request.url)
@@ -18,7 +18,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const { error } = await requireAuth('ops')
+  const { error } = await requirePermission('onboarding', 'create')
   if (error) return error
 
   const body = await request.json()

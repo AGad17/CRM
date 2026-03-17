@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { getDeals } from '@/lib/db/invoicing'
 
 export async function GET(request) {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('invoicing', 'view')
   if (error) return error
   const { searchParams } = new URL(request.url)
   const filters = {
