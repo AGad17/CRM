@@ -361,7 +361,7 @@ export default function PipelinePage() {
   const [ownerFilter, setOwnerFilter] = useState('')
 
   // Modals
-  // null | 'create' | { edit: lead } | { confirmLoss: lead } | { confirmChurn: lead } | 'migrate'
+  // null | 'create' | { edit: lead } | { confirmLoss: lead } | { confirmChurn: lead } | { closedWonBlocked: lead, missing: string[] } | 'migrate'
   const [modal, setModal] = useState(null)
   const [lostReason, setLostReason] = useState('')
   const [formData, setFormData] = useState(EMPTY_FORM)
@@ -521,7 +521,21 @@ export default function PipelinePage() {
   }
 
   function handleStageAction(lead, action) {
-    if (action === 'ClosedWon')  { router.push('/pipeline/close/' + lead.id); return }
+    if (action === 'ClosedWon') {
+      // Gate: required lead fields must be filled before opening the close deal page
+      const missing = []
+      if (!lead.contactName?.trim())                          missing.push('Contact Name')
+      if (!lead.contactEmail?.trim() && !lead.contactPhone?.trim()) missing.push('Contact Email or Phone')
+      if (!lead.countryCode)                                  missing.push('Country')
+      if (!lead.packageInterest)                              missing.push('Package Interest')
+      if (!lead.numberOfBranches || lead.numberOfBranches < 1) missing.push('Number of Branches')
+      if (missing.length > 0) {
+        setModal({ closedWonBlocked: lead, missing })
+        return
+      }
+      router.push('/pipeline/close/' + lead.id)
+      return
+    }
     if (action === 'ClosedLost') { setModal({ confirmLoss:  lead }); setLostReason(''); return }
     if (action === 'Churned')    { setModal({ confirmChurn: lead }); return }
     // Direct transitions (Qualify, back to Lead)
@@ -888,6 +902,36 @@ export default function PipelinePage() {
                 {stageM.isPending ? 'Saving…' : 'Confirm Churned'}
               </button>
               <button onClick={() => setModal(null)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Close Won Blocked — missing required fields */}
+      <Modal isOpen={!!modal?.closedWonBlocked} onClose={() => setModal(null)} title="Complete lead before closing">
+        {modal?.closedWonBlocked && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Fill in the following required fields on <strong>{modal.closedWonBlocked.companyName}</strong> before closing as Won:
+            </p>
+            <ul className="space-y-1.5">
+              {modal.missing.map((field) => (
+                <li key={field} className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  <span className="text-red-500 font-bold">✕</span>
+                  {field}
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => { openEdit(modal.closedWonBlocked); }}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
+              >
+                ✎ Edit Lead
+              </button>
+              <button onClick={() => setModal(null)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors text-sm">
+                Cancel
+              </button>
             </div>
           </div>
         )}

@@ -491,15 +491,27 @@ export default function OnboardingDetailPage() {
               <div key={phase} className="flex items-center flex-1 min-w-0">
                 <div className="flex flex-col items-center flex-shrink-0">
                   <button
-                    onClick={() => !isCurrent && setPendingPhase({ phase, idx })}
-                    disabled={isCurrent}
-                    title={isCurrent ? 'Current stage' : `Move to ${PHASE_LABELS[phase]}`}
+                    onClick={() => {
+                      if (isCurrent) return
+                      // Block clicking a future phase when current tasks are incomplete
+                      if (idx > currentPhaseIdx && !allCurrentDone) return
+                      setPendingPhase({ phase, idx })
+                    }}
+                    disabled={isCurrent || (idx > currentPhaseIdx && !allCurrentDone)}
+                    title={
+                      isCurrent ? 'Current stage'
+                      : idx > currentPhaseIdx && !allCurrentDone
+                        ? `Complete all tasks in ${PHASE_LABELS[tracker.phase]} first`
+                        : `Move to ${PHASE_LABELS[phase]}`
+                    }
                     className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all focus:outline-none ${
                       isCurrent
                         ? `${colors.bar} border-transparent text-white ring-2 ring-offset-2 ${colors.ring} cursor-default`
                         : isPast
                           ? 'bg-green-500 border-green-500 text-white hover:bg-green-400 hover:scale-110 cursor-pointer'
-                          : 'bg-white border-gray-300 text-gray-400 hover:border-gray-400 hover:scale-110 cursor-pointer'
+                          : allCurrentDone
+                            ? 'bg-white border-gray-300 text-gray-400 hover:border-gray-400 hover:scale-110 cursor-pointer'
+                            : 'bg-gray-100 border-gray-200 text-gray-300 cursor-not-allowed'
                     }`}
                   >
                     {isPast ? '✓' : PHASE_ICONS[phase]}
@@ -532,11 +544,21 @@ export default function OnboardingDetailPage() {
               </p>
               <p className="text-xs text-gray-500 mt-0.5">Responsible: {PHASE_TEAMS[pendingPhase.phase]}</p>
               {pendingDirection === 'forward' && !allCurrentDone && (
-                <p className="text-xs text-amber-600 mt-1.5 font-medium">
-                  ⚠️ {incompleteCurrent} task{incompleteCurrent !== 1 ? 's' : ''} still incomplete in the current stage.
-                </p>
+                <div className="mt-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 space-y-1">
+                  <p className="text-xs font-semibold text-red-700">
+                    🚫 Complete all {incompleteCurrent} task{incompleteCurrent !== 1 ? 's' : ''} in {PHASE_LABELS[tracker.phase]} before advancing:
+                  </p>
+                  <ul className="space-y-0.5">
+                    {currentTasks.filter(t => !t.completed).map(t => (
+                      <li key={t.id} className="text-xs text-red-600 flex items-start gap-1.5">
+                        <span className="mt-0.5 flex-shrink-0">•</span>
+                        <span>{t.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
-              {pendingDirection === 'forward' && (
+              {pendingDirection === 'forward' && allCurrentDone && (
                 <p className="text-xs text-indigo-600 mt-1 font-medium">
                   A CSAT survey will be automatically created for this transition.
                 </p>
@@ -626,10 +648,14 @@ export default function OnboardingDetailPage() {
                 trainingSpecialistId:   assignTr || undefined,
                 accountManagerId:       assignAm || undefined,
               })}
-              disabled={setPhaseMutation.isPending || !assignmentComplete}
-              title={!assignmentComplete ? 'Please assign required staff before confirming' : undefined}
+              disabled={setPhaseMutation.isPending || !assignmentComplete || (pendingDirection === 'forward' && !allCurrentDone)}
+              title={
+                pendingDirection === 'forward' && !allCurrentDone
+                  ? `Complete all tasks in ${PHASE_LABELS[tracker.phase]} first`
+                  : !assignmentComplete ? 'Please assign required staff before confirming' : undefined
+              }
               className={`px-4 py-1.5 rounded-lg text-sm font-medium text-white transition-colors ${
-                assignmentComplete ? pendingColors.btn : 'bg-gray-300 cursor-not-allowed'
+                assignmentComplete && (pendingDirection !== 'forward' || allCurrentDone) ? pendingColors.btn : 'bg-gray-300 cursor-not-allowed'
               }`}>
               {setPhaseMutation.isPending ? 'Moving…' : 'Confirm'}
             </button>
@@ -648,9 +674,12 @@ export default function OnboardingDetailPage() {
           )}
           <div className="flex-1" />
           {nextPhase && (
-            <button onClick={() => setPendingPhase({ phase: nextPhase, idx: currentPhaseIdx + 1 })}
+            <button
+              onClick={() => allCurrentDone && setPendingPhase({ phase: nextPhase, idx: currentPhaseIdx + 1 })}
+              disabled={!allCurrentDone}
+              title={!allCurrentDone ? `Complete ${incompleteCurrent} task(s) first` : undefined}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors ${
-                allCurrentDone ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-amber-500 hover:bg-amber-600'
+                allCurrentDone ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-300 cursor-not-allowed'
               }`}>
               {!allCurrentDone && '⚠️ '}
               {PHASE_LABELS[nextPhase]} →

@@ -106,6 +106,39 @@ function DiscountInput({ value, onChange, placeholder = '0' }) {
   )
 }
 
+const WIZARD_STEPS = [
+  { n: 1, label: 'Account & Deal' },
+  { n: 2, label: 'Commercial' },
+  { n: 3, label: 'Handover' },
+  { n: 4, label: 'Review' },
+]
+
+function StepIndicator({ step }) {
+  return (
+    <div className="flex items-center bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm">
+      {WIZARD_STEPS.map((s, idx) => (
+        <div key={s.n} className="flex items-center flex-1 min-w-0">
+          <div className="flex flex-col items-center flex-shrink-0">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all ${
+              s.n < step  ? 'bg-emerald-500 border-emerald-500 text-white'
+              : s.n === step ? 'bg-indigo-600 border-indigo-600 text-white ring-2 ring-indigo-200 ring-offset-1'
+              : 'bg-white border-gray-300 text-gray-400'
+            }`}>
+              {s.n < step ? '✓' : s.n}
+            </div>
+            <span className={`text-xs mt-1 font-medium whitespace-nowrap ${
+              s.n === step ? 'text-indigo-600' : s.n < step ? 'text-emerald-600' : 'text-gray-400'
+            }`}>{s.label}</span>
+          </div>
+          {idx < WIZARD_STEPS.length - 1 && (
+            <div className={`flex-1 h-0.5 mx-3 mb-5 transition-all ${s.n < step ? 'bg-emerald-400' : 'bg-gray-200'}`} />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function CloseDealPage() {
@@ -120,6 +153,7 @@ export default function CloseDealPage() {
   const [errors, setErrors]               = useState({})
   const [modal, setModal]                 = useState(null)
   const [prefilled, setPrefilled]         = useState(false)
+  const [step, setStep]                   = useState(1) // 1 | 2 | 3 | 4
 
   // ── Data ──
   const { data: lead, isLoading: leadLoading } = useQuery({
@@ -239,21 +273,44 @@ export default function CloseDealPage() {
   const setLD = (key) => (v) => setLineDiscounts((p) => ({ ...p, [key]: v }))
   const setH  = (key) => (e) => setHandover((p) => ({ ...p, [key]: e.target.value }))
 
-  // ── Validation ──
-  function validate() {
+  // ── Per-step validation ──
+  function validateStep1() {
     const e = {}
-    if (!account.accountName.trim()) e.accountName = 'Required'
-    if (!deal.countryCode)           e.countryCode  = 'Required'
-    if (!deal.package)               e.package      = 'Required'
-    if (!deal.agentId)               e.agentId      = 'Required'
-    if (!deal.posSystem)             e.posSystem    = 'Required'
+    const isNew = lead?.opportunityType !== 'Expansion' && lead?.opportunityType !== 'Renewal'
+    if (isNew && !account.accountName.trim()) e.accountName = 'Required'
+    if (!deal.posSystem)   e.posSystem   = 'Required'
+    if (!deal.countryCode) e.countryCode = 'Required'
+    if (!deal.package)     e.package     = 'Required'
+    if (!deal.paymentType) e.paymentType = 'Required'
+    if (!deal.startDate)   e.startDate   = 'Required'
+    if (!deal.agentId)     e.agentId     = 'Required'
     return e
   }
 
-  function handleReview() {
-    const e = validate()
-    if (Object.keys(e).length > 0) { setErrors(e); return }
-    setModal('confirm')
+  function validateStep2() {
+    const e = {}
+    const total = Number(deal.normalBranches) + Number(deal.centralKitchens) + Number(deal.warehouses)
+    if (total < 1) e.branches = 'At least 1 branch (Normal, Central Kitchen, or Warehouse) is required to generate a contract'
+    return e
+  }
+
+  function validateStep3() {
+    const e = {}
+    if (!handover.clientPoc?.trim()) e.hClientPoc = 'Contact name is required'
+    if (!handover.clientEmail?.trim() && !handover.clientPhone?.trim()) e.hClientContact = 'At least one contact method (email or phone) is required'
+    if (!handover.primaryObjectives?.trim()) e.hPrimaryObj = 'Primary objectives are required'
+    return e
+  }
+
+  function goNext() {
+    let e = {}
+    if (step === 1) e = validateStep1()
+    if (step === 2) e = validateStep2()
+    if (step === 3) e = validateStep3()
+    if (Object.keys(e).length > 0) { setErrors(e); window.scrollTo({ top: 0, behavior: 'smooth' }); return }
+    setErrors({})
+    setStep((s) => s + 1)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   // ── Mutation ──
@@ -374,6 +431,48 @@ export default function CloseDealPage() {
   const hasWarehouse  = Number(deal.warehouses) > 0
   const hasAI         = Number(deal.aiAgentUsers) > 0
 
+  // ── Reusable pricing preview panel ──
+  function PricingPreview() {
+    if (!summary) return <p className="text-sm text-gray-400 p-5">Select country, channel, and package to see pricing.</p>
+    return (
+      <div className="space-y-3 p-5">
+        {summary.invGross > 0 && <PreviewRow label={`Normal Branches${Number(lineDiscounts.inventory) > 0 ? ` −${lineDiscounts.inventory}%` : ''}`} value={fmt(summary.invNet, currency)} />}
+        {summary.ckGross > 0  && <PreviewRow label={`Central Kitchens${Number(lineDiscounts.ck) > 0 ? ` −${lineDiscounts.ck}%` : ''}`} value={fmt(summary.ckNet, currency)} />}
+        {summary.wGross > 0   && <PreviewRow label={`Warehouses${Number(lineDiscounts.warehouse) > 0 ? ` −${lineDiscounts.warehouse}%` : ''}`} value={fmt(summary.wNet, currency)} />}
+        {summary.accMainGross > 0  && <PreviewRow label={`Acct. Main${Number(lineDiscounts.accMain) > 0 ? ` −${lineDiscounts.accMain}%` : ''}`} value={fmt(summary.accMainNet, currency)} />}
+        {summary.accExtraGross > 0 && <PreviewRow label={`Acct. Extra${Number(lineDiscounts.accExtra) > 0 ? ` −${lineDiscounts.accExtra}%` : ''}`} value={fmt(summary.accExtraNet, currency)} />}
+        {summary.butchGross > 0    && <PreviewRow label={`Butchering${Number(lineDiscounts.butchering) > 0 ? ` −${lineDiscounts.butchering}%` : ''}`} value={fmt(summary.butchNet, currency)} />}
+        {summary.aiGross > 0       && <PreviewRow label={`AI Agent${Number(lineDiscounts.ai) > 0 ? ` −${lineDiscounts.ai}%` : ''}`} value={fmt(summary.aiNet, currency)} />}
+        <div className="border-t border-gray-100 pt-3 space-y-2">
+          <PreviewRow label="Base Annual" value={fmt(summary.baseAnnual, currency)} />
+          {summary.discountAmt > 0 && <PreviewRow label={`Overall Discount (−${deal.discount}%)`} value={`−${fmt(summary.discountAmt, currency)}`} highlight />}
+          <PreviewRow label="Discounted Annual" value={fmt(summary.discountedAnnual, currency)} bold />
+          {deal.paymentType === 'Quarterly' && <PreviewRow label="Quarterly Premium (+6%)" value={`+${fmt(summary.effectiveAnnual - summary.discountedAnnual, currency)}`} />}
+          <PreviewRow label="Effective Annual" value={fmt(summary.effectiveAnnual, currency)} bold />
+        </div>
+        <div className="border-t border-gray-100 pt-3 space-y-2">
+          <PreviewRow label="MRR (excl. VAT)" value={fmt(summary.totalMRR, currency)} bold />
+          <PreviewRow label={`VAT (${(vatRate * 100).toFixed(0)}%)`} value={fmt(summary.totalMRR * vatRate, currency)} />
+          <PreviewRow label="MRR (incl. VAT)" value={fmt(summary.totalMRRInclVAT, currency)} />
+        </div>
+        <div className="border-t border-gray-100 pt-3 space-y-2">
+          <PreviewRow label="Contract Months" value={`${summary.contractMonths} months`} />
+          <PreviewRow label="Contract Value (excl.)" value={fmt(summary.contractValue, currency)} bold />
+          <PreviewRow label="Contract Value (incl.)" value={fmt(summary.contractValueInclVAT, currency)} bold />
+        </div>
+        {deal.paymentType === 'Quarterly' && (
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <PreviewRow label="Per Invoice (excl.)" value={fmt(summary.quarterlyBilling, currency)} />
+            <PreviewRow label="Per Invoice (incl.)" value={fmt(summary.quarterlyBillingInclVAT, currency)} />
+          </div>
+        )}
+        <div className="border-t border-gray-100 pt-3 text-xs text-gray-500">
+          {invoiceCount} invoice{invoiceCount > 1 ? 's' : ''} will be generated
+        </div>
+      </div>
+    )
+  }
+
   // ── Render ──
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -384,7 +483,7 @@ export default function CloseDealPage() {
         <span className="text-gray-300">/</span>
         <div>
           <h1 className="text-xl font-bold text-gray-900">Close Deal — {lead.companyName}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Fill in the contract details. The account and invoices will be created automatically.</p>
+          <p className="text-sm text-gray-500 mt-0.5">Complete all 4 steps to create the account, contract, and invoices.</p>
         </div>
       </div>
 
@@ -406,17 +505,19 @@ export default function CloseDealPage() {
         )
       })()}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Step Indicator */}
+      <StepIndicator step={step} />
 
-        {/* ── Left: Form ────────────────────────────────── */}
-        <div className="lg:col-span-2 space-y-5">
+      {/* ─── STEP 1: Account & Deal ─────────────────────────────────────────── */}
+      {step === 1 && (
+        <div className="max-w-2xl space-y-5">
 
           {/* Account Details */}
           {lead.opportunityType === 'Expansion' || lead.opportunityType === 'Renewal' ? (
             <Section title="Account">
               <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 text-sm">
                 <p className="font-semibold text-indigo-800">{lead.account?.name || account.accountName}</p>
-                <p className="text-indigo-500 text-xs mt-0.5">Existing account · deal will be added to this account's history</p>
+                <p className="text-indigo-500 text-xs mt-0.5">Existing account · deal will be added to this account&apos;s history</p>
               </div>
             </Section>
           ) : (
@@ -475,10 +576,11 @@ export default function CloseDealPage() {
                 {errors.package && <p className="text-xs text-red-500 mt-1">{errors.package}</p>}
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Payment Type</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Payment Type *</label>
                 <select className={fc('paymentType')} value={deal.paymentType} onChange={setD('paymentType')}>
                   {PAY_TYPES.map((p) => <option key={p}>{p}</option>)}
                 </select>
+                {errors.paymentType && <p className="text-xs text-red-500 mt-1">{errors.paymentType}</p>}
               </div>
               {deal.paymentType === 'Special' && (
                 <div>
@@ -493,8 +595,9 @@ export default function CloseDealPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Start Date *</label>
                 <input type="date" className={fc('startDate')} value={deal.startDate} onChange={setD('startDate')} />
+                {errors.startDate && <p className="text-xs text-red-500 mt-1">{errors.startDate}</p>}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Sales Agent *</label>
@@ -514,9 +617,21 @@ export default function CloseDealPage() {
               </div>
             </div>
           </Section>
+        </div>
+      )}
+
+      {/* ─── STEP 2: Commercial Configuration ──────────────────────────────── */}
+      {step === 2 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-5">
 
           {/* Branch Configuration + per-line discounts */}
           <Section title="Branch Configuration">
+            {errors.branches && (
+              <div className="mb-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700 font-medium">
+                ⚠ {errors.branches}
+              </div>
+            )}
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide pb-1 border-b border-gray-100">
                 <span>Branch Type</span>
@@ -526,17 +641,17 @@ export default function CloseDealPage() {
               <div className="grid grid-cols-3 gap-2 items-center">
                 <label className="text-sm text-gray-700">Normal Branches</label>
                 <input type="number" min={0} className={fc('normalBranches')} value={deal.normalBranches} onChange={setD('normalBranches')} />
-                {hasBranches ? <DiscountInput value={lineDiscounts.inventory} onChange={setLD('inventory')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
+                {Number(deal.normalBranches) > 0 ? <DiscountInput value={lineDiscounts.inventory} onChange={setLD('inventory')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
               </div>
               <div className="grid grid-cols-3 gap-2 items-center">
                 <label className="text-sm text-gray-700">Central Kitchens</label>
                 <input type="number" min={0} className={fc('centralKitchens')} value={deal.centralKitchens} onChange={setD('centralKitchens')} />
-                {hasCK ? <DiscountInput value={lineDiscounts.ck} onChange={setLD('ck')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
+                {Number(deal.centralKitchens) > 0 ? <DiscountInput value={lineDiscounts.ck} onChange={setLD('ck')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
               </div>
               <div className="grid grid-cols-3 gap-2 items-center">
                 <label className="text-sm text-gray-700">Warehouses</label>
                 <input type="number" min={0} className={fc('warehouses')} value={deal.warehouses} onChange={setD('warehouses')} />
-                {hasWarehouse ? <DiscountInput value={lineDiscounts.warehouse} onChange={setLD('warehouse')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
+                {Number(deal.warehouses) > 0 ? <DiscountInput value={lineDiscounts.warehouse} onChange={setLD('warehouse')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
               </div>
             </div>
           </Section>
@@ -548,8 +663,6 @@ export default function CloseDealPage() {
                 <span className="col-span-2">Module</span>
                 <span>Line Discount</span>
               </div>
-
-              {/* Accounting Main */}
               <div className="grid grid-cols-3 gap-2 items-center">
                 <div className="col-span-2 flex items-center gap-2">
                   <input type="checkbox" id="hasAccounting" checked={deal.hasAccounting} onChange={setD('hasAccounting')} className="w-4 h-4 accent-indigo-600" />
@@ -557,8 +670,6 @@ export default function CloseDealPage() {
                 </div>
                 {deal.hasAccounting ? <DiscountInput value={lineDiscounts.accMain} onChange={setLD('accMain')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
               </div>
-
-              {/* Accounting Extra Branches */}
               {deal.hasAccounting && (
                 <div className="grid grid-cols-3 gap-2 items-center ml-6">
                   <div className="col-span-1">
@@ -566,13 +677,9 @@ export default function CloseDealPage() {
                     <input type="number" min={0} className={fc('extraAccountingBranches')} value={deal.extraAccountingBranches} onChange={setD('extraAccountingBranches')} />
                   </div>
                   <div />
-                  {Number(deal.extraAccountingBranches) > 0
-                    ? <DiscountInput value={lineDiscounts.accExtra} onChange={setLD('accExtra')} />
-                    : <span className="text-gray-300 text-xs pl-1">—</span>}
+                  {Number(deal.extraAccountingBranches) > 0 ? <DiscountInput value={lineDiscounts.accExtra} onChange={setLD('accExtra')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
                 </div>
               )}
-
-              {/* Butchering */}
               <div className="grid grid-cols-3 gap-2 items-center">
                 <div className="col-span-2 flex items-center gap-2">
                   <input type="checkbox" id="hasButchering" checked={deal.hasButchering} onChange={setD('hasButchering')} className="w-4 h-4 accent-indigo-600" />
@@ -580,15 +687,13 @@ export default function CloseDealPage() {
                 </div>
                 {deal.hasButchering ? <DiscountInput value={lineDiscounts.butchering} onChange={setLD('butchering')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
               </div>
-
-              {/* AI Agent */}
               <div className="grid grid-cols-3 gap-2 items-center">
                 <div className="col-span-1">
                   <label className="block text-xs font-medium text-gray-600 mb-1">AI Agent Named Users</label>
                   <input type="number" min={0} className={fc('aiAgentUsers')} value={deal.aiAgentUsers} onChange={setD('aiAgentUsers')} />
                 </div>
                 <div />
-                {hasAI ? <DiscountInput value={lineDiscounts.ai} onChange={setLD('ai')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
+                {Number(deal.aiAgentUsers) > 0 ? <DiscountInput value={lineDiscounts.ai} onChange={setLD('ai')} /> : <span className="text-gray-300 text-xs pl-1">—</span>}
               </div>
             </div>
           </Section>
@@ -604,12 +709,7 @@ export default function CloseDealPage() {
 
           {/* Notes */}
           <Section title="Notes">
-            <textarea
-              className={`${fc('notes')} h-20 resize-none`}
-              placeholder="Optional notes…"
-              value={deal.notes}
-              onChange={setD('notes')}
-            />
+            <textarea className={`${fc('notes')} h-20 resize-none`} placeholder="Optional notes…" value={deal.notes} onChange={setD('notes')} />
           </Section>
 
           {/* Foodics Invoice Number (Foodics deals only) */}
@@ -617,336 +717,317 @@ export default function CloseDealPage() {
             <Section title="Foodics Invoice">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Foodics Invoice # <span className="text-gray-400 font-normal">(optional — can be added later)</span>
+                  Foodics Invoice # <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
-                <input
-                  className={fc('foodicsInvoiceNumber')}
-                  value={deal.foodicsInvoiceNumber}
-                  onChange={setD('foodicsInvoiceNumber')}
-                  placeholder="e.g. INV-2025-00123"
-                />
-                <p className="text-xs text-gray-400 mt-1.5">
-                  Saved on the first invoice. Additional invoices can be updated from the Invoicing page.
-                </p>
+                <input className={fc('foodicsInvoiceNumber')} value={deal.foodicsInvoiceNumber} onChange={setD('foodicsInvoiceNumber')} placeholder="e.g. INV-2025-00123" />
+                <p className="text-xs text-gray-400 mt-1.5">Saved on the first invoice. Additional invoices can be updated from the Invoicing page.</p>
               </div>
             </Section>
           )}
-
-          {/* ── Internal Handover Document ─────────────── */}
-          <div className="bg-white border border-indigo-200 rounded-xl shadow-sm overflow-hidden">
-            <div className="px-5 py-4 bg-indigo-50 border-b border-indigo-100">
-              <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wider">Internal Handover Document</p>
-              <p className="text-xs text-indigo-500 mt-0.5">Pre-filled from the opportunity. Complete remaining fields before closing.</p>
-            </div>
-
-            <div className="p-5 space-y-6">
-
-              {/* 1 — Deal Summary */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">1. Deal Summary</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Client Name</label>
-                    <input className={fc('hClientName')} value={handover.clientName} onChange={setH('clientName')} placeholder="Account name" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Contract Start</label>
-                    <input type="date" className={fc('hContractStart')} value={handover.contractStart} onChange={setH('contractStart')} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Contract Duration</label>
-                    <input className={fc('hContractDuration')} value={handover.contractDuration} onChange={setH('contractDuration')} placeholder="e.g. 12 months – Annual" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Commercial Model</label>
-                    <input className={fc('hCommercialModel')} value={handover.commercialModel} onChange={setH('commercialModel')} placeholder="e.g. Operations – 3 branches" />
-                  </div>
-                </div>
-              </div>
-
-              {/* 2 — Key Contacts */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">2. Key Contacts</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Client POC</label>
-                    <input className={fc('hClientPoc')} value={handover.clientPoc} onChange={setH('clientPoc')} placeholder="Name" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">POC Role / Title</label>
-                    <input className={fc('hClientPocRole')} value={handover.clientPocRole} onChange={setH('clientPocRole')} placeholder="e.g. Operations Manager" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Client Email</label>
-                    <input type="email" className={fc('hClientEmail')} value={handover.clientEmail} onChange={setH('clientEmail')} placeholder="poc@client.com" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Client Phone</label>
-                    <input className={fc('hClientPhone')} value={handover.clientPhone} onChange={setH('clientPhone')} placeholder="+966 5x xxx xxxx" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Escalation Contact</label>
-                    <input className={fc('hEscalation')} value={handover.escalationContact} onChange={setH('escalationContact')} placeholder="Name & phone / email" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Acquisition Owner</label>
-                    <input className={fc('hAcqOwner')} value={handover.acquisitionOwner} onChange={setH('acquisitionOwner')} placeholder="Sales agent name" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Assigned CS Manager</label>
-                    <input className={fc('hCsManager')} value={handover.assignedCsManager} onChange={setH('assignedCsManager')} placeholder="CS team member" />
-                  </div>
-                </div>
-              </div>
-
-              {/* 3 — Objectives & Success Criteria */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">3. Objectives & Success Criteria</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Primary Objectives</label>
-                    <textarea rows={2} className={`${fc('hPrimaryObj')} resize-none`} value={handover.primaryObjectives} onChange={setH('primaryObjectives')} placeholder="What are the client's main goals with ShopBrain?" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Success Metrics</label>
-                    <textarea rows={2} className={`${fc('hSuccessMetrics')} resize-none`} value={handover.successMetrics} onChange={setH('successMetrics')} placeholder="How will success be measured? (e.g. inventory accuracy ≥95%)" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Short-Term Priorities</label>
-                    <textarea rows={2} className={`${fc('hST')} resize-none`} value={handover.shortTermPriorities} onChange={setH('shortTermPriorities')} placeholder="First 30–90 days" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Long-Term Priorities</label>
-                    <textarea rows={2} className={`${fc('hLT')} resize-none`} value={handover.longTermPriorities} onChange={setH('longTermPriorities')} placeholder="3–12 months" />
-                  </div>
-                </div>
-              </div>
-
-              {/* 4 — Client Operations Snapshot */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">4. Client Operations Snapshot</p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">How They Operate</label>
-                    <textarea rows={2} className={`${fc('hOperate')} resize-none`} value={handover.howTheyOperate} onChange={setH('howTheyOperate')} placeholder="Business model, service type, ordering process..." />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Order / Workflow Summary</label>
-                    <textarea rows={2} className={`${fc('hWorkflow')} resize-none`} value={handover.orderWorkflowSummary} onChange={setH('orderWorkflowSummary')} placeholder="How orders flow from branch to warehouse / supplier..." />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Locations & Operating Hours</label>
-                    <input className={fc('hLocations')} value={handover.locationsOperatingHours} onChange={setH('locationsOperatingHours')} placeholder="e.g. 3 branches in Riyadh – 9am to 11pm" />
-                  </div>
-                </div>
-              </div>
-
-              {/* 5 — Pain Points & Needs */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">5. Pain Points & Needs</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Key Needs</label>
-                    <textarea rows={3} className={`${fc('hNeeds')} resize-none`} value={handover.keyNeeds} onChange={setH('keyNeeds')} placeholder="What does the client urgently need from us?" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Top Pain Points</label>
-                    <textarea rows={3} className={`${fc('hPainPoints')} resize-none`} value={handover.topPainPoints} onChange={setH('topPainPoints')} placeholder="Current frustrations with existing systems..." />
-                  </div>
-                </div>
-              </div>
-
-              {/* 6 — Existing Systems */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">6. Existing Systems</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Current Systems Used</label>
-                    <textarea rows={2} className={`${fc('hSystems')} resize-none`} value={handover.currentSystemsUsed} onChange={setH('currentSystemsUsed')} placeholder="POS, ERP, accounting software, spreadsheets..." />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Required Integrations</label>
-                    <textarea rows={2} className={`${fc('hIntegrations')} resize-none`} value={handover.requiredIntegrations} onChange={setH('requiredIntegrations')} placeholder="APIs, connectors needed (e.g. Foodics POS sync)" />
-                  </div>
-                </div>
-              </div>
-
-              {/* 7 — Scope & Critical Notes */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">7. Scope & Critical Notes</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">In-Scope</label>
-                    <textarea rows={2} className={`${fc('hInScope')} resize-none`} value={handover.inScope} onChange={setH('inScope')} placeholder="What is included in this contract..." />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Out-of-Scope</label>
-                    <textarea rows={2} className={`${fc('hOutScope')} resize-none`} value={handover.outOfScope} onChange={setH('outOfScope')} placeholder="Explicitly excluded items..." />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Dependencies from Client</label>
-                    <textarea rows={2} className={`${fc('hDeps')} resize-none`} value={handover.dependenciesFromClient} onChange={setH('dependenciesFromClient')} placeholder="What the client needs to provide/prepare..." />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Highlights / Critical Notes</label>
-                    <textarea rows={2} className={`${fc('hHighlights')} resize-none`} value={handover.highlights} onChange={setH('highlights')} placeholder="Key commitments, special agreements, sensitivities..." />
-                  </div>
-                </div>
-              </div>
-
-            </div>
           </div>
 
-          <button
-            onClick={handleReview}
-            className="w-full bg-emerald-600 text-white text-sm font-semibold py-3 rounded-xl hover:bg-emerald-700 transition-colors"
-          >
-            Review & Close Deal →
-          </button>
+          {/* Live Pricing Preview */}
+          <div>
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm sticky top-6 overflow-hidden">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 pt-5 pb-3">Live Pricing Preview</p>
+              <PricingPreview />
+            </div>
+          </div>
         </div>
+      )}
 
-        {/* ── Right: Live Preview ───────────────────────── */}
-        <div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm sticky top-6">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Live Preview</p>
+      {/* ─── STEP 3: Handover Document ──────────────────────────────────────── */}
+      {step === 3 && (
+        <div className="bg-white border border-indigo-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 bg-indigo-50 border-b border-indigo-100">
+            <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wider">Internal Handover Document</p>
+            <p className="text-xs text-indigo-500 mt-0.5">Fields marked * are required. Complete the rest so the operations team has full context.</p>
+          </div>
+          <div className="p-5 space-y-6">
 
-            {!summary ? (
-              <p className="text-sm text-gray-400">Select country, channel, and package to see pricing.</p>
-            ) : (
+            {/* Contact errors */}
+            {(errors.hClientPoc || errors.hClientContact || errors.hPrimaryObj) && (
+              <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1">
+                {errors.hClientPoc    && <p className="text-xs text-red-700 font-medium">⚠ {errors.hClientPoc}</p>}
+                {errors.hClientContact && <p className="text-xs text-red-700 font-medium">⚠ {errors.hClientContact}</p>}
+                {errors.hPrimaryObj   && <p className="text-xs text-red-700 font-medium">⚠ {errors.hPrimaryObj}</p>}
+              </div>
+            )}
+
+            {/* 1 — Deal Summary */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">1. Deal Summary</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Client Name</label>
+                  <input className={fc('hClientName')} value={handover.clientName} onChange={setH('clientName')} placeholder="Account name" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Contract Start</label>
+                  <input type="date" className={fc('hContractStart')} value={handover.contractStart} onChange={setH('contractStart')} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Contract Duration</label>
+                  <input className={fc('hContractDuration')} value={handover.contractDuration} onChange={setH('contractDuration')} placeholder="e.g. 12 months – Annual" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Commercial Model</label>
+                  <input className={fc('hCommercialModel')} value={handover.commercialModel} onChange={setH('commercialModel')} placeholder="e.g. Operations – 3 branches" />
+                </div>
+              </div>
+            </div>
+
+            {/* 2 — Key Contacts */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">2. Key Contacts</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Client POC *</label>
+                  <input className={fc('hClientPoc')} value={handover.clientPoc} onChange={setH('clientPoc')} placeholder="Name" />
+                  {errors.hClientPoc && <p className="text-xs text-red-500 mt-1">{errors.hClientPoc}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">POC Role / Title</label>
+                  <input className={fc('hClientPocRole')} value={handover.clientPocRole} onChange={setH('clientPocRole')} placeholder="e.g. Operations Manager" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Client Email *</label>
+                  <input type="email" className={fc('hClientEmail')} value={handover.clientEmail} onChange={setH('clientEmail')} placeholder="poc@client.com" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Client Phone *</label>
+                  <input className={fc('hClientPhone')} value={handover.clientPhone} onChange={setH('clientPhone')} placeholder="+966 5x xxx xxxx" />
+                </div>
+                {errors.hClientContact && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-red-500">{errors.hClientContact}</p>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Escalation Contact</label>
+                  <input className={fc('hEscalation')} value={handover.escalationContact} onChange={setH('escalationContact')} placeholder="Name & phone / email" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Acquisition Owner</label>
+                  <input className={fc('hAcqOwner')} value={handover.acquisitionOwner} onChange={setH('acquisitionOwner')} placeholder="Sales agent name" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Assigned CS Manager</label>
+                  <input className={fc('hCsManager')} value={handover.assignedCsManager} onChange={setH('assignedCsManager')} placeholder="CS team member" />
+                </div>
+              </div>
+            </div>
+
+            {/* 3 — Objectives & Success Criteria */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">3. Objectives & Success Criteria</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Primary Objectives *</label>
+                  <textarea rows={2} className={`${fc('hPrimaryObj')} resize-none`} value={handover.primaryObjectives} onChange={setH('primaryObjectives')} placeholder="What are the client's main goals with ShopBrain?" />
+                  {errors.hPrimaryObj && <p className="text-xs text-red-500 mt-1">{errors.hPrimaryObj}</p>}
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Success Metrics</label>
+                  <textarea rows={2} className={`${fc('hSuccessMetrics')} resize-none`} value={handover.successMetrics} onChange={setH('successMetrics')} placeholder="How will success be measured? (e.g. inventory accuracy ≥95%)" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Short-Term Priorities</label>
+                  <textarea rows={2} className={`${fc('hST')} resize-none`} value={handover.shortTermPriorities} onChange={setH('shortTermPriorities')} placeholder="First 30–90 days" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Long-Term Priorities</label>
+                  <textarea rows={2} className={`${fc('hLT')} resize-none`} value={handover.longTermPriorities} onChange={setH('longTermPriorities')} placeholder="3–12 months" />
+                </div>
+              </div>
+            </div>
+
+            {/* 4 — Client Operations Snapshot */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">4. Client Operations Snapshot</p>
               <div className="space-y-3">
-                {/* Per-component annual values */}
-                {summary.invGross > 0 && (
-                  <PreviewRow
-                    label={`Normal Branches${Number(lineDiscounts.inventory) > 0 ? ` −${lineDiscounts.inventory}%` : ''}`}
-                    value={fmt(summary.invNet, currency)}
-                  />
-                )}
-                {summary.ckGross > 0 && (
-                  <PreviewRow
-                    label={`Central Kitchens${Number(lineDiscounts.ck) > 0 ? ` −${lineDiscounts.ck}%` : ''}`}
-                    value={fmt(summary.ckNet, currency)}
-                  />
-                )}
-                {summary.wGross > 0 && (
-                  <PreviewRow
-                    label={`Warehouses${Number(lineDiscounts.warehouse) > 0 ? ` −${lineDiscounts.warehouse}%` : ''}`}
-                    value={fmt(summary.wNet, currency)}
-                  />
-                )}
-                {summary.accMainGross > 0 && (
-                  <PreviewRow
-                    label={`Acct. Main${Number(lineDiscounts.accMain) > 0 ? ` −${lineDiscounts.accMain}%` : ''}`}
-                    value={fmt(summary.accMainNet, currency)}
-                  />
-                )}
-                {summary.accExtraGross > 0 && (
-                  <PreviewRow
-                    label={`Acct. Extra${Number(lineDiscounts.accExtra) > 0 ? ` −${lineDiscounts.accExtra}%` : ''}`}
-                    value={fmt(summary.accExtraNet, currency)}
-                  />
-                )}
-                {summary.butchGross > 0 && (
-                  <PreviewRow
-                    label={`Butchering${Number(lineDiscounts.butchering) > 0 ? ` −${lineDiscounts.butchering}%` : ''}`}
-                    value={fmt(summary.butchNet, currency)}
-                  />
-                )}
-                {summary.aiGross > 0 && (
-                  <PreviewRow
-                    label={`AI Agent${Number(lineDiscounts.ai) > 0 ? ` −${lineDiscounts.ai}%` : ''}`}
-                    value={fmt(summary.aiNet, currency)}
-                  />
-                )}
-
-                {/* Aggregates */}
-                <div className="border-t border-gray-100 pt-3 space-y-2">
-                  <PreviewRow label="Base Annual" value={fmt(summary.baseAnnual, currency)} />
-                  {summary.discountAmt > 0 && (
-                    <PreviewRow label={`Overall Discount (−${deal.discount}%)`} value={`−${fmt(summary.discountAmt, currency)}`} highlight />
-                  )}
-                  <PreviewRow label="Discounted Annual" value={fmt(summary.discountedAnnual, currency)} bold />
-                  {deal.paymentType === 'Quarterly' && (
-                    <PreviewRow label="Quarterly Premium (+6%)" value={`+${fmt(summary.effectiveAnnual - summary.discountedAnnual, currency)}`} />
-                  )}
-                  <PreviewRow label="Effective Annual" value={fmt(summary.effectiveAnnual, currency)} bold />
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">How They Operate</label>
+                  <textarea rows={2} className={`${fc('hOperate')} resize-none`} value={handover.howTheyOperate} onChange={setH('howTheyOperate')} placeholder="Business model, service type, ordering process..." />
                 </div>
-
-                {/* MRR */}
-                <div className="border-t border-gray-100 pt-3 space-y-2">
-                  <PreviewRow label="MRR (excl. VAT)" value={fmt(summary.totalMRR, currency)} bold />
-                  <PreviewRow label={`VAT (${(vatRate * 100).toFixed(0)}%)`} value={fmt(summary.totalMRR * vatRate, currency)} />
-                  <PreviewRow label="MRR (incl. VAT)" value={fmt(summary.totalMRRInclVAT, currency)} />
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Order / Workflow Summary</label>
+                  <textarea rows={2} className={`${fc('hWorkflow')} resize-none`} value={handover.orderWorkflowSummary} onChange={setH('orderWorkflowSummary')} placeholder="How orders flow from branch to warehouse / supplier..." />
                 </div>
-
-                {/* Contract value */}
-                <div className="border-t border-gray-100 pt-3 space-y-2">
-                  <PreviewRow label="Contract Months" value={`${summary.contractMonths} months`} />
-                  <PreviewRow label="Contract Value (excl.)" value={fmt(summary.contractValue, currency)} bold />
-                  <PreviewRow label="Contract Value (incl.)" value={fmt(summary.contractValueInclVAT, currency)} bold />
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Locations & Operating Hours</label>
+                  <input className={fc('hLocations')} value={handover.locationsOperatingHours} onChange={setH('locationsOperatingHours')} placeholder="e.g. 3 branches in Riyadh – 9am to 11pm" />
                 </div>
+              </div>
+            </div>
 
-                {deal.paymentType === 'Quarterly' && (
-                  <div className="border-t border-gray-100 pt-3 space-y-2">
-                    <PreviewRow label="Per Invoice (excl.)" value={fmt(summary.quarterlyBilling, currency)} />
-                    <PreviewRow label="Per Invoice (incl.)" value={fmt(summary.quarterlyBillingInclVAT, currency)} />
+            {/* 5 — Pain Points & Needs */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">5. Pain Points & Needs</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Key Needs</label>
+                  <textarea rows={3} className={`${fc('hNeeds')} resize-none`} value={handover.keyNeeds} onChange={setH('keyNeeds')} placeholder="What does the client urgently need from us?" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Top Pain Points</label>
+                  <textarea rows={3} className={`${fc('hPainPoints')} resize-none`} value={handover.topPainPoints} onChange={setH('topPainPoints')} placeholder="Current frustrations with existing systems..." />
+                </div>
+              </div>
+            </div>
+
+            {/* 6 — Existing Systems */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">6. Existing Systems</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Current Systems Used</label>
+                  <textarea rows={2} className={`${fc('hSystems')} resize-none`} value={handover.currentSystemsUsed} onChange={setH('currentSystemsUsed')} placeholder="POS, ERP, accounting software, spreadsheets..." />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Required Integrations</label>
+                  <textarea rows={2} className={`${fc('hIntegrations')} resize-none`} value={handover.requiredIntegrations} onChange={setH('requiredIntegrations')} placeholder="APIs, connectors needed (e.g. Foodics POS sync)" />
+                </div>
+              </div>
+            </div>
+
+            {/* 7 — Scope & Critical Notes */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">7. Scope & Critical Notes</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">In-Scope</label>
+                  <textarea rows={2} className={`${fc('hInScope')} resize-none`} value={handover.inScope} onChange={setH('inScope')} placeholder="What is included in this contract..." />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Out-of-Scope</label>
+                  <textarea rows={2} className={`${fc('hOutScope')} resize-none`} value={handover.outOfScope} onChange={setH('outOfScope')} placeholder="Explicitly excluded items..." />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Dependencies from Client</label>
+                  <textarea rows={2} className={`${fc('hDeps')} resize-none`} value={handover.dependenciesFromClient} onChange={setH('dependenciesFromClient')} placeholder="What the client needs to provide/prepare..." />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Highlights / Critical Notes</label>
+                  <textarea rows={2} className={`${fc('hHighlights')} resize-none`} value={handover.highlights} onChange={setH('highlights')} placeholder="Key commitments, special agreements, sensitivities..." />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── STEP 4: Review & Submit ─────────────────────────────────────────── */}
+      {step === 4 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-5">
+
+            {/* Deal summary */}
+            <Section title="Deal Summary">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-gray-500">Account</span><span className="font-semibold">{lead.account?.name || account.accountName}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Country</span><span>{selectedCountry?.name || deal.countryCode}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">POS System</span><span>{deal.posSystem}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Package</span><span>{deal.package}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Sales Channel</span><span>{deal.salesChannel}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Payment Type</span><span>{deal.paymentType}{deal.paymentType === 'Special' ? ` (${deal.contractYears} yr)` : ''}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Start Date</span><span>{deal.startDate}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Sales Agent</span><span>{agents.find(a => a.id === deal.agentId)?.name || deal.agentId}</span></div>
+                {(Number(deal.normalBranches) > 0) && <div className="flex justify-between"><span className="text-gray-500">Normal Branches</span><span>{deal.normalBranches}</span></div>}
+                {(Number(deal.centralKitchens) > 0) && <div className="flex justify-between"><span className="text-gray-500">Central Kitchens</span><span>{deal.centralKitchens}</span></div>}
+                {(Number(deal.warehouses) > 0) && <div className="flex justify-between"><span className="text-gray-500">Warehouses</span><span>{deal.warehouses}</span></div>}
+                {deal.hasAccounting && <div className="flex justify-between"><span className="text-gray-500">Accounting</span><span>✓{Number(deal.extraAccountingBranches) > 0 ? ` + ${deal.extraAccountingBranches} extra branches` : ''}</span></div>}
+                {deal.hasButchering && <div className="flex justify-between"><span className="text-gray-500">Butchering</span><span>✓</span></div>}
+                {Number(deal.aiAgentUsers) > 0 && <div className="flex justify-between"><span className="text-gray-500">AI Agent Users</span><span>{deal.aiAgentUsers}</span></div>}
+                {summary?.discountAmt > 0 && <div className="flex justify-between text-indigo-600"><span>Overall Discount</span><span>−{deal.discount}%</span></div>}
+              </div>
+            </Section>
+
+            {/* Handover summary */}
+            <Section title="Handover Summary">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-gray-500">Client POC</span><span className="font-medium">{handover.clientPoc || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Email</span><span>{handover.clientEmail || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Phone</span><span>{handover.clientPhone || '—'}</span></div>
+                {handover.primaryObjectives && (
+                  <div className="pt-1 border-t border-gray-100">
+                    <p className="text-xs text-gray-400 mb-1">Primary Objectives</p>
+                    <p className="text-gray-700 text-xs leading-relaxed">{handover.primaryObjectives}</p>
                   </div>
                 )}
+              </div>
+              <button onClick={() => setStep(3)} className="mt-3 text-xs text-indigo-600 hover:text-indigo-800 underline">Edit handover →</button>
+            </Section>
 
-                <div className="border-t border-gray-100 pt-3 text-xs text-gray-500">
-                  {invoiceCount} invoice{invoiceCount > 1 ? 's' : ''} will be generated
-                </div>
+            {/* What will happen */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-800 space-y-1">
+              <p className="font-semibold text-emerald-700">What happens when you submit:</p>
+              {lead.opportunityType === 'Expansion' || lead.opportunityType === 'Renewal' ? (
+                <ul className="text-xs text-emerald-700 space-y-0.5 list-disc list-inside mt-1">
+                  <li>Deal recorded against existing account</li>
+                  <li>{invoiceCount} invoice{invoiceCount > 1 ? 's' : ''} generated</li>
+                  <li>Handover document saved</li>
+                  <li>Lead marked as Closed Won</li>
+                </ul>
+              ) : (
+                <ul className="text-xs text-emerald-700 space-y-0.5 list-disc list-inside mt-1">
+                  <li>New CRM account created</li>
+                  <li>Deal, contract & {invoiceCount} invoice{invoiceCount > 1 ? 's' : ''} generated</li>
+                  <li>Onboarding tracker seeded with tasks</li>
+                  <li>Handover document saved</li>
+                  <li>Lead marked as Closed Won</li>
+                </ul>
+              )}
+            </div>
+
+            {closeMutation.error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+                ⚠ {closeMutation.error.message}
               </div>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* ── Confirm Modal ────────────────────────────────── */}
-      <Modal isOpen={modal === 'confirm'} onClose={() => setModal(null)} title="Confirm & Close Deal">
-        {summary && (
-          <div className="space-y-4">
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-1.5 text-sm">
-              <p><span className="text-gray-500">Account:</span> <span className="font-semibold">{account.accountName}</span></p>
-              <p><span className="text-gray-500">Country:</span> {selectedCountry?.name || deal.countryCode}</p>
-              <p><span className="text-gray-500">Channel · Package:</span> {deal.salesChannel} · {deal.package}</p>
-              <p><span className="text-gray-500">Payment:</span> {deal.paymentType}{deal.paymentType === 'Special' ? ` (${deal.contractYears} yr)` : ''}</p>
-              {summary.discountAmt > 0 && (
-                <p><span className="text-gray-500">Discount:</span> <span className="text-indigo-600 font-medium">−{deal.discount}% overall</span></p>
-              )}
-              <p><span className="text-gray-500">MRR (excl. VAT):</span> <span className="font-mono font-semibold">{fmt(summary.totalMRR, currency)}</span></p>
-              <p><span className="text-gray-500">Contract Value (incl. VAT):</span> <span className="font-mono font-semibold">{fmt(summary.contractValueInclVAT, currency)}</span></p>
-              <p><span className="text-gray-500">Invoices:</span> <span className="font-semibold">{invoiceCount}</span></p>
-            </div>
-            <p className="text-sm text-gray-600">
-              {lead.opportunityType === 'Expansion' || lead.opportunityType === 'Renewal'
-                ? <>This will <strong>record the deal</strong> against the existing account and <strong>generate {invoiceCount} invoice{invoiceCount > 1 ? 's' : ''}</strong>. The opportunity will be marked as <strong>Closed Won</strong>.</>
-                : <>This will <strong>create the CRM account</strong>, <strong>record the deal</strong>, and <strong>generate {invoiceCount} invoice{invoiceCount > 1 ? 's' : ''}</strong> — all in one step. The lead will be marked as <strong>Closed Won</strong>.</>
-              }
-            </p>
-            {closeMutation.error && (
-              <p className="text-sm text-red-500">{closeMutation.error.message}</p>
-            )}
-            <div className="flex gap-3">
-              <button
-                onClick={handleConfirm}
-                disabled={closeMutation.isPending}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors"
-              >
-                {closeMutation.isPending ? 'Creating…'
-                  : (lead.opportunityType === 'Expansion' || lead.opportunityType === 'Renewal')
-                    ? 'Confirm & Record Deal'
-                    : 'Confirm & Create Account'}
-              </button>
-              <button
-                onClick={() => setModal(null)}
-                className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
-              >
-                Back
-              </button>
+          {/* Full Pricing Preview */}
+          <div>
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm sticky top-6 overflow-hidden">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 pt-5 pb-3">Pricing Summary</p>
+              <PricingPreview />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ─── Navigation Buttons ──────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+        <button
+          onClick={() => { setStep((s) => s - 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+          disabled={step === 1}
+          className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          ← Back
+        </button>
+        {step < 4 ? (
+          <button
+            onClick={goNext}
+            className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors"
+          >
+            Next →
+          </button>
+        ) : (
+          <button
+            onClick={handleConfirm}
+            disabled={closeMutation.isPending}
+            className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold transition-colors"
+          >
+            {closeMutation.isPending
+              ? 'Creating…'
+              : (lead.opportunityType === 'Expansion' || lead.opportunityType === 'Renewal')
+                ? '🎉 Confirm & Record Deal'
+                : '🎉 Confirm & Create Account'
+            }
+          </button>
         )}
-      </Modal>
+      </div>
     </div>
   )
 }
