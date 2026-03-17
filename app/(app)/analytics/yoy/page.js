@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts'
 import { AnalyticsTable } from '../_components/AnalyticsTable'
 import { PageError } from '@/components/ui/PageError'
+import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
 
 function MRRTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
@@ -19,6 +20,7 @@ function MRRTooltip({ active, payload, label }) {
 
 export default function YoYPage() {
   const [country, setCountry] = useState('')
+  const [leadSources, setLeadSources] = useState([])
   const [yearFrom, setYearFrom] = useState('')
   const [yearTo, setYearTo] = useState('')
 
@@ -28,10 +30,11 @@ export default function YoYPage() {
   })
 
   const { data = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ['analytics-yoy', country],
+    queryKey: ['analytics-yoy', country, leadSources],
     queryFn: () => {
       const p = new URLSearchParams()
       if (country) p.set('country', country)
+      if (leadSources.length > 0) p.set('leadSources', leadSources.join(','))
       return fetch(`/api/analytics/yoy?${p}`).then((r) => {
         if (!r.ok) throw new Error('Failed to load year-over-year data')
         return r.json()
@@ -48,7 +51,7 @@ export default function YoYPage() {
     return true
   }), [data, yearFrom, yearTo])
 
-  const hasFilters = country || yearFrom || yearTo
+  const hasFilters = country || yearFrom || yearTo || leadSources.length > 0
   const chartData = filtered.filter((r) => r.totalMRRSigned != null)
 
   if (isError) return <PageError onRetry={refetch} />
@@ -58,6 +61,7 @@ export default function YoYPage() {
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mr-1">Filter</span>
+        <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
         <select
           className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
           value={country}
@@ -85,7 +89,7 @@ export default function YoYPage() {
         {hasFilters && (
           <button
             className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2"
-            onClick={() => { setCountry(''); setYearFrom(''); setYearTo('') }}
+            onClick={() => { setCountry(''); setLeadSources([]); setYearFrom(''); setYearTo('') }}
           >
             Clear all
           </button>

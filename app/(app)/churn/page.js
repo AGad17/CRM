@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
+import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
 
-const SOURCES = ['Foodics', 'EmployeeReferral', 'CustomerReferral', 'PartnerReferral', 'Website', 'AmbassadorReferral', 'DirectSales', 'Sonic']
 
 function pct(v) { return v !== null && v !== undefined ? `${(v * 100).toFixed(1)}%` : '—' }
 
@@ -29,7 +29,7 @@ function ChurnRateBadge({ value }) {
 
 export default function ChurnPage() {
   const [country, setCountry] = useState('')
-  const [leadSource, setLeadSource] = useState('')
+  const [leadSources, setLeadSources] = useState([])
 
   const { data: countries = [] } = useQuery({
     queryKey: ['countries'],
@@ -37,11 +37,11 @@ export default function ChurnPage() {
   })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['churn', country, leadSource],
+    queryKey: ['churn', country, leadSources],
     queryFn: () => {
       const p = new URLSearchParams()
       if (country) p.set('country', country)
-      if (leadSource) p.set('leadSource', leadSource)
+      if (leadSources.length > 0) p.set('leadSources', leadSources.join(','))
       return fetch(`/api/analytics/churn?${p}`).then((r) => r.json())
     },
   })
@@ -90,7 +90,7 @@ export default function ChurnPage() {
     </div>
   )
 
-  const hasFilters = country || leadSource
+  const hasFilters = country || leadSources.length > 0
   // Chart data — only quarters that have churn data
   const chartData = byQuarter.filter((r) => r.logoChurnRate !== null && r.logoChurnRate !== undefined)
 
@@ -99,24 +99,9 @@ export default function ChurnPage() {
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mr-1">Filter</span>
-        <select
-          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
-          value={country}
-          onChange={(e) => setCountry(e.target.value)}
-        >
-          <option value="">All Countries</option>
-          {countries.filter((c) => c.isActive).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
-        </select>
-        <select
-          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
-          value={leadSource}
-          onChange={(e) => setLeadSource(e.target.value)}
-        >
-          <option value="">All Lead Sources</option>
-          {SOURCES.map((s) => <option key={s} value={s}>{s.replace(/([A-Z])/g, ' $1').trim()}</option>)}
-        </select>
+        <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
         {hasFilters && (
-          <button onClick={() => { setCountry(''); setLeadSource('') }} className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">
+          <button onClick={() => { setCountry(''); setLeadSources([]) }} className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">
             Clear all
           </button>
         )}

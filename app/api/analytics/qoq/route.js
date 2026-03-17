@@ -6,6 +6,10 @@ export async function GET(request) {
   const { error } = await requireAuth('read')
   if (error) return error
   const { searchParams } = new URL(request.url)
-  const filters = { country: searchParams.get('country') || undefined }
+  const leadSources = searchParams.get('leadSources')?.split(',').filter(Boolean) || []
+  const filters = {
+    country: searchParams.get('country') || undefined,
+    leadSources,
+  }
   return NextResponse.json(await getQoQ(filters))
 }

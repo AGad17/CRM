@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { KPICard } from '@/components/ui/KPICard'
 import { DeltaBadge } from '@/components/ui/DeltaBadge'
 import { PageError } from '@/components/ui/PageError'
+import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts'
@@ -15,7 +16,6 @@ function fmt(v, type = 'number') {
   return Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 })
 }
 
-const SOURCES = ['Foodics', 'EmployeeReferral', 'CustomerReferral', 'PartnerReferral', 'Website', 'AmbassadorReferral', 'DirectSales', 'Sonic']
 
 function SectionHeader({ label, color = '#5061F6' }) {
   return (
@@ -51,7 +51,7 @@ function MRRChartTooltip({ active, payload, label }) {
 }
 
 export default function DashboardPage() {
-  const [filters, setFilters] = useState({ country: '', leadSource: '' })
+  const [filters, setFilters] = useState({ country: '', leadSources: [] })
 
   const { data: countries = [] } = useQuery({
     queryKey: ['countries'],
@@ -63,7 +63,7 @@ export default function DashboardPage() {
     queryFn: () => {
       const p = new URLSearchParams()
       if (filters.country) p.set('country', filters.country)
-      if (filters.leadSource) p.set('leadSource', filters.leadSource)
+      if (filters.leadSources.length > 0) p.set('leadSources', filters.leadSources.join(','))
       return fetch(`/api/analytics/dashboard?${p}`).then((r) => {
         if (!r.ok) throw new Error('Failed to load dashboard')
         return r.json()
@@ -75,7 +75,7 @@ export default function DashboardPage() {
   if (isError || !data) return <PageError onRetry={refetch} />
 
   const { snapshot, recentMonths, priorMonth, atRiskAccounts = [] } = data
-  const hasFilters = filters.country || filters.leadSource
+  const hasFilters = filters.country || filters.leadSources.length > 0
 
   // MRR chart: oldest → newest left → right
   const chartData = [...recentMonths].reverse().map((m) => ({
@@ -91,27 +91,10 @@ export default function DashboardPage() {
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mr-1">Filter</span>
-        <select
-          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
-          value={filters.country}
-          onChange={(e) => setFilters({ ...filters, country: e.target.value })}
-        >
-          <option value="">All Countries</option>
-          {countries.filter((c) => c.isActive).map((c) => (
-            <option key={c.code} value={c.code}>{c.name}</option>
-          ))}
-        </select>
-        <select
-          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
-          value={filters.leadSource}
-          onChange={(e) => setFilters({ ...filters, leadSource: e.target.value })}
-        >
-          <option value="">All Lead Sources</option>
-          {SOURCES.map((s) => <option key={s} value={s}>{s.replace(/([A-Z])/g, ' $1').trim()}</option>)}
-        </select>
+        <LeadSourceFilter value={filters.leadSources} onChange={(v) => setFilters({ ...filters, leadSources: v })} />
         {hasFilters && (
           <button
-            onClick={() => setFilters({ country: '', leadSource: '' })}
+            onClick={() => setFilters({ country: '', leadSources: [] })}
             className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2"
           >
             Clear all
@@ -121,12 +104,6 @@ export default function DashboardPage() {
           <span className="text-xs bg-[#F5F2FF] text-[#5061F6] px-2.5 py-1 rounded-full font-semibold border border-[#5061F6]/20 flex items-center gap-1">
             {countries.find((c) => c.code === filters.country)?.name || filters.country}
             <button onClick={() => setFilters({ ...filters, country: '' })} className="hover:text-[#3b4cc4] ml-0.5">✕</button>
-          </span>
-        )}
-        {filters.leadSource && (
-          <span className="text-xs bg-[#F5F2FF] text-[#5061F6] px-2.5 py-1 rounded-full font-semibold border border-[#5061F6]/20 flex items-center gap-1">
-            {filters.leadSource.replace(/([A-Z])/g, ' $1').trim()}
-            <button onClick={() => setFilters({ ...filters, leadSource: '' })} className="hover:text-[#3b4cc4] ml-0.5">✕</button>
           </span>
         )}
       </div>

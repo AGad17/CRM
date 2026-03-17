@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
 
 function pct(v) {
   if (v === null || v === undefined) return '—'
@@ -16,6 +17,7 @@ function cellStyle(v) {
 
 export default function CohortsPage() {
   const [country, setCountry] = useState('')
+  const [leadSources, setLeadSources] = useState([])
 
   const { data: countries = [] } = useQuery({
     queryKey: ['countries'],
@@ -23,10 +25,11 @@ export default function CohortsPage() {
   })
 
   const { data = [], isLoading } = useQuery({
-    queryKey: ['cohorts', country],
+    queryKey: ['cohorts', country, leadSources],
     queryFn: () => {
       const p = new URLSearchParams()
       if (country) p.set('country', country)
+      if (leadSources.length > 0) p.set('leadSources', leadSources.join(','))
       return fetch(`/api/analytics/cohorts?${p}`).then((r) => r.json())
     },
   })
@@ -34,7 +37,7 @@ export default function CohortsPage() {
   if (isLoading) return <div className="animate-pulse h-64 bg-gray-200 rounded-2xl" />
   if (!data.length) return <div className="text-sm text-gray-400 text-center py-16">No cohort data available yet.</div>
 
-  const hasFilters = !!country
+  const hasFilters = !!country || leadSources.length > 0
 
   return (
     <div className="space-y-5">
@@ -49,8 +52,9 @@ export default function CohortsPage() {
           <option value="">All Countries</option>
           {countries.filter((c) => c.isActive).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
         </select>
+        <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
         {hasFilters && (
-          <button onClick={() => setCountry('')} className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">
+          <button onClick={() => { setCountry('')} className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">
             Clear filters
           </button>
         )}

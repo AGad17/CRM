@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
+import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
 
 function usd(v) { return `USD ${Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}` }
 function pct(v) { return v !== null && v !== undefined ? `${(v * 100).toFixed(1)}%` : '—' }
@@ -40,6 +41,7 @@ function ConcentrationBar({ value }) {
 
 export default function RevenueQualityPage() {
   const [country, setCountry] = useState('')
+  const [leadSources, setLeadSources] = useState([])
   const [topN, setTopN] = useState(10)
 
   const { data: countries = [] } = useQuery({
@@ -48,10 +50,11 @@ export default function RevenueQualityPage() {
   })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['revenue-quality', country],
+    queryKey: ['revenue-quality', country, leadSources],
     queryFn: () => {
       const p = new URLSearchParams()
       if (country) p.set('country', country)
+      if (leadSources.length > 0) p.set('leadSources', leadSources.join(','))
       return fetch(`/api/analytics/revenue-quality?${p}`).then((r) => r.json())
     },
   })
@@ -105,7 +108,7 @@ export default function RevenueQualityPage() {
     </div>
   )
 
-  const hasFilters = !!country
+  const hasFilters = !!country || leadSources.length > 0
 
   return (
     <div className="space-y-6">
@@ -120,6 +123,7 @@ export default function RevenueQualityPage() {
           <option value="">All Countries</option>
           {countries.filter((c) => c.isActive).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
         </select>
+        <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
         <div className="flex items-center gap-2 ml-2">
           <span className="text-xs text-gray-400 font-medium">Show top</span>
           <select
@@ -131,7 +135,7 @@ export default function RevenueQualityPage() {
           </select>
         </div>
         {hasFilters && (
-          <button onClick={() => setCountry('')} className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">
+          <button onClick={() => { setCountry(''); setLeadSources([]) }} className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">
             Clear filters
           </button>
         )}

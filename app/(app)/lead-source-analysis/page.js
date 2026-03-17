@@ -8,6 +8,7 @@ import {
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
 import { PageError } from '@/components/ui/PageError'
+import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
 
 const COLORS = ['#5061F6', '#49B697', '#F4BF1D', '#C2B4FB', '#AAB3FA', '#f97316', '#ec4899', '#06b6d4']
 
@@ -38,6 +39,7 @@ function PieTooltip({ active, payload }) {
 
 export default function LeadSourceAnalysisPage() {
   const [country, setCountry] = useState('')
+  const [leadSources, setLeadSources] = useState([])
 
   const { data: countries = [] } = useQuery({
     queryKey: ['countries'],
@@ -45,10 +47,11 @@ export default function LeadSourceAnalysisPage() {
   })
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['lead-source', country],
+    queryKey: ['lead-source', country, leadSources],
     queryFn: () => {
       const p = new URLSearchParams()
       if (country) p.set('country', country)
+      if (leadSources.length > 0) p.set('leadSources', leadSources.join(','))
       return fetch(`/api/analytics/lead-source?${p}`).then((r) => {
         if (!r.ok) throw new Error('Failed to load lead source data')
         return r.json()
@@ -101,8 +104,9 @@ export default function LeadSourceAnalysisPage() {
           <option value="">All Countries</option>
           {countries.filter((c) => c.isActive).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
         </select>
-        {country && <button onClick={() => setCountry('')}
-          className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">Clear</button>}
+        <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
+        {(country || leadSources.length > 0) && <button onClick={() => { setCountry(''); setLeadSources([]) }}
+          className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">Clear all</button>}
       </div>
 
       {/* Empty state */}

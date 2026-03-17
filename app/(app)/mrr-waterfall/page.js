@@ -5,8 +5,8 @@ import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts'
 import { KPICard } from '@/components/ui/KPICard'
+import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
 
-const SOURCES = ['Foodics', 'EmployeeReferral', 'CustomerReferral', 'PartnerReferral', 'Website', 'AmbassadorReferral', 'DirectSales', 'Sonic']
 
 function usd(v) { return `USD ${Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}` }
 function fmt(v) { if (v == null) return '—'; return usd(v) }
@@ -28,7 +28,7 @@ function WaterfallTooltip({ active, payload, label }) {
 
 export default function MRRWaterfallPage() {
   const [country, setCountry] = useState('')
-  const [leadSource, setLeadSource] = useState('')
+  const [leadSources, setLeadSources] = useState([])
   const [yearFrom, setYearFrom] = useState('')
   const [yearTo, setYearTo] = useState('')
 
@@ -38,11 +38,11 @@ export default function MRRWaterfallPage() {
   })
 
   const { data = [], isLoading } = useQuery({
-    queryKey: ['mrr-waterfall', country, leadSource],
+    queryKey: ['mrr-waterfall', country, leadSources],
     queryFn: () => {
       const p = new URLSearchParams()
       if (country) p.set('country', country)
-      if (leadSource) p.set('leadSource', leadSource)
+      if (leadSources.length > 0) p.set('leadSources', leadSources.join(','))
       return fetch(`/api/analytics/mrr-waterfall?${p}`).then((r) => r.json())
     },
   })
@@ -56,7 +56,7 @@ export default function MRRWaterfallPage() {
   }), [data, yearFrom, yearTo])
 
   const latest = filtered[filtered.length - 1] || {}
-  const hasFilters = country || leadSource || yearFrom || yearTo
+  const hasFilters = country || leadSources.length > 0 || yearFrom || yearTo
 
   if (isLoading) return (
     <div className="animate-pulse space-y-6">
@@ -71,16 +71,7 @@ export default function MRRWaterfallPage() {
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mr-1">Filter</span>
-        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
-          value={country} onChange={(e) => setCountry(e.target.value)}>
-          <option value="">All Countries</option>
-          {countries.filter((c) => c.isActive).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
-        </select>
-        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
-          value={leadSource} onChange={(e) => setLeadSource(e.target.value)}>
-          <option value="">All Lead Sources</option>
-          {SOURCES.map((s) => <option key={s} value={s}>{s.replace(/([A-Z])/g, ' $1').trim()}</option>)}
-        </select>
+        <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
         <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
           value={yearFrom} onChange={(e) => setYearFrom(e.target.value)}>
           <option value="">From Year</option>
@@ -91,7 +82,7 @@ export default function MRRWaterfallPage() {
           <option value="">To Year</option>
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
-        {hasFilters && <button onClick={() => { setCountry(''); setLeadSource(''); setYearFrom(''); setYearTo('') }}
+        {hasFilters && <button onClick={() => { setCountry(''); setLeadSources([]); setYearFrom(''); setYearTo('') }}
           className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">Clear all</button>}
       </div>
 
