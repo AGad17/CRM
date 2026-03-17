@@ -15,8 +15,6 @@ const STAGES = [
   { key: 'Qualified',  label: 'Qualified',   color: 'bg-blue-100 text-blue-700',       dot: 'bg-blue-500'     },
   { key: 'ClosedWon',  label: 'Closed Won',  color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500'  },
   { key: 'ClosedLost', label: 'Closed Lost', color: 'bg-red-100 text-red-600',         dot: 'bg-red-400'      },
-  { key: 'Expired',    label: 'Expired',     color: 'bg-orange-100 text-orange-700',   dot: 'bg-orange-500'   },
-  { key: 'Churned',    label: 'Churned',     color: 'bg-amber-100 text-amber-700',     dot: 'bg-amber-500'    },
 ]
 
 const CHANNEL_COLORS = {
@@ -309,7 +307,7 @@ function LeadCard({ lead, onStageAction, onEdit, isAdmin }) {
            className="text-xs text-indigo-600 hover:underline truncate block">
           🏢 {lead.account.name}
         </a>
-      ) : (lead.stage === 'ClosedWon' || lead.stage === 'Churned' || lead.stage === 'Expired') ? (
+      ) : (lead.stage === 'ClosedWon') ? (
         <span className="text-xs text-gray-300 italic">No account linked</span>
       ) : null}
 
@@ -334,18 +332,7 @@ function CardActions({ lead, onStageAction, isAdmin }) {
       <button onClick={() => onStageAction(lead, 'Lead')} className="w-full text-xs text-gray-400 hover:text-gray-600 rounded-lg px-2 py-1 transition-colors text-center">← Move back to Lead</button>
     </div>
   )
-  if (stage === 'ClosedWon') return (
-    <div className="flex gap-1.5 pt-1 border-t border-gray-100">
-      <button onClick={() => onStageAction(lead, 'Churned')} className="w-full text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg px-2 py-1.5 font-medium transition-colors">Mark as Churned</button>
-    </div>
-  )
-  if (stage === 'Expired') return (
-    <div className="flex gap-1.5 pt-1 border-t border-gray-100">
-      <button onClick={() => onStageAction(lead, 'ClosedWon')} className="flex-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg px-2 py-1.5 font-medium transition-colors">✓ Renewed</button>
-      <button onClick={() => onStageAction(lead, 'Churned')} className="flex-1 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg px-2 py-1.5 font-medium transition-colors">Churned</button>
-    </div>
-  )
-  // ClosedLost & Churned: terminal — no stage actions
+  // ClosedWon & ClosedLost: terminal in pipeline — lifecycle tracked in Operations
   return null
 }
 
@@ -377,8 +364,6 @@ export default function PipelinePage() {
   const [formData, setFormData] = useState(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState({})
   const [migrateResult, setMigrateResult] = useState(null)
-  const [expiredChurnTarget, setExpiredChurnTarget] = useState(null)
-
   // New Opportunity flow
   const [oppType, setOppType] = useState(null)           // null | 'New' | 'Expansion' | 'Renewal'
   const [accountSearch, setAccountSearch] = useState('')
@@ -416,15 +401,6 @@ export default function PipelinePage() {
     () => allAccounts.filter((a) => a.status === 'Expired'),
     [allAccounts]
   )
-  const expiredChurnM = useMutation({
-    mutationFn: (id) => fetch(`/api/accounts/${id}/churn`, { method: 'POST' }).then((r) => r.json()),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['all-accounts-expired-tab'] })
-      qc.invalidateQueries({ queryKey: ['pipeline-leads'] })
-      setExpiredChurnTarget(null)
-    },
-  })
-
   // ── Mutations ──
   const invalidate = () => qc.invalidateQueries({ queryKey: ['pipeline-leads'] })
 
@@ -464,8 +440,7 @@ export default function PipelinePage() {
     const totalClosed  = leads.filter((l) => l.stage === 'ClosedWon' || l.stage === 'ClosedLost').length
     const totalWon     = leads.filter((l) => l.stage === 'ClosedWon').length
     const winRate      = totalClosed > 0 ? totalWon / totalClosed : null
-    const expiredCount = leads.filter((l) => l.stage === 'Expired').length
-    return { inPipeline, pipelineVal, wonThisMonth, winRate, expiredCount }
+    return { inPipeline, pipelineVal, wonThisMonth, winRate }
   }, [leads])
 
   // ── At-risk count ──
@@ -553,11 +528,6 @@ export default function PipelinePage() {
 
   function handleStageAction(lead, action) {
     if (action === 'ClosedWon') {
-      // Renewal: Expired → ClosedWon is a direct transition (deal/invoice handled in Invoicing)
-      if (lead.stage === 'Expired') {
-        stageM.mutate({ id: lead.id, stage: 'ClosedWon' })
-        return
-      }
       // Gate: required lead fields must be filled before opening the close deal page
       const missing = []
       if (!lead.contactName?.trim())                          missing.push('Contact Name')
@@ -572,9 +542,8 @@ export default function PipelinePage() {
       router.push('/pipeline/close/' + lead.id)
       return
     }
-    if (action === 'ClosedLost') { setModal({ confirmLoss:  lead }); setLostReason(''); return }
-    if (action === 'Churned')    { setModal({ confirmChurn: lead }); return }
-    // Direct transitions (Qualify, back to Lead, Expired)
+    if (action === 'ClosedLost') { setModal({ confirmLoss: lead }); setLostReason(''); return }
+    // Direct transitions (Qualify, back to Lead)
     stageM.mutate({ id: lead.id, stage: action })
   }
 
@@ -614,9 +583,6 @@ export default function PipelinePage() {
           {r.stage === 'Lead'      && <button onClick={() => handleStageAction(r, 'Qualified')}  className="text-xs text-blue-600 hover:text-blue-800 font-medium">Qualify</button>}
           {r.stage === 'Qualified' && <button onClick={() => handleStageAction(r, 'ClosedWon')}  className="text-xs text-emerald-600 hover:text-emerald-800 font-medium">Won</button>}
           {(r.stage === 'Lead' || r.stage === 'Qualified') && <button onClick={() => handleStageAction(r, 'ClosedLost')} className="text-xs text-red-500 hover:text-red-700 font-medium">Lost</button>}
-          {r.stage === 'ClosedWon' && <button onClick={() => handleStageAction(r, 'Churned')}  className="text-xs text-amber-600 hover:text-amber-800 font-medium">Churned</button>}
-          {r.stage === 'Expired'   && <button onClick={() => handleStageAction(r, 'ClosedWon')} className="text-xs text-emerald-600 hover:text-emerald-800 font-medium">✓ Renewed</button>}
-          {r.stage === 'Expired'   && <button onClick={() => handleStageAction(r, 'Churned')}  className="text-xs text-amber-600 hover:text-amber-800 font-medium">Churned</button>}
           {isAdmin && <button onClick={() => { if (confirm('Delete this lead?')) deleteM.mutate(r.id) }} className="text-xs text-gray-400 hover:text-red-500 font-medium">Delete</button>}
         </div>
       ),
@@ -677,12 +643,11 @@ export default function PipelinePage() {
 
       {/* KPIs (leads tab only) */}
       {tab === 'leads' && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-          <KPICard label="In Pipeline"     value={kpis.inPipeline}   format="integer" subLabel="Lead + Qualified" />
-          <KPICard label="Pipeline Value"  value={kpis.pipelineVal}  format="number"  subLabel="Qualified stage" />
-          <KPICard label="Won This Month"  value={kpis.wonThisMonth} format="integer" subLabel="Closed Won" />
-          <KPICard label="Expired"         value={kpis.expiredCount} format="integer" subLabel="Awaiting renewal" trend={kpis.expiredCount > 0 ? 'down' : null} />
-          <KPICard label="Win Rate"        value={kpis.winRate}      format="percent" subLabel="Won ÷ (Won + Lost)" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <KPICard label="In Pipeline"    value={kpis.inPipeline}   format="integer" subLabel="Lead + Qualified" />
+          <KPICard label="Pipeline Value" value={kpis.pipelineVal}  format="number"  subLabel="Qualified stage" />
+          <KPICard label="Won This Month" value={kpis.wonThisMonth} format="integer" subLabel="Closed Won" />
+          <KPICard label="Win Rate"       value={kpis.winRate}      format="percent" subLabel="Won ÷ (Won + Lost)" />
         </div>
       )}
 
@@ -731,7 +696,7 @@ export default function PipelinePage() {
         isLoading ? (
           <div className="animate-pulse h-64 bg-gray-100 rounded-xl" />
         ) : (
-          <div className="grid grid-cols-6 gap-4 items-start">
+          <div className="grid grid-cols-4 gap-4 items-start">
             {STAGES.map((s) => {
               const col = byStage(s.key)
               const colVal = col.reduce((sum, l) => sum + (l.estimatedValue || 0), 0)
@@ -781,7 +746,7 @@ export default function PipelinePage() {
         <div className="border border-dashed border-gray-200 rounded-xl p-4 flex items-center justify-between bg-gray-50">
           <div>
             <p className="text-sm font-medium text-gray-700">Import Existing Accounts</p>
-            <p className="text-xs text-gray-400">One-time migration: creates pipeline records for all CRM accounts without one. Active → Closed Won · Churned → Churned.</p>
+            <p className="text-xs text-gray-400">One-time migration: creates pipeline records for all CRM accounts without one. All accounts → Closed Won.</p>
           </div>
           <button onClick={() => setModal('migrate')} className="text-sm bg-white border border-gray-200 hover:border-indigo-400 hover:text-indigo-600 text-gray-600 font-medium px-4 py-2 rounded-xl transition-colors">
             🔄 Import Accounts
@@ -872,15 +837,9 @@ export default function PipelinePage() {
                     <div className="flex gap-2 pt-1 border-t border-gray-100">
                       <button
                         onClick={() => router.push(`/accounts/${account.id}`)}
-                        className="flex-1 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg py-1.5 hover:bg-indigo-50 transition-colors"
+                        className="w-full text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg py-1.5 hover:bg-indigo-50 transition-colors"
                       >
                         View Account
-                      </button>
-                      <button
-                        onClick={() => setExpiredChurnTarget(account)}
-                        className="flex-1 text-xs font-medium text-red-600 border border-red-200 rounded-lg py-1.5 hover:bg-red-50 transition-colors"
-                      >
-                        🚫 Churn
                       </button>
                     </div>
                   </div>
@@ -1061,22 +1020,6 @@ export default function PipelinePage() {
         )}
       </Modal>
 
-      {/* Confirm Churned */}
-      <Modal isOpen={!!modal?.confirmChurn} onClose={() => setModal(null)} title="Mark as Churned">
-        {modal?.confirmChurn && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">Mark <strong>{modal.confirmChurn.companyName}</strong> as <strong>Churned</strong>?</p>
-            <p className="text-xs text-gray-400">This indicates the account was a paying customer that has since cancelled. This is different from Closed Lost — Churned accounts were won deals that later ended.</p>
-            <div className="flex gap-3">
-              <button onClick={() => confirmStage(modal.confirmChurn, 'Churned')} disabled={stageM.isPending} className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors">
-                {stageM.isPending ? 'Saving…' : 'Confirm Churned'}
-              </button>
-              <button onClick={() => setModal(null)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
       {/* Close Won Blocked — missing required fields */}
       <Modal isOpen={!!modal?.closedWonBlocked} onClose={() => setModal(null)} title="Complete lead before closing">
         {modal?.closedWonBlocked && (
@@ -1107,47 +1050,6 @@ export default function PipelinePage() {
         )}
       </Modal>
 
-      {/* Expired Account → Churn */}
-      <Modal isOpen={!!expiredChurnTarget} onClose={() => setExpiredChurnTarget(null)} title="Churn Expired Account">
-        {expiredChurnTarget && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              You are about to churn <strong>{expiredChurnTarget.name}</strong>. All renewal options have been exhausted.
-            </p>
-            <div className="bg-red-50 border border-red-100 rounded-xl p-4 grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <p className="text-xs text-red-400 font-medium uppercase tracking-wide mb-1">Last MRR</p>
-                <p className="text-xl font-bold text-red-700">
-                  USD {(expiredChurnTarget.totalMRR || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-red-400 font-medium uppercase tracking-wide mb-1">Contracts to Close</p>
-                <p className="text-xl font-bold text-red-700">
-                  {(expiredChurnTarget.contracts || []).filter((c) => !c.cancellationDate).length}
-                </p>
-              </div>
-            </div>
-            <p className="text-xs text-gray-400">This will officially mark the account as Churned and set today as the cancellation date on all open contracts.</p>
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={() => expiredChurnM.mutate(expiredChurnTarget.id)}
-                disabled={expiredChurnM.isPending}
-                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors"
-              >
-                {expiredChurnM.isPending ? 'Churning…' : 'Yes, Churn Account'}
-              </button>
-              <button
-                onClick={() => setExpiredChurnTarget(null)}
-                className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
       {/* Migration */}
       <Modal isOpen={modal === 'migrate'} onClose={() => { setModal(null); setMigrateResult(null) }} title="Import Existing Accounts">
         <div className="space-y-4">
@@ -1155,8 +1057,7 @@ export default function PipelinePage() {
             <>
               <p className="text-sm text-gray-600">This will create pipeline records for all CRM accounts that don't already have one:</p>
               <ul className="text-sm text-gray-500 space-y-1 list-disc list-inside">
-                <li><strong>Active</strong> accounts → Closed Won stage</li>
-                <li><strong>Churned</strong> accounts → Churned stage</li>
+                <li>All accounts → <strong>Closed Won</strong> stage</li>
               </ul>
               <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">This operation is safe to run multiple times — already-linked accounts are skipped.</p>
               <div className="flex gap-3">

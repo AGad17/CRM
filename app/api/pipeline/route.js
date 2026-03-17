@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/roleGuard'
-import { getLeads, createLead, syncExpiredLeads } from '@/lib/db/pipeline'
+import { getLeads, createLead } from '@/lib/db/pipeline'
 
 export async function GET(request) {
   const { error } = await requirePermission('pipeline', 'view')
   if (error) return error
-
-  // Auto-advance any ClosedWon leads whose account contracts have naturally lapsed
-  await syncExpiredLeads()
 
   const { searchParams } = new URL(request.url)
   const filters = {
