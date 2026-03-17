@@ -54,7 +54,7 @@ export default function CohortsPage() {
         </select>
         <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
         {hasFilters && (
-          <button onClick={() => { setCountry('')} className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">
+          <button onClick={() => { setCountry(''); setLeadSources([]) }} className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">
             Clear filters
           </button>
         )}
