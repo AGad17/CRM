@@ -12,25 +12,11 @@ const ROLE_LABELS = {
   CUSTOMER_SUCCESS: 'Customer Success',
   READ_ONLY: 'Read Only',
 }
-
 const MODULE_LABELS = {
-  dashboard:  'Dashboard',
-  accounts:   'Accounts',
-  pipeline:   'Pipeline',
-  onboarding: 'Onboarding',
-  invoicing:  'Invoicing',
-  analytics:  'Analytics',
-  settings:   'Settings',
+  dashboard: 'Dashboard', accounts: 'Accounts', pipeline: 'Pipeline',
+  onboarding: 'Onboarding', invoicing: 'Invoicing', analytics: 'Analytics', settings: 'Settings',
 }
-
-const ACTION_LABELS = {
-  view:   'View',
-  create: 'Create',
-  edit:   'Edit',
-  delete: 'Delete',
-  admin:  'Admin',
-}
-
+const ACTION_LABELS = { view: 'View', create: 'Create', edit: 'Edit', delete: 'Delete', admin: 'Admin' }
 const ACTION_COLORS = {
   view:   'bg-blue-50 text-blue-700 border-blue-200',
   create: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -38,8 +24,7 @@ const ACTION_COLORS = {
   delete: 'bg-red-50 text-red-700 border-red-200',
   admin:  'bg-purple-50 text-purple-700 border-purple-200',
 }
-
-const ROLES = Object.keys(ROLE_LABELS)
+const SYSTEM_ROLES = Object.keys(ROLE_LABELS)
 const CURRENCY_HINTS = { SAR: 'SAR', EGP: 'EGP', AED: 'AED', BHD: 'BHD', JOD: 'JOD', KWD: 'KWD', OMR: 'OMR', QAR: 'QAR', USD: 'USD', EUR: 'EUR', GBP: 'GBP' }
 
 export default function SettingsPage() {
@@ -48,7 +33,7 @@ export default function SettingsPage() {
   const isAdmin = session?.user?.role === 'CCO_ADMIN'
   const [tab, setTab] = useState('countries')
 
-  // Countries
+  // ── Countries ──────────────────────────────────────────────────────────────
   const { data: countries = [], isLoading: countriesLoading } = useQuery({
     queryKey: ['countries'],
     queryFn: () => fetch('/api/countries').then((r) => r.json()),
@@ -69,7 +54,6 @@ export default function SettingsPage() {
     mutationFn: (id) => fetch(`/api/countries/${id}`, { method: 'DELETE' }).then((r) => r.json()),
     onSuccess: (res) => { if (res.error) alert(res.error); else qc.invalidateQueries(['countries']) },
   })
-
   function validateCountry(form) {
     const e = {}
     if (!form.code.trim()) e.code = 'Required'
@@ -84,7 +68,29 @@ export default function SettingsPage() {
     createCountry.mutate({ code: countryForm.code.toUpperCase(), name: countryForm.name, currency: countryForm.currency.toUpperCase() })
   }
 
-  // Users
+  // ── Custom Roles ───────────────────────────────────────────────────────────
+  const { data: customRoles = [], isLoading: rolesLoading } = useQuery({
+    queryKey: ['custom-roles'],
+    queryFn: () => fetch('/api/roles').then((r) => r.json()),
+    enabled: isAdmin,
+    retry: false,
+  })
+  const [roleModal, setRoleModal] = useState(null) // null | 'create' | roleObject
+
+  const createRoleMut = useMutation({
+    mutationFn: (data) => fetch('/api/roles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then((r) => r.json()),
+    onSuccess: (res) => { if (!res.error) { qc.invalidateQueries(['custom-roles']); setRoleModal(null) } },
+  })
+  const updateRoleMut = useMutation({
+    mutationFn: ({ id, ...data }) => fetch(`/api/roles/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then((r) => r.json()),
+    onSuccess: (res) => { if (!res.error) { qc.invalidateQueries(['custom-roles']); qc.invalidateQueries(['users']); setRoleModal(null) } },
+  })
+  const deleteRoleMut = useMutation({
+    mutationFn: (id) => fetch(`/api/roles/${id}`, { method: 'DELETE' }).then((r) => r.json()),
+    onSuccess: (res) => { if (res.error) alert(res.error); else qc.invalidateQueries(['custom-roles']) },
+  })
+
+  // ── Users ──────────────────────────────────────────────────────────────────
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ['users'],
     queryFn: () => fetch('/api/users').then((r) => r.json()),
@@ -99,7 +105,7 @@ export default function SettingsPage() {
   })
   const updateUser = useMutation({
     mutationFn: ({ id, ...data }) => fetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then((r) => r.json()),
-    onSuccess: () => qc.invalidateQueries(['users']),
+    onSuccess: (res) => { if (res.error) alert(res.error); else qc.invalidateQueries(['users']) },
   })
   const updatePerms = useMutation({
     mutationFn: ({ id, permissions }) =>
@@ -113,19 +119,23 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-5">
+      {/* Tab bar */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-        {[['countries', 'Countries'], ['team', 'Team']].map(([val, label]) => (
+        {[['countries', 'Countries'], ['roles', 'Custom Roles'], ['team', 'Team']].map(([val, label]) => (
           <button
             key={val}
             onClick={() => setTab(val)}
             className={`px-5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
             {label}
+            {val === 'roles' && Array.isArray(customRoles) && customRoles.length > 0 && (
+              <span className="ml-1.5 bg-indigo-100 text-indigo-700 text-xs px-1.5 py-0.5 rounded-full font-semibold">{customRoles.length}</span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Countries tab */}
+      {/* ── Countries tab ── */}
       {tab === 'countries' && (
         <div className="space-y-5">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -152,21 +162,16 @@ export default function SettingsPage() {
               </button>
             </form>
           </div>
-
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {countriesLoading ? (
-              <div className="animate-pulse h-40 bg-gray-100" />
-            ) : (
+            {countriesLoading ? <div className="animate-pulse h-40 bg-gray-100" /> : (
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Currency</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
+                <thead><tr className="border-b border-gray-100">
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Currency</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="px-4 py-3" />
+                </tr></thead>
                 <tbody className="divide-y divide-gray-50">
                   {countries.map((c) => (
                     <tr key={c.id}>
@@ -211,7 +216,92 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Team tab */}
+      {/* ── Custom Roles tab ── */}
+      {tab === 'roles' && (
+        <div className="space-y-5">
+          {!isAdmin ? (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center text-sm text-gray-400">
+              Admin access required to manage custom roles.
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-500">
+                  Custom roles are reusable permission templates you can assign to team members. They override the system role defaults for module access.
+                </p>
+                <button
+                  onClick={() => setRoleModal('create')}
+                  className="ml-4 shrink-0 bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors"
+                >
+                  + Create Role
+                </button>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                {rolesLoading ? <div className="animate-pulse h-40 bg-gray-100" /> :
+                 Array.isArray(customRoles) && customRoles.length === 0 ? (
+                  <div className="text-center py-16">
+                    <p className="text-4xl mb-3">🔑</p>
+                    <p className="font-semibold text-gray-600 text-lg">No custom roles yet</p>
+                    <p className="text-sm text-gray-400 mt-1">Create a role to define a reusable set of permissions.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead><tr className="border-b border-gray-100">
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role Name</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Permissions</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Users</th>
+                      <th className="px-4 py-3" />
+                    </tr></thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {(Array.isArray(customRoles) ? customRoles : []).map((r) => (
+                        <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-5 py-3">
+                            <span className="font-semibold text-gray-900">{r.name}</span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 text-xs max-w-xs truncate">{r.description || <span className="italic text-gray-300">No description</span>}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap gap-1">
+                              {MODULES.filter(m => Object.values(r.permissions?.[m] || {}).some(Boolean)).map(m => (
+                                <span key={m} className="bg-indigo-50 text-indigo-600 text-xs px-1.5 py-0.5 rounded font-medium">{MODULE_LABELS[m]}</span>
+                              ))}
+                              {MODULES.every(m => !Object.values(r.permissions?.[m] || {}).some(Boolean)) && (
+                                <span className="text-xs text-gray-300 italic">No permissions</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {r.userCount > 0 ? (
+                              <span className="bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-semibold">{r.userCount} user{r.userCount !== 1 ? 's' : ''}</span>
+                            ) : (
+                              <span className="text-gray-300 text-xs">Unassigned</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <button onClick={() => setRoleModal(r)} className="text-xs text-indigo-500 hover:text-indigo-700 mr-3 font-medium">Edit</button>
+                            <button
+                              onClick={() => {
+                                if (r.userCount > 0) { alert(`Cannot delete: ${r.userCount} user${r.userCount > 1 ? 's are' : ' is'} assigned this role.`); return }
+                                if (confirm(`Delete role "${r.name}"?`)) deleteRoleMut.mutate(r.id)
+                              }}
+                              className="text-xs text-red-400 hover:text-red-600"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Team tab ── */}
       {tab === 'team' && (
         <div className="space-y-5">
           <div className="flex justify-end">
@@ -221,29 +311,28 @@ export default function SettingsPage() {
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {usersLoading ? (
-              <div className="animate-pulse h-40 bg-gray-100" />
-            ) : users.error ? (
+            {usersLoading ? <div className="animate-pulse h-40 bg-gray-100" /> :
+             users.error ? (
               <div className="text-center py-10 text-sm text-gray-400">Admin access required to manage team.</div>
             ) : (
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Permissions</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
+                <thead><tr className="border-b border-gray-100">
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">System Role</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Custom Role</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Overrides</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="px-4 py-3" />
+                </tr></thead>
                 <tbody className="divide-y divide-gray-50">
                   {(Array.isArray(users) ? users : []).map((u) => {
                     const overrideCount = countOverrides(u.role, u.permissions || {})
+                    const isCCOAdmin = u.role === 'CCO_ADMIN'
                     return (
                       <tr key={u.id}>
                         <td className="px-5 py-3 font-medium text-gray-900">{u.name || '\u2014'}</td>
-                        <td className="px-4 py-3 text-gray-600">{u.email}</td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">{u.email}</td>
                         <td className="px-4 py-3">
                           <select
                             className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white"
@@ -251,8 +340,30 @@ export default function SettingsPage() {
                             onChange={(e) => updateUser.mutate({ id: u.id, role: e.target.value })}
                             disabled={!isAdmin}
                           >
-                            {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                            {SYSTEM_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                           </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          {isCCOAdmin ? (
+                            <span className="text-xs text-gray-300 italic">N/A</span>
+                          ) : isAdmin ? (
+                            <select
+                              className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white max-w-[160px]"
+                              value={u.customRole?.id || ''}
+                              onChange={(e) => updateUser.mutate({ id: u.id, customRoleId: e.target.value || null })}
+                            >
+                              <option value="">\u2014 None (system defaults)</option>
+                              {(Array.isArray(customRoles) ? customRoles : []).map((r) => (
+                                <option key={r.id} value={r.id}>{r.name}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-xs text-gray-500">
+                              {u.customRole ? (
+                                <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">{u.customRole.name}</span>
+                              ) : <span className="text-gray-300 italic">None</span>}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {isAdmin ? (
@@ -266,12 +377,14 @@ export default function SettingsPage() {
                                   {overrideCount} override{overrideCount !== 1 ? 's' : ''}
                                 </span>
                               ) : (
-                                <span className="text-gray-400">Role defaults</span>
+                                <span className="text-gray-400">
+                                  {u.customRole ? `Base: ${u.customRole.name}` : 'System defaults'}
+                                </span>
                               )}
                             </button>
                           ) : (
                             <span className="text-xs text-gray-400">
-                              {overrideCount > 0 ? `${overrideCount} override${overrideCount !== 1 ? 's' : ''}` : 'Role defaults'}
+                              {overrideCount > 0 ? `${overrideCount} override${overrideCount !== 1 ? 's' : ''}` : '—'}
                             </span>
                           )}
                         </td>
@@ -282,19 +395,9 @@ export default function SettingsPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           {isAdmin && (u.isActive ? (
-                            <button
-                              onClick={() => { if (confirm(`Deactivate ${u.email}?`)) updateUser.mutate({ id: u.id, isActive: false }) }}
-                              className="text-xs text-red-400 hover:text-red-600"
-                            >
-                              Deactivate
-                            </button>
+                            <button onClick={() => { if (confirm(`Deactivate ${u.email}?`)) updateUser.mutate({ id: u.id, isActive: false }) }} className="text-xs text-red-400 hover:text-red-600">Deactivate</button>
                           ) : (
-                            <button
-                              onClick={() => updateUser.mutate({ id: u.id, isActive: true })}
-                              className="text-xs text-indigo-500 hover:text-indigo-700"
-                            >
-                              Reactivate
-                            </button>
+                            <button onClick={() => updateUser.mutate({ id: u.id, isActive: true })} className="text-xs text-indigo-500 hover:text-indigo-700">Reactivate</button>
                           ))}
                         </td>
                       </tr>
@@ -309,14 +412,25 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {/* Invite user modal */}
       <Modal isOpen={userModal === 'create'} onClose={() => setUserModal(null)} title="Invite Member">
-        <UserForm
-          onSubmit={(data) => createUser.mutate(data)}
-          onCancel={() => setUserModal(null)}
-          loading={createUser.isPending}
-        />
+        <UserForm onSubmit={(data) => createUser.mutate(data)} onCancel={() => setUserModal(null)} loading={createUser.isPending} />
       </Modal>
 
+      {/* Custom role create/edit modal */}
+      {roleModal && (
+        <RoleModal
+          role={roleModal === 'create' ? null : roleModal}
+          onSave={(data) => {
+            if (roleModal === 'create') createRoleMut.mutate(data)
+            else updateRoleMut.mutate({ id: roleModal.id, ...data })
+          }}
+          onClose={() => setRoleModal(null)}
+          saving={createRoleMut.isPending || updateRoleMut.isPending}
+        />
+      )}
+
+      {/* User permissions override modal */}
       {permModal && (
         <PermissionsModal
           user={permModal}
@@ -329,11 +443,162 @@ export default function SettingsPage() {
   )
 }
 
-// ---- Permissions Modal ----
+// ── Custom Role Create/Edit Modal ─────────────────────────────────────────────
+
+function RoleModal({ role, onSave, onClose, saving }) {
+  const isEdit = !!role
+  const [name, setName] = useState(role?.name || '')
+  const [description, setDescription] = useState(role?.description || '')
+  const [nameErr, setNameErr] = useState('')
+
+  // Permission matrix: start from role.permissions or empty
+  const [perms, setPerms] = useState(() => {
+    const p = {}
+    for (const mod of MODULES) {
+      p[mod] = {}
+      for (const action of ACTIONS) {
+        p[mod][action] = role?.permissions?.[mod]?.[action] === true
+      }
+    }
+    return p
+  })
+
+  function toggle(mod, action) {
+    setPerms((prev) => ({ ...prev, [mod]: { ...prev[mod], [action]: !prev[mod][action] } }))
+  }
+
+  function handleSave() {
+    if (!name.trim()) { setNameErr('Role name is required'); return }
+    // Build permissions: only include true values
+    const permissions = {}
+    for (const mod of MODULES) {
+      for (const action of ACTIONS) {
+        if (perms[mod][action]) {
+          if (!permissions[mod]) permissions[mod] = {}
+          permissions[mod][action] = true
+        }
+      }
+    }
+    onSave({ name: name.trim(), description: description.trim() || null, permissions })
+  }
+
+  const grantedCount = MODULES.reduce((sum, mod) => sum + ACTIONS.filter(a => perms[mod][a]).length, 0)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-start justify-between p-6 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">{isEdit ? `Edit Role: ${role.name}` : 'Create Custom Role'}</h2>
+            <p className="text-sm text-gray-400 mt-0.5">Define a reusable set of module permissions for this role.</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">\u2715</button>
+        </div>
+
+        <div className="flex-1 overflow-auto p-6 space-y-5">
+          {/* Name + Description */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Role Name *</label>
+              <input
+                className={cInp(nameErr)}
+                value={name}
+                onChange={(e) => { setName(e.target.value); setNameErr('') }}
+                placeholder="e.g. Sales Lead"
+              />
+              {nameErr && <p className="text-xs text-red-500 mt-1">{nameErr}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</label>
+              <input
+                className={cInp()}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Optional — what is this role for?"
+              />
+            </div>
+          </div>
+
+          {/* Permission matrix */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Module Permissions</label>
+              {grantedCount > 0 && (
+                <span className="text-xs text-indigo-600 font-medium">{grantedCount} permission{grantedCount !== 1 ? 's' : ''} granted</span>
+              )}
+            </div>
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-32">Module</th>
+                    {ACTIONS.map((action) => (
+                      <th key={action} className="py-2.5 px-3 text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${ACTION_COLORS[action]}`}>
+                          {ACTION_LABELS[action]}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {MODULES.map((mod) => (
+                    <tr key={mod} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-4 py-2.5 font-medium text-gray-800 text-sm">{MODULE_LABELS[mod]}</td>
+                      {ACTIONS.map((action) => {
+                        const granted = perms[mod][action]
+                        return (
+                          <td key={action} className="py-2.5 px-3 text-center">
+                            <button
+                              onClick={() => toggle(mod, action)}
+                              className={`w-6 h-6 rounded border-2 transition-all flex items-center justify-center mx-auto ${
+                                granted ? 'border-indigo-400 bg-indigo-500 text-white shadow-sm' : 'border-gray-200 bg-white text-gray-300 hover:border-gray-300'
+                              }`}
+                            >
+                              {granted && (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            {saving ? 'Saving\u2026' : isEdit ? 'Save Changes' : 'Create Role'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── User Permissions Override Modal ───────────────────────────────────────────
 
 function PermissionsModal({ user, onSave, onClose, saving }) {
   const roleDefaults = ROLE_DEFAULTS[user.role] || {}
+  const customRolePerms = user.customRole
+    ? (user.permissions || {})  // overrides on top of custom role
+    : null
   const currentOverrides = user.permissions || {}
+
+  // base = custom role permissions if set, else system role defaults
+  const basePermissions = user.customRole
+    ? {} // we'll fetch from the role; but we only have the user object here
+    : roleDefaults
 
   const [draft, setDraft] = useState(() => {
     const d = {}
@@ -389,45 +654,40 @@ function PermissionsModal({ user, onSave, onClose, saving }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-        {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-gray-100">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Edit Permissions</h2>
+            <h2 className="text-lg font-bold text-gray-900">Edit Permission Overrides</h2>
             <p className="text-sm text-gray-500 mt-0.5">
               <span className="font-medium text-gray-700">{user.name || user.email}</span>
               {' \u00b7 '}
               <span className="text-indigo-600">{ROLE_LABELS[user.role]}</span>
+              {user.customRole && (
+                <span className="ml-2 bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                  Custom: {user.customRole.name}
+                </span>
+              )}
               {totalOverrides > 0 && (
                 <span className="ml-2 bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">
                   {totalOverrides} override{totalOverrides !== 1 ? 's' : ''}
                 </span>
               )}
             </p>
+            {user.customRole && (
+              <p className="text-xs text-amber-600 mt-1 bg-amber-50 px-3 py-1 rounded-lg inline-block">
+                \u26a0\ufe0f These overrides are applied on top of the &ldquo;{user.customRole.name}&rdquo; custom role. The comparison below uses system role defaults as reference.
+              </p>
+            )}
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">\u2715</button>
         </div>
 
-        {/* Legend */}
         <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-5 text-xs text-gray-500 flex-wrap">
-          <span className="flex items-center gap-1.5">
-            <span className="w-4 h-4 rounded border-2 border-indigo-400 bg-indigo-500 inline-block" />
-            Granted (override)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-4 h-4 rounded border-2 border-emerald-300 bg-emerald-400 inline-block" />
-            Granted (role default)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-4 h-4 rounded border-2 border-red-300 bg-red-50 inline-block" />
-            Revoked (override)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-4 h-4 rounded border border-gray-200 bg-white inline-block" />
-            Not granted (role default)
-          </span>
+          <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded border-2 border-indigo-400 bg-indigo-500 inline-block" />Granted (override)</span>
+          <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded border-2 border-emerald-300 bg-emerald-400 inline-block" />Granted (system role default)</span>
+          <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded border-2 border-red-300 bg-red-50 inline-block" />Revoked (override)</span>
+          <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded border border-gray-200 bg-white inline-block" />Not granted</span>
         </div>
 
-        {/* Grid */}
         <div className="flex-1 overflow-auto p-6">
           <table className="w-full text-sm border-collapse">
             <thead>
@@ -479,15 +739,14 @@ function PermissionsModal({ user, onSave, onClose, saving }) {
           </table>
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-between p-6 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
           <button onClick={resetToDefaults} className="text-sm text-gray-500 hover:text-gray-700 underline underline-offset-2 transition-colors">
-            Reset to role defaults
+            Reset to system role defaults
           </button>
           <div className="flex gap-3">
             <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors">Cancel</button>
             <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-              {saving ? 'Saving\u2026' : 'Save Permissions'}
+              {saving ? 'Saving\u2026' : 'Save Overrides'}
             </button>
           </div>
         </div>
@@ -496,7 +755,7 @@ function PermissionsModal({ user, onSave, onClose, saving }) {
   )
 }
 
-// ---- Role Defaults Reference Card ----
+// ── Role Defaults Reference Card ──────────────────────────────────────────────
 
 function RoleDefaultsCard() {
   const [open, setOpen] = useState(false)
@@ -506,22 +765,18 @@ function RoleDefaultsCard() {
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
       >
-        <span className="flex items-center gap-2"><span>\ud83d\udccb</span> Role Defaults Reference</span>
+        <span className="flex items-center gap-2"><span>\ud83d\udccb</span> System Role Defaults Reference</span>
         <span className="text-gray-400 text-lg">{open ? '\u25b2' : '\u25bc'}</span>
       </button>
       {open && (
         <div className="overflow-x-auto border-t border-gray-100">
           <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="text-left px-5 py-2.5 font-semibold text-gray-500 uppercase tracking-wide">Module / Action</th>
-                {Object.keys(ROLE_LABELS).map((role) => (
-                  <th key={role} className="px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-center whitespace-nowrap">
-                    {ROLE_LABELS[role]}
-                  </th>
-                ))}
-              </tr>
-            </thead>
+            <thead><tr className="bg-gray-50">
+              <th className="text-left px-5 py-2.5 font-semibold text-gray-500 uppercase tracking-wide">Module / Action</th>
+              {Object.keys(ROLE_LABELS).map((role) => (
+                <th key={role} className="px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-center whitespace-nowrap">{ROLE_LABELS[role]}</th>
+              ))}
+            </tr></thead>
             <tbody className="divide-y divide-gray-50">
               {MODULES.flatMap((mod) =>
                 ACTIONS.map((action, ai) => {
@@ -531,17 +786,11 @@ function RoleDefaultsCard() {
                     <tr key={`${mod}-${action}`} className={ai === 0 ? 'border-t-2 border-gray-200' : ''}>
                       <td className="px-5 py-2 text-gray-700">
                         {ai === 0 && <span className="font-semibold text-gray-900">{MODULE_LABELS[mod]} \u00b7 </span>}
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${ACTION_COLORS[action]}`}>
-                          {ACTION_LABELS[action]}
-                        </span>
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${ACTION_COLORS[action]}`}>{ACTION_LABELS[action]}</span>
                       </td>
                       {Object.keys(ROLE_LABELS).map((role) => (
                         <td key={role} className="px-4 py-2 text-center">
-                          {ROLE_DEFAULTS[role]?.[mod]?.[action] ? (
-                            <span className="text-emerald-500 font-bold">\u2713</span>
-                          ) : (
-                            <span className="text-gray-200">\u2014</span>
-                          )}
+                          {ROLE_DEFAULTS[role]?.[mod]?.[action] ? <span className="text-emerald-500 font-bold">\u2713</span> : <span className="text-gray-200">\u2014</span>}
                         </td>
                       ))}
                     </tr>
@@ -556,7 +805,7 @@ function RoleDefaultsCard() {
   )
 }
 
-// ---- Helpers ----
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function countOverrides(role, perms) {
   const defaults = ROLE_DEFAULTS[role] || {}
@@ -564,10 +813,7 @@ function countOverrides(role, perms) {
   for (const mod of MODULES) {
     if (!perms[mod]) continue
     for (const action of ACTIONS) {
-      if (perms[mod][action] !== undefined) {
-        const roleVal = defaults[mod]?.[action] === true
-        if (perms[mod][action] !== roleVal) count++
-      }
+      if (perms[mod][action] !== undefined && perms[mod][action] !== (defaults[mod]?.[action] === true)) count++
     }
   }
   return count

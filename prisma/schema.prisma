@@ -221,6 +221,21 @@ model ExchangeRate {
   @@map("exchange_rates")
 }
 
+// ─── Custom Roles (flexible named permission templates) ───────────────────────
+
+model CustomRole {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  permissions Json     @default("{}")   // { module: { action: bool }, ... }
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+
+  @@map("custom_roles")
+}
+
 // ─── NextAuth Models ──────────────────────────────────────────────────────────
 
 model User {
@@ -231,15 +246,17 @@ model User {
   image         String?
   password      String?
   role          Role      @default(READ_ONLY)
-  permissions   Json      @default("{}")    // per-module overrides: { accounts: { view, create, edit, delete, admin }, ... }
+  permissions   Json      @default("{}")    // per-user module overrides (layer 3)
+  customRoleId  String?                     // optional custom role assignment (layer 2)
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts NextAuthAccount[]
-  sessions Session[]
-  deals    Deal[]
-  leads    Lead[]    @relation("UserLeads")
+  accounts   NextAuthAccount[]
+  sessions   Session[]
+  deals      Deal[]
+  leads      Lead[]       @relation("UserLeads")
+  customRole CustomRole?  @relation(fields: [customRoleId], references: [id])
 
   // Onboarding staff assignments
   obTrackers OnboardingTracker[] @relation("ObSpecialist")
