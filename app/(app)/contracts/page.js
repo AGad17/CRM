@@ -53,35 +53,8 @@ export default function ContractsPage() {
     { key: 'type', label: 'Type', render: (r) => <Badge value={r.type} />, getValue: (r) => r.type },
     { key: 'startDate', label: 'Start', render: (r) => new Date(r.startDate).toLocaleDateString(), getValue: (r) => r.startDate ? new Date(r.startDate).toLocaleDateString('en-GB') : '' },
     { key: 'endDate', label: 'End', render: (r) => new Date(r.endDate).toLocaleDateString(), getValue: (r) => r.endDate ? new Date(r.endDate).toLocaleDateString('en-GB') : '' },
-    {
-      key: 'contractValue', label: 'Value',
-      render: (r) => {
-        const ccy = r.account?.currency || 'USD'
-        return `${ccy} ${Number(r.contractValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-      },
-      getValue: (r) => Number(r.contractValue || 0).toFixed(2),
-    },
-    {
-      key: 'mrr', label: 'MRR',
-      render: (r) => {
-        const ccy = r.account?.currency || 'USD'
-        return `${ccy} ${(r.mrr || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-      },
-      getValue: (r) => (r.mrr || 0).toFixed(2),
-    },
-    {
-      key: 'usdRate', label: 'FX Rate',
-      render: (r) => {
-        if (!r.usdRate) return <span className="text-gray-300">—</span>
-        const ccy = r.account?.currency || ''
-        return (
-          <span className="text-xs text-gray-500 font-mono whitespace-nowrap">
-            1 USD = {Number(r.usdRate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {ccy}
-          </span>
-        )
-      },
-      getValue: (r) => r.usdRate ? Number(r.usdRate).toFixed(4) : '',
-    },
+    { key: 'contractValue', label: 'Value', render: (r) => `USD ${Number(r.contractValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, getValue: (r) => Number(r.contractValue || 0).toFixed(2) },
+    { key: 'mrr', label: 'MRR', render: (r) => `USD ${(r.mrr || 0).toFixed(2)}`, getValue: (r) => (r.mrr || 0).toFixed(2) },
     { key: 'contractStatus', label: 'Status', render: (r) => <Badge value={r.contractStatus} />, getValue: (r) => r.contractStatus },
     { key: 'churnFlag', label: 'Churn', render: (r) => <Badge value={r.churnFlag} />, getValue: (r) => r.churnFlag },
     { key: 'actions', label: '', sortable: false, exportable: false, render: (r) => (
