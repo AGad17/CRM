@@ -7,6 +7,7 @@ import { getPricingConfig } from '@/lib/db/invoicing'
 import { calcDealSummary, calcInvoiceDates, getQuarterNumber, generateInvoiceNumber } from '@/lib/invoicingCalc'
 import { DEFAULT_TASKS } from '@/lib/db/onboarding'
 import { logActivity } from '@/lib/activityLog'
+import { getUSDRate } from '@/lib/exchange-rate'
 
 export async function POST(request, { params }) {
   const { error } = await requireAuth('write')
@@ -36,6 +37,10 @@ export async function POST(request, { params }) {
   if (!country) {
     return NextResponse.json({ error: `Country not found: ${body.country}` }, { status: 400 })
   }
+
+  // Fetch historical USD exchange rate for the deal's currency at start date
+  // Done outside the transaction to avoid holding the DB connection during network I/O
+  const usdRate = await getUSDRate(country.currency, body.startDate)
 
   // Load pricing config (new: inventoryPricing + addOnPricing)
   const config      = await getPricingConfig()
@@ -396,6 +401,7 @@ export async function POST(request, { params }) {
           startDate:     new Date(body.startDate),
           endDate,
           type:          contractType,
+          usdRate:       usdRate ?? undefined,
           items:         { create: items },
         },
       })
