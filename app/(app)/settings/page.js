@@ -396,7 +396,6 @@ export default function SettingsPage() {
             )}
           </div>
 
-          <RoleDefaultsCard />
         </div>
       )}
 
@@ -729,56 +728,6 @@ function PermissionsModal({ user, onSave, onClose, saving }) {
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-// ── Role Defaults Reference Card ──────────────────────────────────────────────
-
-function RoleDefaultsCard() {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-      >
-        <span className="flex items-center gap-2"><span>\ud83d\udccb</span> System Role Defaults Reference</span>
-        <span className="text-gray-400 text-lg">{open ? '\u25b2' : '\u25bc'}</span>
-      </button>
-      {open && (
-        <div className="overflow-x-auto border-t border-gray-100">
-          <table className="w-full text-xs">
-            <thead><tr className="bg-gray-50">
-              <th className="text-left px-5 py-2.5 font-semibold text-gray-500 uppercase tracking-wide">Module / Action</th>
-              {Object.keys(ROLE_LABELS).map((role) => (
-                <th key={role} className="px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-center whitespace-nowrap">{ROLE_LABELS[role]}</th>
-              ))}
-            </tr></thead>
-            <tbody className="divide-y divide-gray-50">
-              {MODULES.flatMap((mod) =>
-                ACTIONS.map((action, ai) => {
-                  const hasAny = Object.keys(ROLE_LABELS).some(r => ROLE_DEFAULTS[r]?.[mod]?.[action])
-                  if (!hasAny) return null
-                  return (
-                    <tr key={`${mod}-${action}`} className={ai === 0 ? 'border-t-2 border-gray-200' : ''}>
-                      <td className="px-5 py-2 text-gray-700">
-                        {ai === 0 && <span className="font-semibold text-gray-900">{MODULE_LABELS[mod]} \u00b7 </span>}
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${ACTION_COLORS[action]}`}>{ACTION_LABELS[action]}</span>
-                      </td>
-                      {Object.keys(ROLE_LABELS).map((role) => (
-                        <td key={role} className="px-4 py-2 text-center">
-                          {ROLE_DEFAULTS[role]?.[mod]?.[action] ? <span className="text-emerald-500 font-bold">\u2713</span> : <span className="text-gray-200">\u2014</span>}
-                        </td>
-                      ))}
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   )
 }

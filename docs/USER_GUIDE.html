@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShopBrain CRM — User Guide</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --indigo: #4f46e5;
+      --indigo-light: #6366f1;
+      --indigo-pale: #eef2ff;
+      --purple: #7c3aed;
+      --emerald: #059669;
+      --emerald-pale: #ecfdf5;
+      --amber: #d97706;
+      --amber-pale: #fffbeb;
+      --red: #dc2626;
+      --red-pale: #fef2f2;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+    }
+
+    /* ── Base ── */
+    html { font-size: 15px; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      color: var(--gray-800);
+      background: #fff;
+      line-height: 1.7;
+    }
+
+    /* ── Layout ── */
+    .page {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 48px 40px;
+    }
+
+    /* ── Cover ── */
+    .cover {
+      background: linear-gradient(135deg, #0f0f1a 0%, #1a1040 50%, #0f1a2a 100%);
+      color: #fff;
+      padding: 80px 60px;
+      border-radius: 16px;
+      margin-bottom: 48px;
+      position: relative;
+      overflow: hidden;
+    }
+    .cover::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(79,70,229,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79,70,229,0.08) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .cover-inner { position: relative; z-index: 1; }
+    .cover-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #818cf8;
+      margin-bottom: 20px;
+    }
+    .cover h1 {
+      font-size: 52px;
+      font-weight: 900;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+    .cover h1 span {
+      background: linear-gradient(135deg, #818cf8, #a78bfa, #6ee7b7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .cover-sub {
+      font-size: 20px;
+      color: rgba(255,255,255,0.65);
+      margin-bottom: 32px;
+      font-weight: 400;
+    }
+    .cover-meta {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .cover-tag {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.7);
+      font-weight: 500;
+    }
+
+    /* ── TOC ── */
+    .toc {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      padding: 28px 32px;
+      margin-bottom: 48px;
+    }
+    .toc-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      margin-bottom: 16px;
+    }
+    .toc-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 32px;
+      list-style: none;
+    }
+    .toc-list li a {
+      color: var(--indigo-light);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .toc-list li a:hover { text-decoration: underline; }
+    .toc-num {
+      color: var(--gray-400);
+      font-size: 12px;
+      margin-right: 6px;
+    }
+
+    /* ── Section headings ── */
+    h2 {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--gray-900);
+      letter-spacing: -0.02em;
+      margin-top: 56px;
+      margin-bottom: 6px;
+      padding-top: 24px;
+      border-top: 2px solid var(--gray-100);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2:first-child { margin-top: 0; border-top: none; }
+    h2 .h-num {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--indigo-light);
+      border-radius: 6px;
+      padding: 2px 8px;
+      letter-spacing: 0;
+    }
+    h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--gray-800);
+      margin-top: 32px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h3::before {
+      content: '';
+      display: block;
+      width: 4px;
+      height: 18px;
+      background: linear-gradient(180deg, var(--indigo-light), var(--purple));
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    h4 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gray-700);
+      margin-top: 20px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Body text ── */
+    p {
+      font-size: 14.5px;
+      color: var(--gray-600);
+      margin-bottom: 12px;
+      line-height: 1.75;
+    }
+
+    /* ── Tables ── */
+    .table-wrap { overflow-x: auto; margin: 16px 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+    thead tr {
+      background: var(--gray-800);
+      color: #fff;
+    }
+    thead th {
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+    tbody tr:nth-child(even) { background: var(--gray-50); }
+    tbody tr:hover { background: var(--indigo-pale); }
+    td {
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--gray-100);
+      color: var(--gray-700);
+      vertical-align: top;
+    }
+    td code, th code {
+      background: var(--gray-100);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: 'Fira Code', monospace;
+      font-size: 12px;
+      color: var(--indigo);
+    }
+
+    /* ── Code blocks ── */
+    pre {
+      background: var(--gray-900);
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-family: 'Fira Code', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-x: auto;
+      margin: 16px 0;
+    }
+    code {
+      font-family: 'Fira Code', monospace;
+      font-size: 13px;
+      background: var(--indigo-pale);
+      color: var(--indigo);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      border-radius: 0;
+    }
+
+    /* ── Callout boxes ── */
+    .callout {
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin: 16px 0;
+      display: flex;
+      gap: 12px;
+      font-size: 13.5px;
+      line-height: 1.6;
+    }
+    .callout-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .callout-body { color: var(--gray-700); }
+    .callout-body strong { color: var(--gray-900); }
+    .callout-info { background: var(--indigo-pale); border-left: 4px solid var(--indigo-light); }
+    .callout-warn { background: var(--amber-pale); border-left: 4px solid var(--amber); }
+    .callout-tip  { background: var(--emerald-pale); border-left: 4px solid var(--emerald); }
+    .callout-dev  { background: var(--gray-50); border-left: 4px solid var(--gray-400); }
+
+    /* ── Step lists ── */
+    ol.steps { list-style: none; margin: 12px 0; }
+    ol.steps li {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+      font-size: 14px;
+      color: var(--gray-700);
+    }
+    .step-num {
+      background: var(--indigo-light);
+      color: #fff;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* ── Pill badges ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 10px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-indigo  { background: var(--indigo-pale); color: var(--indigo); }
+    .badge-emerald { background: var(--emerald-pale); color: var(--emerald); }
+    .badge-amber   { background: var(--amber-pale);   color: var(--amber); }
+    .badge-red     { background: var(--red-pale);     color: var(--red); }
+    .badge-gray    { background: var(--gray-100);     color: var(--gray-600); }
+
+    /* ── Role cards ── */
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .role-card {
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+    .role-card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--gray-800);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .role-card p {
+      font-size: 13px;
+      margin-bottom: 0;
+    }
+    .role-card.admin { border-top: 3px solid var(--indigo-light); }
+    .role-card.rm    { border-top: 3px solid var(--emerald); }
+    .role-card.cs    { border-top: 3px solid #0ea5e9; }
+    .role-card.ro    { border-top: 3px solid var(--gray-400); }
+
+    /* ── Phase flow ── */
+    .phase-flow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 16px 0;
+    }
+    .phase-chip {
+      padding: 5px 14px;
+      border-radius: 100px;
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+    .arrow-sep { color: var(--gray-400); font-size: 16px; }
+
+    /* ── Workflow box ── */
+    .workflow {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 16px 0;
+    }
+    .workflow-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gray-800);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── Formula box ── */
+    .formula {
+      background: var(--gray-900);
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 16px 20px;
+      font-family: 'Fira Code', monospace;
+      font-size: 13px;
+      margin: 12px 0;
+    }
+    .formula .comment { color: #6ee7b7; }
+
+    /* ── Section divider ── */
+    .section-intro {
+      background: linear-gradient(135deg, var(--indigo-pale), #f5f3ff);
+      border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: var(--gray-700);
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .section-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    /* ── Print styles ── */
+    @media print {
+      body { font-size: 13px; }
+      .cover { border-radius: 0; }
+      h2 { page-break-before: always; }
+      h2:first-child { page-break-before: avoid; }
+      pre, table, .callout, .workflow { page-break-inside: avoid; }
+      @page { margin: 20mm 18mm; }
+    }
+
+    /* ── Utility ── */
+    ul { margin: 10px 0 10px 20px; }
+    ul li { font-size: 14px; color: var(--gray-600); margin-bottom: 4px; }
+    strong { color: var(--gray-800); font-weight: 600; }
+    hr { border: none; border-top: 1px solid var(--gray-200); margin: 32px 0; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══════════════════════════════════════════════════ COVER -->
+  <div class="cover">
+    <div class="cover-inner">
+      <div class="cover-label">Internal Documentation</div>
+      <h1>ShopBrain <span>CRM</span></h1>
+      <div class="cover-sub">User Guide — Everything you need to navigate the platform</div>
+      <div class="cover-meta">
+        <span class="cover-tag">📅 Version 1.0 · March 2026</span>
+        <span class="cover-tag">📖 12 Sections</span>
+        <span class="cover-tag">🔄 Kept updated in docs/USER_GUIDE.md</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════ TOC -->
+  <div class="toc">
+    <div class="toc-title">Table of Contents</div>
+    <ul class="toc-list">
+      <li><a href="#s1"><span class="toc-num">01</span>Overview</a></li>
+      <li><a href="#s2"><span class="toc-num">02</span>Getting Started</a></li>
+      <li><a href="#s3"><span class="toc-num">03</span>Roles &amp; Permissions</a></li>
+      <li><a href="#s4"><span class="toc-num">04</span>Dashboard</a></li>
+      <li><a href="#s5"><span class="toc-num">05</span>Sales Pipeline</a></li>
+      <li><a href="#s6"><span class="toc-num">06</span>Accounts</a></li>
+      <li><a href="#s7"><span class="toc-num">07</span>Operations (Customer Journey)</a></li>
+      <li><a href="#s8"><span class="toc-num">08</span>Invoicing</a></li>
+      <li><a href="#s9"><span class="toc-num">09</span>Analytics</a></li>
+      <li><a href="#s10"><span class="toc-num">10</span>Settings</a></li>
+      <li><a href="#s11"><span class="toc-num">11</span>How Numbers Are Calculated</a></li>
+      <li><a href="#s12"><span class="toc-num">12</span>Common Workflows</a></li>
+    </ul>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════ 01 OVERVIEW -->
+  <h2 id="s1"><span class="h-num">01</span> Overview</h2>
+  <p>ShopBrain CRM is the internal revenue intelligence platform covering the entire customer lifecycle:</p>
+  <div class="phase-flow">
+    <div class="phase-chip" style="background:#eef2ff; color:#4f46e5;">Lead</div>
+    <span class="arrow-sep">→</span>
+    <div class="phase-chip" style="background:#eff6ff; color:#2563eb;">Qualified</div>
+    <span class="arrow-sep">→</span>
+    <div class="phase-chip" style="background:#ecfdf5; color:#059669;">Closed Won</div>
+    <span class="arrow-sep">→</span>
+    <div class="phase-chip" style="background:#fef9c3; color:#854d0e;">Onboarding</div>
+    <span class="arrow-sep">→</span>
+    <div class="phase-chip" style="background:#f0fdf4; color:#166534;">Account Management</div>
+    <span class="arrow-sep">→</span>
+    <div class="phase-chip" style="background:#fef3c7; color:#92400e;">Renewal</div>
+    <span class="arrow-sep">or</span>
+    <div class="phase-chip" style="background:#fef2f2; color:#dc2626;">Churn</div>
+  </div>
+
+  <div class="table-wrap" style="margin-top:20px;">
+    <table>
+      <thead><tr><th>Module</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Dashboard</strong></td><td>Executive KPI snapshot — accounts, MRR, churn, health</td></tr>
+        <tr><td><strong>Sales Pipeline</strong></td><td>Lead tracking and deal closing (kanban + table)</td></tr>
+        <tr><td><strong>Accounts</strong></td><td>Customer master database with contract history</td></tr>
+        <tr><td><strong>Operations</strong></td><td>Customer journey and onboarding tracker (7 phases)</td></tr>
+        <tr><td><strong>Invoicing</strong></td><td>Deal confirmation, invoice generation, AR tracking</td></tr>
+        <tr><td><strong>Analytics</strong></td><td>13+ revenue and performance reports</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════ 02 GETTING STARTED -->
+  <h2 id="s2"><span class="h-num">02</span> Getting Started</h2>
+  <h3>Logging In</h3>
+  <ol class="steps">
+    <li><span class="step-num">1</span>Go to the CRM URL and click <strong>Sign In</strong></li>
+    <li><span class="step-num">2</span>Enter your company email and password</li>
+    <li><span class="step-num">3</span>You will land on the <strong>Dashboard</strong></li>
+  </ol>
+  <div class="callout callout-info">
+    <span class="callout-icon">💡</span>
+    <div class="callout-body">First-time users: ask a <strong>CCO_ADMIN</strong> to create your account from <strong>Settings → Team → Invite User</strong>.</div>
+  </div>
+
+  <h3>UI Conventions</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Element</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-red">Red badge</span></td><td>Overdue, at-risk, or urgent</td></tr>
+        <tr><td><span class="badge badge-amber">Amber badge</span></td><td>Warning, needs attention</td></tr>
+        <tr><td><span class="badge badge-emerald">Green badge</span></td><td>Healthy, active, on track</td></tr>
+        <tr><td><span class="badge badge-indigo">Indigo badge</span></td><td>Informational / action required</td></tr>
+        <tr><td><strong>Bold labels</strong></td><td>Required fields</td></tr>
+        <tr><td><span style="color:var(--gray-400)">Gray text</span></td><td>Read-only / calculated</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════ 03 ROLES -->
+  <h2 id="s3"><span class="h-num">03</span> Roles &amp; Permissions</h2>
+  <p>Every user has one system role. Admins can also create <strong>custom roles</strong> as reusable permission templates.</p>
+
+  <div class="role-grid">
+    <div class="role-card admin">
+      <div class="role-card-title">👑 CCO_ADMIN</div>
+      <p>Full access to all modules and settings. Manages users, custom roles, and pricing. Cannot be restricted by custom roles.</p>
+    </div>
+    <div class="role-card rm">
+      <div class="role-card-title">💼 REVENUE_MANAGER</div>
+      <p>Write access to pipeline, accounts, and invoicing. Read access to analytics. Can update settings but not delete.</p>
+    </div>
+    <div class="role-card cs">
+      <div class="role-card-title">🤝 CUSTOMER_SUCCESS</div>
+      <p>Full access to Operations (onboarding). Read-only on Pipeline, Invoicing, and Analytics. No settings access.</p>
+    </div>
+    <div class="role-card ro">
+      <div class="role-card-title">👁 READ_ONLY</div>
+      <p>View-only across all modules. Default for new users until a role is assigned.</p>
+    </div>
+  </div>
+
+  <h3>Permission Layers</h3>
+  <p>Permissions resolve in 3 layers — higher layers override lower ones:</p>
+  <div class="formula">
+    <span class="comment">// Layer 1: System role defaults</span>
+    ROLE_DEFAULTS[user.role]            → base permissions
+
+    <span class="comment">// Layer 2: Custom role (replaces Layer 1 if assigned)</span>
+    CustomRole.permissions              → overrides base
+
+    <span class="comment">// Layer 3: Per-user overrides (applied on top)</span>
+    User.permissions JSON               → fine-tuning exceptions
+  </div>
+
+  <h3>Module Actions</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Action</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>view</code></td><td>See the module and its data</td></tr>
+        <tr><td><code>create</code></td><td>Add new records</td></tr>
+        <tr><td><code>edit</code></td><td>Modify existing records</td></tr>
+        <tr><td><code>delete</code></td><td>Remove records</td></tr>
+        <tr><td><code>admin</code></td><td>Admin-only features (e.g. pricing management)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════ 04 DASHBOARD -->
+  <h2 id="s4"><span class="h-num">04</span> Dashboard</h2>
+  <div class="section-intro">
+    <span style="font-size:20px;">📊</span>
+    <div>
+      <strong>Who uses it:</strong> Everyone &nbsp;·&nbsp; <strong>Permission:</strong> <code>dashboard.view</code><br/>
+      Real-time executive snapshot. Use the <strong>Lead Source</strong> and <strong>Country</strong> filters at the top to narrow all KPIs.
+    </div>
+  </div>
+
+  <h3>Account KPIs</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>KPI</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Total Accounts</strong></td><td>All accounts ever created</td></tr>
+      <tr><td><strong>Active Accounts</strong></td><td>Accounts with at least one valid, non-cancelled contract</td></tr>
+      <tr><td><strong>Expired Accounts</strong></td><td>All contracts past end date, no cancellation (natural lapse)</td></tr>
+      <tr><td><strong>Churned Accounts</strong></td><td>Accounts with at least one explicitly cancelled contract</td></tr>
+      <tr><td><strong>Overall Churn Rate</strong></td><td>Churned ÷ Total Accounts × 100</td></tr>
+      <tr><td><strong>Accumulative Churn</strong></td><td>Expired + Churned combined count</td></tr>
+      <tr><td><strong>Accumulative Churn %</strong></td><td>(Expired + Churned) ÷ Total × 100</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout callout-info">
+    <span class="callout-icon">ℹ️</span>
+    <div class="callout-body"><strong>Expired vs. Churned:</strong> Expired = contract ended naturally (renewal opportunity). Churned = customer explicitly cancelled (harder to recover).</div>
+  </div>
+
+  <h3>Revenue KPIs</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>KPI</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Total MRR</strong></td><td>Sum of monthly value across all active contracts</td></tr>
+      <tr><td><strong>Total ARR</strong></td><td>Total MRR × 12</td></tr>
+      <tr><td><strong>Total ACV</strong></td><td>Sum of annualized contract values</td></tr>
+      <tr><td><strong>Total Contract Value</strong></td><td>Sum of all contract values (active + expired)</td></tr>
+      <tr><td><strong>Active Contract Value</strong></td><td>Contract value of non-cancelled contracts only</td></tr>
+      <tr><td><strong>ARPA</strong></td><td>Total MRR ÷ Active Accounts</td></tr>
+      <tr><td><strong>Avg ACV</strong></td><td>Total ACV ÷ Active Contracts</td></tr>
+      <tr><td><strong>Avg MRR / Contract</strong></td><td>Total MRR ÷ Active Contract Count</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>MRR Composition Chart</h3>
+  <p>Stacked bar chart showing the last 3 months by MRR component:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Component</th><th>Color</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>New MRR</td><td>Blue</td><td>Revenue from brand-new accounts this period</td></tr>
+      <tr><td>Expansion MRR</td><td>Green</td><td>Revenue from upsells to existing accounts</td></tr>
+      <tr><td>Renewal MRR</td><td>Light purple</td><td>Revenue from contract renewals</td></tr>
+      <tr><td>Churned MRR</td><td>Red outline</td><td>Revenue lost from churned accounts</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>At-Risk Accounts Strip</h3>
+  <p>A red warning strip appears when any accounts have a <strong>health score below 40</strong>. Click an account badge to navigate directly to its tracker.</p>
+
+  <h3>Efficiency &amp; Operations KPIs</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>KPI</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Open Tasks</strong></td><td>All incomplete onboarding tasks across all accounts</td></tr>
+      <tr><td><strong>Overdue Tasks</strong></td><td>Tasks past their due date and not completed</td></tr>
+      <tr><td><strong>NRR (Last Month)</strong></td><td>Net Revenue Retention over the last 30 days</td></tr>
+      <tr><td><strong>NRR (Last Quarter)</strong></td><td>Net Revenue Retention over the last 90 days</td></tr>
+      <tr><td><strong>MRR per Branch</strong></td><td>Total MRR ÷ Total Active Branches</td></tr>
+      <tr><td><strong>Avg Contract Duration</strong></td><td>Average contract length in months</td></tr>
+      <tr><td><strong>Countries Served</strong></td><td>Number of countries with active accounts</td></tr>
+      <tr><td><strong>Total Brands / Branches</strong></td><td>Brand and branch counts across active accounts</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Recent Performance Table</h3>
+  <p>A 3-month historical table with delta badges (month-over-month % change). Metrics include: New MRR Signed, Expansion MRR, Renewal MRR, Total MRR, Churned MRR, Net New MRR, New Contracts, Churned Contracts, Contract Value, NRR, GRR.</p>
+
+  <!-- ══════════════════════════════════════════════════ 05 PIPELINE -->
+  <h2 id="s5"><span class="h-num">05</span> Sales Pipeline</h2>
+  <div class="section-intro">
+    <span style="font-size:20px;">🚀</span>
+    <div>
+      <strong>Who uses it:</strong> Revenue Manager, CCO_ADMIN (CS read-only) &nbsp;·&nbsp; <strong>Permission:</strong> <code>pipeline.view</code><br/>
+      Track every opportunity from first contact to deal close. Pipeline terminates at Closed Won or Closed Lost — lifecycle continues in Operations.
+    </div>
+  </div>
+
+  <h3>Pipeline Stages</h3>
+  <div class="phase-flow">
+    <div class="phase-chip" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">🎯 Lead</div>
+    <span class="arrow-sep">→</span>
+    <div class="phase-chip" style="background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe;">🔍 Qualified</div>
+    <span class="arrow-sep">→</span>
+    <div class="phase-chip" style="background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;">✅ Closed Won</div>
+    <span class="arrow-sep">or</span>
+    <div class="phase-chip" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca;">✗ Closed Lost</div>
+  </div>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Transition</th><th>Allowed Destinations</th></tr></thead>
+    <tbody>
+      <tr><td>From <strong>Lead</strong></td><td>Qualified, Closed Lost</td></tr>
+      <tr><td>From <strong>Qualified</strong></td><td>Closed Won, Closed Lost, Lead (back)</td></tr>
+      <tr><td>From <strong>Closed Won</strong></td><td>— Terminal</td></tr>
+      <tr><td>From <strong>Closed Lost</strong></td><td>— Terminal</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Opportunity Types</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Type</th><th>Icon</th><th>When to Use</th></tr></thead>
+    <tbody>
+      <tr><td><strong>New</strong></td><td>✨</td><td>Brand-new customer, no prior account</td></tr>
+      <tr><td><strong>Expansion</strong></td><td>📈</td><td>Existing account adding branches or modules</td></tr>
+      <tr><td><strong>Renewal</strong></td><td>🔄</td><td>Existing account renewing their contract</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout callout-warn">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">For <strong>Expansion</strong> and <strong>Renewal</strong> opportunities, you must link the lead to an existing Account in the form.</div>
+  </div>
+
+  <h3>Lead Source Channels</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Channel</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Foodics</td><td>Referred through Foodics POS integration</td></tr>
+      <tr><td>Employee Referral</td><td>Referred by a ShopBrain team member</td></tr>
+      <tr><td>Customer Referral</td><td>Referred by an existing customer</td></tr>
+      <tr><td>Partner Referral</td><td>Referred by a business partner</td></tr>
+      <tr><td>Website</td><td>Inbound from the website</td></tr>
+      <tr><td>Ambassador Referral</td><td>Referred by a brand ambassador</td></tr>
+      <tr><td>Direct Sales</td><td>Outbound / cold outreach</td></tr>
+      <tr><td>Sonic</td><td>Referred through Sonic POS integration</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Creating a Lead</h3>
+  <ol class="steps">
+    <li><span class="step-num">1</span>Click <strong>+ New Lead</strong></li>
+    <li><span class="step-num">2</span>Fill required fields: Company Name, Lead Source, Owner</li>
+    <li><span class="step-num">3</span>Select Opportunity Type. For Expansion/Renewal, link to an existing Account</li>
+    <li><span class="step-num">4</span>Optionally add: contact info, estimated value, # branches, package interest, expected close date</li>
+    <li><span class="step-num">5</span>Click <strong>Save</strong></li>
+  </ol>
+
+  <h3>Risk Indicators</h3>
+  <p>Leads are flagged <span class="badge badge-amber">at-risk</span> if not updated in 7+ days. This appears on the kanban card and in the table view.</p>
+
+  <!-- ══════════════════════════════════════════════════ 06 ACCOUNTS -->
+  <h2 id="s6"><span class="h-num">06</span> Accounts</h2>
+  <div class="section-intro">
+    <span style="font-size:20px;">🏢</span>
+    <div>
+      <strong>Who uses it:</strong> Everyone (read); Revenue Manager + CCO_ADMIN (write) &nbsp;·&nbsp; <strong>Permission:</strong> <code>accounts.view</code><br/>
+      Customer master database. Every active or past customer has a record here.
+    </div>
+  </div>
+
+  <h3>Account Statuses</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge badge-emerald">Active</span></td><td>At least one valid, non-cancelled contract</td></tr>
+      <tr><td><span class="badge badge-amber">Expired</span></td><td>All contracts past end date — no cancellation (natural lapse, renewal opportunity)</td></tr>
+      <tr><td><span class="badge badge-red">Churned</span></td><td>Account has at least one explicitly cancelled contract</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Account Detail</h3>
+  <p>Click any account to open its detail view:</p>
+  <ul>
+    <li><strong>Contract History</strong> — all contracts, start/end dates, value, cancellation status</li>
+    <li><strong>Health Score</strong> — current health score (0–100) with component breakdown</li>
+    <li><strong>Onboarding Tracker</strong> — current journey phase and task progress</li>
+    <li><strong>Notes</strong> — timestamped notes from the team</li>
+    <li><strong>Activity Log</strong> — system-recorded events (stage changes, phase changes, etc.)</li>
+  </ul>
+
+  <!-- ══════════════════════════════════════════════════ 07 OPERATIONS -->
+  <h2 id="s7"><span class="h-num">07</span> Operations (Customer Journey)</h2>
+  <div class="section-intro">
+    <span style="font-size:20px;">🏗️</span>
+    <div>
+      <strong>Who uses it:</strong> Customer Success (primary), Revenue Manager, CCO_ADMIN &nbsp;·&nbsp; <strong>Permission:</strong> <code>onboarding.view</code><br/>
+      Tracks every customer through a structured 7-phase lifecycle from deal close to ongoing management (or churn).
+    </div>
+  </div>
+
+  <h3>The 7 Phases</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>#</th><th>Phase</th><th>Owner</th><th>Duration</th><th>Key Goal</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>Deal Closure</strong></td><td>Sales / AM</td><td>~3 days</td><td>Contract signed, SOP shared, internal handover, kickoff email sent</td></tr>
+      <tr><td>2</td><td><strong>Onboarding</strong></td><td>Onboarding Team</td><td>~23 days</td><td>System configured, menus/data loaded, QA passed, client presentation done</td></tr>
+      <tr><td>3</td><td><strong>Training</strong></td><td>Onboarding Team</td><td>~14 days</td><td>All modules trained (Inventory, Recipes, Accounting, Production, Forecasting, Reports), go-live ready</td></tr>
+      <tr><td>4</td><td><strong>Incubation</strong></td><td>Onboarding Team</td><td>~14 days</td><td>Day-1 go-live support, daily logs, mid-review, CSAT captured, closure report signed</td></tr>
+      <tr><td>5</td><td><strong>Account Management</strong></td><td>Customer Success</td><td>Ongoing</td><td>Monthly check-ins, quarterly reviews, upsell identification. Recurring tasks auto-generate.</td></tr>
+      <tr><td>6</td><td><strong>Expired</strong></td><td>Customer Success</td><td>Until renewed</td><td>Contract lapsed naturally — pursue renewal. Shows days until deadline.</td></tr>
+      <tr><td>7</td><td><strong>Churned</strong></td><td>—</td><td>Terminal</td><td>Explicit cancellation. Removed from active reporting. No further automated actions.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Auto-Sync Logic</h3>
+  <p>The Operations page automatically runs <code>syncExpiredTrackers()</code> on every load:</p>
+  <ul>
+    <li>If <strong>all contracts are past end date</strong> and <strong>none were cancelled</strong> → moves tracker to <span class="badge badge-amber">Expired</span></li>
+    <li>If <strong>any contract was cancelled</strong> → tracker stays in or moves to <span class="badge badge-red">Churned</span></li>
+  </ul>
+  <div class="callout callout-tip">
+    <span class="callout-icon">✅</span>
+    <div class="callout-body">Contract data is always the <strong>source of truth</strong>. Click <strong>Sync All Accounts</strong> manually to create trackers for any accounts missing one.</div>
+  </div>
+
+  <h3>Kanban View</h3>
+  <p>7-column kanban — one per phase. Each card shows:</p>
+  <ul>
+    <li>Account name + country</li>
+    <li>"X days in phase" badge: <span class="badge badge-emerald">&lt;7d</span> <span class="badge badge-amber">7–14d</span> <span class="badge badge-red">&gt;14d</span></li>
+    <li>Overdue task count, package tags, task progress bar</li>
+  </ul>
+
+  <h3>Tracker Detail Page</h3>
+  <p>Click any account card to open the full tracker:</p>
+  <ol class="steps">
+    <li><span class="step-num">1</span><strong>Account &amp; Deal Info</strong> — linked account, contract summary</li>
+    <li><span class="step-num">2</span><strong>Current Phase &amp; Progress</strong> — visual phase bar, % tasks completed</li>
+    <li><span class="step-num">3</span><strong>Task Checklist</strong> — grouped by phase; toggle completion; overdue = red; recurring tasks auto-generate on completion</li>
+    <li><span class="step-num">4</span><strong>Staff Assignments</strong> — Onboarding Specialist, Training Specialist, Account Manager</li>
+    <li><span class="step-num">5</span><strong>CSAT History</strong> — auto-created per phase transition, 1–5 scale</li>
+    <li><span class="step-num">6</span><strong>NPS History</strong> — quarterly for Incubation + Account Mgmt phases, 0–10 scale</li>
+    <li><span class="step-num">7</span><strong>Notes Timeline</strong> — timestamped team notes with author</li>
+  </ol>
+
+  <h3>Health Score</h3>
+  <p>Each account receives an automated health score (0–100):</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Score</th><th>Label</th><th>Appears In</th></tr></thead>
+    <tbody>
+      <tr><td>70–100</td><td><span class="badge badge-emerald">Healthy</span></td><td>Normal — no action needed</td></tr>
+      <tr><td>40–69</td><td><span class="badge badge-amber">Watch</span></td><td>Monitor closely</td></tr>
+      <tr><td>0–39</td><td><span class="badge badge-red">At Risk</span></td><td>Appears in Dashboard warning strip</td></tr>
+    </tbody>
+  </table></div>
+  <p>Score factors: task completion %, average CSAT, average NPS, deductions for overdue tasks.</p>
+
+  <!-- ══════════════════════════════════════════════════ 08 INVOICING -->
+  <h2 id="s8"><span class="h-num">08</span> Invoicing</h2>
+  <div class="section-intro">
+    <span style="font-size:20px;">💰</span>
+    <div>
+      <strong>Who uses it:</strong> Revenue Manager, CCO_ADMIN &nbsp;·&nbsp; <strong>Permission:</strong> <code>invoicing.view</code><br/>
+      Deal confirmation, invoice generation, and accounts receivable tracking.
+    </div>
+  </div>
+
+  <h3>Deal Calculator</h3>
+  <p>Use when a deal is ready to be confirmed (Closed Won in Pipeline).</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Input</th><th>Options</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Deal Type</strong></td><td>New, Renewal, Upsell, Expansion</td></tr>
+      <tr><td><strong>POS System</strong></td><td>Foodics, Geidea, Sonic</td></tr>
+      <tr><td><strong>Package</strong></td><td>Essential, Operations, Enterprise</td></tr>
+      <tr><td><strong>Payment Type</strong></td><td>Annual (1 invoice), Quarterly (4 invoices), Special (1 invoice)</td></tr>
+      <tr><td><strong>Branches</strong></td><td>Normal branches, Central Kitchens, Warehouses (separate counts)</td></tr>
+      <tr><td><strong>Add-ons</strong></td><td>Accounting Main/Extra, Butchering, AI Agent, Central Kitchen, Warehouse</td></tr>
+      <tr><td><strong>Discount %</strong></td><td>Applied to total before VAT</td></tr>
+    </tbody>
+  </table></div>
+  <div class="formula">
+Base MRR       = Branch Pricing × Branch Counts (by type)
+Add-on MRR     = Add-on Pricing × Unit Counts
+Total MRR      = (Base + Add-on) × (1 − Discount%)
+VAT Amount     = Total MRR × Country VAT Rate
+Total incl VAT = Total MRR + VAT Amount
+Contract Value = Total MRR (excl VAT) × Contract Months
+  </div>
+  <p><strong>Confirm Deal</strong> creates: a Deal record (with immutable snapshot values), a Contract, Invoice(s), and a new Account (if Deal Type = New).</p>
+
+  <h3>Invoice Number Format</h3>
+  <pre>SB-{YEAR}Q{QUARTER}-{4-digit-random}
+Example: SB-2026Q1-a7f3</pre>
+
+  <h3>Invoices — 4 Tabs</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tab</th><th>Shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Foodics AR</strong></td><td>Active Foodics invoices pending collection. Status: Pending → Eligible → Collected. Eligible date = invoice date + 38 days.</td></tr>
+      <tr><td><strong>Foodics History</strong></td><td>Collected Foodics invoices with collection cycle days</td></tr>
+      <tr><td><strong>Direct AR</strong></td><td>Non-Foodics invoices (Geidea, Sonic, Direct)</td></tr>
+      <tr><td><strong>Full History</strong></td><td>All invoices in one table</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>AR Report</h3>
+  <p>Summary metrics: Total AR, Eligible count, Collected count, Average collection cycle (days). Aging buckets: 0–30 d, 30–60 d, 60–90 d, 90+ d. Broken down by country and POS system.</p>
+
+  <!-- ══════════════════════════════════════════════════ 09 ANALYTICS -->
+  <h2 id="s9"><span class="h-num">09</span> Analytics</h2>
+  <div class="section-intro">
+    <span style="font-size:20px;">📈</span>
+    <div>
+      <strong>Who uses it:</strong> Everyone (read-only) &nbsp;·&nbsp; <strong>Permission:</strong> <code>analytics.view</code><br/>
+      13+ purpose-built reports. Navigate via the sidebar or dropdown.
+    </div>
+  </div>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Report</th><th>What It Shows</th></tr></thead>
+    <tbody>
+      <tr><td><strong>MRR Waterfall</strong></td><td>Opening MRR ± New / Expansion / Renewal / Churned = Closing MRR</td></tr>
+      <tr><td><strong>MOM</strong></td><td>Month-over-month MRR, contracts, churn with delta badges</td></tr>
+      <tr><td><strong>QOQ</strong></td><td>Quarter-over-quarter revenue and contract comparison</td></tr>
+      <tr><td><strong>YOY</strong></td><td>Year-over-year MRR growth and annual retention curves</td></tr>
+      <tr><td><strong>Churn Analysis</strong></td><td>Churn rate %, accumulative churn, by-country breakdown, cohort retention curves</td></tr>
+      <tr><td><strong>NRR Breakdown</strong></td><td>Net and Gross Revenue Retention % with expansion contribution</td></tr>
+      <tr><td><strong>Account Health</strong></td><td>Health distribution (Healthy / Watch / At Risk), trend over time, at-risk list</td></tr>
+      <tr><td><strong>Lead Source Analysis</strong></td><td>MRR by source, win rate by channel, avg deal size by source</td></tr>
+      <tr><td><strong>CS Performance</strong></td><td>Task completion rate, overdue count per rep, CSAT &amp; NPS trends</td></tr>
+      <tr><td><strong>Cohorts</strong></td><td>Retention % by signup cohort, revenue per cohort, expansion rates</td></tr>
+      <tr><td><strong>Contracts</strong></td><td>Active / expired / cancelled counts, renewals due in 90 days, avg duration</td></tr>
+      <tr><td><strong>Products</strong></td><td>Revenue by package (Essential / Operations / Enterprise), add-on adoption %</td></tr>
+      <tr><td><strong>Revenue Quality</strong></td><td>New vs. Expansion vs. Renewal composition, LTV, stability ratio</td></tr>
+      <tr><td><strong>Segments</strong></td><td>MRR, churn, growth by country / package / customer size</td></tr>
+      <tr><td><strong>Surveys</strong></td><td>CSAT and NPS trends over time</td></tr>
+      <tr><td><strong>Win / Loss</strong></td><td>Win rate by channel and rep, loss reasons, deal velocity</td></tr>
+    </tbody>
+  </table></div>
+
+  <!-- ══════════════════════════════════════════════════ 10 SETTINGS -->
+  <h2 id="s10"><span class="h-num">10</span> Settings</h2>
+  <div class="section-intro">
+    <span style="font-size:20px;">⚙️</span>
+    <div>
+      <strong>Who uses it:</strong> CCO_ADMIN (primary) &nbsp;·&nbsp; <strong>Permission:</strong> <code>settings.view</code>
+    </div>
+  </div>
+
+  <h3>Countries Tab</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Code</td><td>Short identifier (e.g. <code>UAE</code>)</td></tr>
+      <tr><td>Name</td><td>Full country name displayed in dropdowns</td></tr>
+      <tr><td>Currency</td><td>Currency code used in invoicing (e.g. <code>AED</code>)</td></tr>
+      <tr><td>VAT Rate</td><td>Decimal (e.g. <code>0.05</code> = 5%). Applied automatically in Deal Calculator.</td></tr>
+      <tr><td>Active</td><td>Whether this country appears in dropdowns</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Custom Roles Tab</h3>
+  <ol class="steps">
+    <li><span class="step-num">1</span>Click <strong>+ Create Role</strong></li>
+    <li><span class="step-num">2</span>Enter a unique name and optional description</li>
+    <li><span class="step-num">3</span>Use the permission matrix to set module × action combinations</li>
+    <li><span class="step-num">4</span>Click <strong>Save</strong>. Assign to users via the Team tab.</li>
+  </ol>
+  <div class="callout callout-warn">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">You cannot delete a custom role while users are assigned to it. Re-assign those users first.</div>
+  </div>
+
+  <h3>Team Tab</h3>
+  <p><strong>Inviting a user:</strong></p>
+  <ol class="steps">
+    <li><span class="step-num">1</span>Click <strong>+ Invite User</strong></li>
+    <li><span class="step-num">2</span>Enter email (required) and name</li>
+    <li><span class="step-num">3</span>Select initial role</li>
+    <li><span class="step-num">4</span>Click <strong>Send Invite</strong></li>
+  </ol>
+  <p><strong>Managing permissions:</strong> Use the <strong>Custom Role dropdown</strong> to assign a role template, or click <strong>✏️ Permissions</strong> to fine-tune individual overrides. Colors: <span class="badge badge-emerald">Green</span> = role default · <span class="badge badge-indigo">Indigo</span> = manually granted · <span class="badge badge-red">Red</span> = manually revoked.</p>
+
+  <!-- ══════════════════════════════════════════════════ 11 HOW NUMBERS -->
+  <h2 id="s11"><span class="h-num">11</span> How Numbers Are Calculated</h2>
+
+  <h3>MRR &amp; ARR</h3>
+  <div class="formula">
+Contract MRR = Annual Contract Value ÷ 12
+Total MRR    = Sum of all active Contract MRRs
+ARR          = Total MRR × 12
+
+<span class="comment">// "Active" = cancellationDate IS NULL AND endDate ≥ today</span>
+  </div>
+
+  <h3>ACV (Annual Contract Value)</h3>
+  <div class="formula">ACV = Contract Value ÷ Contract Months × 12</div>
+
+  <h3>NRR &amp; GRR</h3>
+  <div class="formula">
+NRR = (End MRR + Expansion MRR − Churned MRR) ÷ Start MRR × 100
+GRR = (End MRR − Churned MRR) ÷ Start MRR × 100
+
+<span class="comment">// NRR &gt; 100% = net expansion (good). GRR excludes expansion.</span>
+  </div>
+
+  <h3>Churn Rate</h3>
+  <div class="formula">
+Churn Rate % = Churned Accounts ÷ Total Accounts × 100
+<span class="comment">// "Churned" = accounts with cancellationDate IS NOT NULL</span>
+  </div>
+
+  <h3>Account Health Score (0–100)</h3>
+  <div class="formula">
+Factors:
+  + Task completion % in current phase
+  + Average CSAT score (1–5, normalized)
+  + Average NPS score (0–10, normalized)
+  − Deductions per overdue task
+  </div>
+
+  <h3>Deal &amp; Invoice Math</h3>
+  <div class="formula">
+Base MRR       = Branch Pricing × Branch Count (per type)
+Add-on MRR     = Add-on Pricing × Unit Count
+Total MRR      = (Base + Add-on) × (1 − Discount%)
+VAT Amount     = Total MRR × Country VAT Rate
+Total incl VAT = Total MRR + VAT Amount
+Contract Value = Total MRR (excl VAT) × Contract Months
+
+Foodics Eligible Date = Invoice Date + 38 days
+  </div>
+
+  <h3>Days in Phase Coloring</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Range</th><th>Color</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>&lt; 7 days</td><td><span class="badge badge-emerald">Green</span></td><td>Fresh start — no action needed</td></tr>
+      <tr><td>7–14 days</td><td><span class="badge badge-amber">Amber</span></td><td>Monitor closely</td></tr>
+      <tr><td>&gt; 14 days</td><td><span class="badge badge-red">Red</span></td><td>Investigate — account may be stuck</td></tr>
+    </tbody>
+  </table></div>
+
+  <!-- ══════════════════════════════════════════════════ 12 WORKFLOWS -->
+  <h2 id="s12"><span class="h-num">12</span> Common Workflows</h2>
+
+  <h3>Workflow 1 — New Customer (End-to-End)</h3>
+  <div class="workflow">
+    <div class="workflow-title">✨ New Deal → Fully Onboarded Customer</div>
+    <ol class="steps">
+      <li><span class="step-num">1</span>Create Lead in Pipeline → Type: New, Channel: [source]</li>
+      <li><span class="step-num">2</span>Qualify the Lead — update contact info and estimated value</li>
+      <li><span class="step-num">3</span>Move to Closed Won → go to <strong>Invoicing → Deal Calculator</strong> → configure and confirm</li>
+      <li><span class="step-num">4</span>Account + Contract + Invoice(s) created automatically</li>
+      <li><span class="step-num">5</span>Onboarding Tracker auto-created in <strong>Deal Closure</strong> phase — assign Onboarding Specialist</li>
+      <li><span class="step-num">6</span>Advance through phases: Deal Closure → Onboarding → Training → Incubation → Account Management</li>
+      <li><span class="step-num">7</span>CSAT is auto-captured at each phase advance. NPS recorded quarterly.</li>
+    </ol>
+  </div>
+
+  <h3>Workflow 2 — Contract Renewal</h3>
+  <div class="workflow">
+    <div class="workflow-title">🔄 Renewing an Existing Customer</div>
+    <ol class="steps">
+      <li><span class="step-num">1</span>Create Lead → Type: <strong>Renewal</strong>, link to existing Account</li>
+      <li><span class="step-num">2</span>Qualify and move to Closed Won</li>
+      <li><span class="step-num">3</span>In Deal Calculator, set Deal Type = <strong>Renewal</strong> → new contract and invoice(s) created</li>
+      <li><span class="step-num">4</span>Account remains in Account Management phase in Operations</li>
+    </ol>
+  </div>
+
+  <h3>Workflow 3 — Expansion / Upsell</h3>
+  <div class="workflow">
+    <div class="workflow-title">📈 Adding Revenue to an Existing Account</div>
+    <ol class="steps">
+      <li><span class="step-num">1</span>Create Lead → Type: <strong>Expansion</strong>, link to existing Account</li>
+      <li><span class="step-num">2</span>Qualify and close</li>
+      <li><span class="step-num">3</span>In Deal Calculator, set Deal Type = Expansion or Upsell → MRR increase recorded as Expansion MRR in the waterfall</li>
+    </ol>
+  </div>
+
+  <h3>Workflow 4 — Invoicing a Foodics Deal</h3>
+  <div class="workflow">
+    <div class="workflow-title">💳 Tracking a Foodics Invoice to Collection</div>
+    <ol class="steps">
+      <li><span class="step-num">1</span>Deal confirmed → Invoice created, Status = <strong>Pending</strong></li>
+      <li><span class="step-num">2</span>After 38 days → Go to <strong>Invoicing → Foodics AR</strong>, change status to <strong>Eligible</strong></li>
+      <li><span class="step-num">3</span>When Foodics pays → enter Foodics Invoice #, set status to <strong>Collected</strong>, enter collection date</li>
+      <li><span class="step-num">4</span>Invoice moves to Foodics History; collection cycle days recorded automatically</li>
+    </ol>
+  </div>
+
+  <h3>Workflow 5 — Handling an Expired Account</h3>
+  <div class="workflow">
+    <div class="workflow-title">⏰ Pursuing a Naturally Lapsed Account</div>
+    <ol class="steps">
+      <li><span class="step-num">1</span>Operations auto-sync moves the account to <span class="badge badge-amber">Expired</span> when contract end date passes with no cancellation</li>
+      <li><span class="step-num">2</span>View in Operations → Expired column</li>
+      <li><span class="step-num">3</span>To pursue renewal: create new Lead (Type: Renewal) linked to the account</li>
+      <li><span class="step-num">4</span>If renewed: new contract → MRR resumes → account returns to Account Management</li>
+    </ol>
+  </div>
+
+  <h3>Workflow 6 — Setting Up a New Team Member</h3>
+  <div class="workflow">
+    <div class="workflow-title">👤 Onboarding a New User</div>
+    <ol class="steps">
+      <li><span class="step-num">1</span>Settings → Roles → <strong>+ Create Role</strong> (if a custom role is needed)</li>
+      <li><span class="step-num">2</span>Settings → Team → <strong>+ Invite User</strong> → enter email, name, initial role</li>
+      <li><span class="step-num">3</span>Assign custom role via the Custom Role dropdown in the Team tab</li>
+      <li><span class="step-num">4</span>Fine-tune with per-user overrides using the <strong>✏️ Permissions</strong> button if needed</li>
+    </ol>
+  </div>
+
+  <hr/>
+  <div class="callout callout-dev">
+    <span class="callout-icon">🛠️</span>
+    <div class="callout-body">
+      <strong>For developers:</strong> When adding a new module, KPI, or feature — update <code>docs/USER_GUIDE.md</code> (and regenerate this HTML) in the same PR as the code change. Update the permissions table if module/actions change. Update Section 11 if any formula changes.
+    </div>
+  </div>
+  <p style="text-align:center; margin-top:32px; color:var(--gray-400); font-size:13px;">
+    ShopBrain CRM User Guide · Version 1.0 · March 2026
+  </p>
+
+</div>
+</body>
+</html>
