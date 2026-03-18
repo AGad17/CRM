@@ -107,6 +107,10 @@ export default function SettingsPage() {
     mutationFn: ({ id, ...data }) => fetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then((r) => r.json()),
     onSuccess: (res) => { if (res.error) alert(res.error); else qc.invalidateQueries(['users']) },
   })
+  const deleteUser = useMutation({
+    mutationFn: (id) => fetch(`/api/users/${id}`, { method: 'DELETE' }).then((r) => r.json()),
+    onSuccess: (res) => { if (res.error) alert(res.error); else qc.invalidateQueries(['users']) },
+  })
   const updatePerms = useMutation({
     mutationFn: ({ id, permissions }) =>
       fetch(`/api/users/${id}/permissions`, {
@@ -381,12 +385,25 @@ export default function SettingsPage() {
                             {u.isActive ? 'Active' : 'Deactivated'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          {isAdmin && (u.isActive ? (
-                            <button onClick={() => { if (confirm(`Deactivate ${u.email}?`)) updateUser.mutate({ id: u.id, isActive: false }) }} className="text-xs text-red-400 hover:text-red-600">Deactivate</button>
-                          ) : (
-                            <button onClick={() => updateUser.mutate({ id: u.id, isActive: true })} className="text-xs text-indigo-500 hover:text-indigo-700">Reactivate</button>
-                          ))}
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          {isAdmin && !isCCOAdmin && (
+                            <div className="flex items-center justify-end gap-3">
+                              {u.isActive ? (
+                                <button onClick={() => { if (confirm(`Deactivate ${u.email}?`)) updateUser.mutate({ id: u.id, isActive: false }) }} className="text-xs text-amber-500 hover:text-amber-700">Deactivate</button>
+                              ) : (
+                                <button onClick={() => updateUser.mutate({ id: u.id, isActive: true })} className="text-xs text-indigo-500 hover:text-indigo-700">Reactivate</button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Permanently remove ${u.email}? This cannot be undone.`))
+                                    deleteUser.mutate(u.id)
+                                }}
+                                className="text-xs text-red-400 hover:text-red-600 font-medium"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )
