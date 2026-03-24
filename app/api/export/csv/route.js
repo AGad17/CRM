@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { getAccounts } from '@/lib/db/accounts'
 import { getContracts } from '@/lib/db/contracts'
 
@@ -19,7 +19,7 @@ function toCSV(rows, columns) {
 }
 
 export async function GET(request) {
-  const { error } = await requireAuth('export')
+  const { error } = await requirePermission('analytics', 'view')
   if (error) return error
 
   const { searchParams } = new URL(request.url)

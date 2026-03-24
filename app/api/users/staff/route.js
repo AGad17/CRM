@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { prisma } from '@/lib/prisma'
 
 // GET /api/users/staff
 // Returns active staff users (non-READ_ONLY) for assignment dropdowns.
 // Requires only read-level auth so ops pages can populate selects.
 export async function GET() {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('onboarding', 'view')
   if (error) return error
 
   const users = await prisma.user.findMany({

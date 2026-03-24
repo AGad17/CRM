@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requireAuth, requirePermission } from '@/lib/roleGuard'
 import { getCountries, createCountry } from '@/lib/db/countries'
 
 export async function GET() {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('settings', 'view')
   if (error) return error
 
   const countries = await getCountries()

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { getAccountActivityLog } from '@/lib/activityLog'
 
 export async function GET(request, { params }) {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('accounts', 'view')
   if (error) return error
 
   const { id } = await params

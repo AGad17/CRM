@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { prisma } from '@/lib/prisma'
 import { getPricingConfig } from '@/lib/db/invoicing'
 import { calcDealSummary, calcInvoiceDates, getQuarterNumber, generateInvoiceNumber } from '@/lib/invoicingCalc'
@@ -10,7 +10,7 @@ import { logActivity } from '@/lib/activityLog'
 import { getUSDRate } from '@/lib/exchange-rate'
 
 export async function POST(request, { params }) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('pipeline', 'edit')
   if (error) return error
 
   const { id } = await params

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request, { params }) {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('accounts', 'view')
   if (error) return error
 
   const { id } = await params
@@ -16,7 +16,7 @@ export async function GET(request, { params }) {
 }
 
 export async function PATCH(request, { params }) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('accounts', 'edit')
   if (error) return error
 
   const { id } = await params

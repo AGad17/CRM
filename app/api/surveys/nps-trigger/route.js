@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { triggerNpsForTracker } from '@/lib/db/surveys'
 import { currentQuarter } from '@/lib/db/onboarding'
 
@@ -7,7 +7,7 @@ import { currentQuarter } from '@/lib/db/onboarding'
 // Body: { trackerId, quarter? }
 // Idempotent — returns existing record if one already exists for this quarter.
 export async function POST(request) {
-  const { error } = await requireAuth('ops')
+  const { error } = await requirePermission('onboarding', 'edit')
   if (error) return error
 
   const body = await request.json()

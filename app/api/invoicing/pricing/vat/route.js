@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { updateCountryVAT } from '@/lib/db/invoicing'
 
 /**
@@ -8,7 +8,7 @@ import { updateCountryVAT } from '@/lib/db/invoicing'
  * Updates the VAT rate for a country and returns the full pricing config.
  */
 export async function POST(request) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('invoicing', 'edit')
   if (error) return error
 
   const { countryCode, vatRate } = await request.json()

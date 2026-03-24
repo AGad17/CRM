@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { updateEngagementLog, deleteEngagementLog } from '@/lib/db/engagementLogs'
 
 export async function PUT(request, { params }) {
-  const { error } = await requireAuth('ops')
+  const { error } = await requirePermission('accounts', 'edit')
   if (error) return error
 
   const body = await request.json()
@@ -19,7 +19,7 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('accounts', 'edit')
   if (error) return error
 
   await deleteEngagementLog(params.id)

@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { seedMissingTrackers, syncExpiredTrackers } from '@/lib/db/onboarding'
 
 // POST /api/onboarding/seed
 // Creates OnboardingTracker records for every Account that does not have one yet,
 // then auto-advances active trackers to Expired phase when contracts have lapsed.
 export async function POST(request) {
-  const { error } = await requireAuth('ops')
+  const { error } = await requirePermission('onboarding', 'create')
   if (error) return error
 
   try {

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { cancelContract } from '@/lib/db/contracts'
 
 export async function POST(request, { params }) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('accounts', 'edit')
   if (error) return error
 
   const body = await request.json()

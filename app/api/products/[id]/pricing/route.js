@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { addPricing } from '@/lib/db/products'
 
 const COUNTRIES = ['KSA', 'Egypt', 'UAE', 'Bahrain', 'Jordan']
 
 export async function POST(request, { params }) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('settings', 'edit')
   if (error) return error
 
   const body = await request.json()

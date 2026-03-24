@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { updateContractItem, deleteContractItem } from '@/lib/db/contracts'
 
 export async function PUT(request, { params }) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('accounts', 'edit')
   if (error) return error
 
   const body = await request.json()
@@ -12,7 +12,7 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(_, { params }) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('accounts', 'edit')
   if (error) return error
 
   const contract = await deleteContractItem(params.id, params.itemId)

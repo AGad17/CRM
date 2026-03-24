@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { getProducts, createProduct } from '@/lib/db/products'
 
 export async function GET() {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('settings', 'view')
   if (error) return error
 
   const products = await getProducts()
@@ -11,7 +11,7 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('settings', 'edit')
   if (error) return error
 
   const body = await request.json()

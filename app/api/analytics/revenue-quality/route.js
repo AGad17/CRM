@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { getRevenueQuality } from '@/lib/db/analytics'
 
 export async function GET(request) {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('analytics', 'view')
   if (error) return error
   const { searchParams } = new URL(request.url)
   const leadSources = searchParams.get('leadSources')?.split(',').filter(Boolean) || []

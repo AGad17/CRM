@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { getEngagementLogs, createEngagementLog } from '@/lib/db/engagementLogs'
 
 export async function GET(request) {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('accounts', 'view')
   if (error) return error
 
   const { searchParams } = new URL(request.url)
@@ -20,7 +20,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const { error, session } = await requireAuth('ops')
+  const { error, session } = await requirePermission('accounts', 'edit')
   if (error) return error
 
   const body = await request.json()

@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { seedQuarterlyNps, currentQuarter } from '@/lib/db/onboarding'
 
 // POST /api/onboarding/nps-seed
 // Seeds NPS records for the current (or a provided) quarter for all
 // Incubation + AccountManagement accounts. Safe to call multiple times.
 export async function POST(request) {
-  const { error } = await requireAuth('ops')
+  const { error } = await requirePermission('onboarding', 'create')
   if (error) return error
 
   try {

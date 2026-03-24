@@ -1,9 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 
 export async function GET() {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('pipeline', 'view')
   if (error) return error
 
   const leads = await prisma.lead.findMany({

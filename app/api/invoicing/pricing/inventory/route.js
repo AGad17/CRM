@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { saveInventoryPricing } from '@/lib/db/invoicing'
 
 /**
@@ -8,7 +8,7 @@ import { saveInventoryPricing } from '@/lib/db/invoicing'
  * Saves inventory pricing (expire old + create new for history).
  */
 export async function POST(request) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('invoicing', 'edit')
   if (error) return error
 
   const { rows } = await request.json()

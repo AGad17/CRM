@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { getContractById, addContractItem } from '@/lib/db/contracts'
 
 export async function GET(_, { params }) {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('accounts', 'view')
   if (error) return error
 
   const contract = await getContractById(params.id)
@@ -12,7 +12,7 @@ export async function GET(_, { params }) {
 }
 
 export async function POST(request, { params }) {
-  const { error } = await requireAuth('write')
+  const { error } = await requirePermission('accounts', 'edit')
   if (error) return error
 
   const body = await request.json()

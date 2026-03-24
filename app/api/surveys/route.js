@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { getSurveysData } from '@/lib/db/surveys'
 
 // GET /api/surveys — all CSAT + NPS records with stats
 export async function GET() {
-  const { error } = await requireAuth('read')
+  const { error } = await requirePermission('onboarding', 'view')
   if (error) return error
 
   try {
