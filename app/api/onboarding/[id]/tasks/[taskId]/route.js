@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { toggleTask } from '@/lib/db/onboarding'
 
 export async function PATCH(request, { params }) {
-  const { error } = await requireAuth('ops')
+  const { error } = await requirePermission('onboarding', 'edit')
   if (error) return error
 
   const { taskId } = await params

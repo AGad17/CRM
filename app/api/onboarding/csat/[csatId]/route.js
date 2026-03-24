@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/roleGuard'
+import { requirePermission } from '@/lib/roleGuard'
 import { completeCsat } from '@/lib/db/onboarding'
 
 // PATCH /api/onboarding/csat/:csatId  — record score & mark complete
 export async function PATCH(request, { params }) {
-  const { error } = await requireAuth('ops')
+  const { error } = await requirePermission('onboarding', 'edit')
   if (error) return error
 
   const { csatId } = await params
