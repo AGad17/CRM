@@ -550,6 +550,7 @@ model Lead {
   stage             LeadStage   @default(Lead)
   lostReason        String?
   notes             String?
+  opportunityDate   DateTime    @default(now())
   expectedCloseDate DateTime?
   ownerId           String
   owner             User        @relation("UserLeads", fields: [ownerId], references: [id])

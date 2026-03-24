@@ -595,7 +595,7 @@ export default function CloseDealPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Start Date *</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Contract Activation Date *</label>
                 <input type="date" className={fc('startDate')} value={deal.startDate} onChange={setD('startDate')} />
                 {errors.startDate && <p className="text-xs text-red-500 mt-1">{errors.startDate}</p>}
               </div>
@@ -931,7 +931,7 @@ export default function CloseDealPage() {
                 <div className="flex justify-between"><span className="text-gray-500">Package</span><span>{deal.package}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Sales Channel</span><span>{deal.salesChannel}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Payment Type</span><span>{deal.paymentType}{deal.paymentType === 'Special' ? ` (${deal.contractYears} yr)` : ''}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Start Date</span><span>{deal.startDate}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Contract Activation Date</span><span>{deal.startDate}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Sales Agent</span><span>{agents.find(a => a.id === deal.agentId)?.name || deal.agentId}</span></div>
                 {(Number(deal.normalBranches) > 0) && <div className="flex justify-between"><span className="text-gray-500">Normal Branches</span><span>{deal.normalBranches}</span></div>}
                 {(Number(deal.centralKitchens) > 0) && <div className="flex justify-between"><span className="text-gray-500">Central Kitchens</span><span>{deal.centralKitchens}</span></div>}

@@ -59,7 +59,8 @@ const OPP_COLORS = {
 const EMPTY_FORM = {
   companyName: '', contactName: '', contactEmail: '', contactPhone: '',
   channel: '', countryCode: '', estimatedValue: '', packageInterest: '',
-  branches: '', expectedCloseDate: '', notes: '', ownerId: '',
+  branches: '', opportunityDate: new Date().toISOString().slice(0, 10),
+  expectedCloseDate: '', notes: '', ownerId: '',
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -228,6 +229,10 @@ function LeadForm({ form, setForm, errors, agents, pricing }) {
           )}
         </div>
         <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Opportunity Date *</label>
+          <input className={cls('opportunityDate')} type="date" max={new Date().toISOString().slice(0, 10)} value={form.opportunityDate} onChange={set('opportunityDate')} />
+        </div>
+        <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Expected Close Date</label>
           <input className={cls('expectedCloseDate')} type="date" value={form.expectedCloseDate} onChange={set('expectedCloseDate')} />
         </div>
@@ -293,7 +298,7 @@ function LeadCard({ lead, onStageAction, onEdit, isAdmin }) {
       <div className="flex items-center justify-between text-xs text-gray-400">
         <span className="font-semibold text-gray-700">{val || '—'}</span>
         <div className="flex items-center gap-2">
-          <span>{daysAgo(lead.createdAt)}</span>
+          <span>{daysAgo(lead.opportunityDate)}</span>
           <span className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
             {initials(lead.owner?.name)}
           </span>
@@ -487,6 +492,7 @@ export default function PipelinePage() {
       numberOfBranches: lead.numberOfBranches != null ? String(lead.numberOfBranches) : '',
       branches:         lead.numberOfBranches != null ? String(lead.numberOfBranches) : '',
       packageInterest:  lead.packageInterest  || '',
+      opportunityDate:   lead.opportunityDate   ? new Date(lead.opportunityDate).toISOString().slice(0, 10)   : new Date().toISOString().slice(0, 10),
       expectedCloseDate: lead.expectedCloseDate ? new Date(lead.expectedCloseDate).toISOString().slice(0, 10) : '',
       notes:            lead.notes            || '',
       ownerId:          lead.ownerId,

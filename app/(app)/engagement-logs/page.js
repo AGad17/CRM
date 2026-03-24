@@ -131,10 +131,10 @@ function LogModal({ accounts, initial, onClose, onSave, isSaving }) {
             )}
           </div>
 
-          {/* Date */}
+          {/* Event Date */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Date <span className="text-red-400">*</span>
+              Event Date <span className="text-red-400">*</span>
             </label>
             <input
               type="date"
