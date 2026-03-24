@@ -129,6 +129,7 @@ model Account {
   healthSnapshots AccountHealthSnapshot[]
   notes           AccountNote[]
   brandNames      AccountBrand[]
+  engagementLogs  EngagementLog[]
 
   @@map("accounts")
 }
@@ -260,9 +261,10 @@ model User {
   customRole CustomRole?  @relation(fields: [customRoleId], references: [id])
 
   // Onboarding staff assignments
-  obTrackers OnboardingTracker[] @relation("ObSpecialist")
-  trTrackers OnboardingTracker[] @relation("TrSpecialist")
-  amTrackers OnboardingTracker[] @relation("AccManager")
+  obTrackers      OnboardingTracker[] @relation("ObSpecialist")
+  trTrackers      OnboardingTracker[] @relation("TrSpecialist")
+  amTrackers      OnboardingTracker[] @relation("AccManager")
+  engagementLogs  EngagementLog[]     @relation("UserEngagementLogs")
 
   @@map("users")
 }
@@ -667,6 +669,24 @@ model AccountBrand {
   @@map("account_brands")
 }
 
+// ─── Engagement Log Enums ─────────────────────────────────────────────────────
+
+enum CommChannel {
+  Whatsapp
+  Call
+  VirtualMeeting
+  PhysicalMeeting
+  Email
+  Other
+}
+
+enum EngagementObjective {
+  Inquiry
+  BugReport
+  TrainingRequest
+  NewRequirement
+}
+
 // ─── Account Notes ────────────────────────────────────────────────────────────
 
 model AccountNote {
@@ -681,4 +701,25 @@ model AccountNote {
 
   @@index([accountId, createdAt])
   @@map("account_notes")
+}
+
+// ─── Engagement Logs ──────────────────────────────────────────────────────────
+
+model EngagementLog {
+  id          Int                 @id @default(autoincrement())
+  accountId   Int
+  loggedById  String
+  channel     CommChannel
+  objective   EngagementObjective
+  notes       String?
+  loggedAt    DateTime
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  account  Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  loggedBy User    @relation("UserEngagementLogs", fields: [loggedById], references: [id])
+
+  @@index([accountId, loggedAt])
+  @@index([loggedById])
+  @@map("engagement_logs")
 }

@@ -35,6 +35,10 @@ function ScoreDot({ score }) {
 }
 
 function AccountRow({ acc }) {
+  const daysSinceEngagement = acc.lastEngagedAt
+    ? Math.floor((Date.now() - new Date(acc.lastEngagedAt).getTime()) / 86400000)
+    : null
+
   return (
     <tr className="hover:bg-gray-50">
       <td className="px-4 py-2.5 text-gray-800 font-medium">
@@ -57,6 +61,22 @@ function AccountRow({ acc }) {
         {acc.overdueCount > 0
           ? <span className="inline-flex px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-semibold">{acc.overdueCount} late</span>
           : <span className="text-gray-300 text-xs">—</span>}
+      </td>
+      <td className="px-4 py-2.5 text-center text-sm">
+        <span className={acc.engagements30d > 0 ? 'font-semibold text-indigo-600' : 'text-gray-300'}>
+          {acc.engagements30d ?? 0}
+        </span>
+      </td>
+      <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+        {daysSinceEngagement === null
+          ? <span className="text-gray-300">Never</span>
+          : daysSinceEngagement === 0
+            ? <span className="text-emerald-600 font-medium">Today</span>
+            : daysSinceEngagement <= 7
+              ? <span className="text-emerald-600">{daysSinceEngagement}d ago</span>
+              : daysSinceEngagement <= 30
+                ? <span className="text-amber-600">{daysSinceEngagement}d ago</span>
+                : <span className="text-red-400">{daysSinceEngagement}d ago</span>}
       </td>
     </tr>
   )
@@ -91,15 +111,17 @@ function RepCard({ rep }) {
       </div>
 
       {/* KPI row */}
-      <div className="border-t border-gray-50 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 divide-x divide-gray-50">
+      <div className="border-t border-gray-50 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 divide-x divide-gray-50">
         {[
-          { label: 'Accounts', value: rep.accountsManaged, mono: true },
-          { label: 'Avg Health', render: () => <HealthBar value={rep.avgHealthScore} /> },
-          { label: 'Healthy', value: rep.accountsHealthy, color: 'text-emerald-600' },
-          { label: 'Watch', value: rep.accountsWatch, color: 'text-amber-500' },
-          { label: 'At Risk', value: rep.accountsAtRisk, color: 'text-red-500' },
-          { label: 'Avg CSAT', value: fmtScore(rep.avgCSAT), mono: true },
-          { label: 'Avg NPS', value: fmtScore(rep.avgNPS), mono: true },
+          { label: 'Accounts',     value: rep.accountsManaged,  mono: true },
+          { label: 'Avg Health',   render: () => <HealthBar value={rep.avgHealthScore} /> },
+          { label: 'Healthy',      value: rep.accountsHealthy,  color: 'text-emerald-600' },
+          { label: 'Watch',        value: rep.accountsWatch,    color: 'text-amber-500' },
+          { label: 'At Risk',      value: rep.accountsAtRisk,   color: 'text-red-500' },
+          { label: 'Avg CSAT',     value: fmtScore(rep.avgCSAT), mono: true },
+          { label: 'Avg NPS',      value: fmtScore(rep.avgNPS),  mono: true },
+          { label: 'Engagements',  value: fmt(rep.totalEngagements), mono: true },
+          { label: 'Last 30 days', value: fmt(rep.engagements30d),   mono: true, color: rep.engagements30d > 0 ? 'text-indigo-600' : 'text-gray-400' },
         ].map(({ label, value, render, color, mono }) => (
           <div key={label} className="px-4 py-3 text-center">
             <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">{label}</p>
@@ -118,7 +140,7 @@ function RepCard({ rep }) {
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                {['Account', 'Phase', 'Health', 'CSAT', 'NPS', 'Tasks', 'Overdue'].map((h) => (
+                {['Account', 'Phase', 'Health', 'CSAT', 'NPS', 'Tasks', 'Overdue', '30d Eng.', 'Last Engaged'].map((h) => (
                   <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>

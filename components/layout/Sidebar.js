@@ -136,8 +136,9 @@ const NAV = [
   {
     label: 'Operations', icon: IcOperations,
     children: [
-      { href: '/onboarding', label: 'Customer Journey' },
-      { href: '/surveys',    label: 'CSAT & NPS'       },
+      { href: '/onboarding',       label: 'Customer Journey' },
+      { href: '/surveys',          label: 'CSAT & NPS'       },
+      { href: '/engagement-logs',  label: 'Engagement Logs'  },
     ],
   },
   {

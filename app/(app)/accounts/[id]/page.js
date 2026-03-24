@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { CHANNEL_LABELS, OBJECTIVE_LABELS } from '@/app/(app)/engagement-logs/page'
 
 function HandoverField({ label, value }) {
   if (!value) return null
@@ -114,6 +115,44 @@ export default function AccountDetailPage() {
       fetch(`/api/accounts/${id}/notes?noteId=${noteId}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['account-notes', id] }),
   })
+
+  // ── Engagement Logs ──
+  const { data: engagements = [] } = useQuery({
+    queryKey: ['account-engagements', id],
+    queryFn: () => fetch(`/api/accounts/${id}/engagement-logs`).then((r) => r.json()),
+    enabled: !!id,
+  })
+
+  const [engForm, setEngForm] = useState({ channel: '', objective: '', notes: '', loggedAt: new Date().toISOString().slice(0, 10) })
+  const [showEngForm, setShowEngForm] = useState(false)
+
+  const addEngagement = useMutation({
+    mutationFn: (data) => fetch('/api/engagement-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...data, accountId: id }),
+    }).then((r) => r.json()),
+    onSuccess: () => {
+      setEngForm({ channel: '', objective: '', notes: '', loggedAt: new Date().toISOString().slice(0, 10) })
+      setShowEngForm(false)
+      qc.invalidateQueries({ queryKey: ['account-engagements', id] })
+    },
+  })
+
+  const deleteEngagement = useMutation({
+    mutationFn: (eid) => fetch(`/api/engagement-logs/${eid}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['account-engagements', id] }),
+  })
+
+  const CHANNEL_COLOR = {
+    Whatsapp: 'bg-emerald-50 text-emerald-700', Call: 'bg-blue-50 text-blue-700',
+    VirtualMeeting: 'bg-violet-50 text-violet-700', PhysicalMeeting: 'bg-amber-50 text-amber-700',
+    Email: 'bg-sky-50 text-sky-700', Other: 'bg-gray-50 text-gray-600',
+  }
+  const OBJECTIVE_COLOR = {
+    Inquiry: 'bg-blue-50 text-blue-700', BugReport: 'bg-red-50 text-red-700',
+    TrainingRequest: 'bg-amber-50 text-amber-700', NewRequirement: 'bg-indigo-50 text-indigo-700',
+  }
 
   if (isLoading) return <div className="animate-pulse h-64 bg-gray-200 rounded-2xl" />
   if (!account || account.error) return <div className="text-red-500">Account not found</div>
@@ -422,6 +461,125 @@ export default function AccountDetailPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Engagement Logs */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Engagement History</h3>
+          <div className="flex items-center gap-2">
+            {engagements.length > 0 && (
+              <span className="text-xs text-gray-400">{engagements.length} interaction{engagements.length !== 1 ? 's' : ''}</span>
+            )}
+            <button
+              onClick={() => setShowEngForm((v) => !v)}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-[#5061F6] hover:bg-[#3b4cc4] rounded-lg transition-colors"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} aria-hidden><path strokeLinecap="round" d="M12 5v14M5 12h14" /></svg>
+              Log Interaction
+            </button>
+          </div>
+        </div>
+
+        {/* Quick-add form */}
+        {showEngForm && (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-3 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Channel *</label>
+                <select
+                  value={engForm.channel}
+                  onChange={(e) => setEngForm((f) => ({ ...f, channel: e.target.value }))}
+                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30"
+                >
+                  <option value="">Select…</option>
+                  {Object.entries(CHANNEL_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Objective *</label>
+                <select
+                  value={engForm.objective}
+                  onChange={(e) => setEngForm((f) => ({ ...f, objective: e.target.value }))}
+                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30"
+                >
+                  <option value="">Select…</option>
+                  {Object.entries(OBJECTIVE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date *</label>
+                <input
+                  type="date"
+                  value={engForm.loggedAt}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setEngForm((f) => ({ ...f, loggedAt: e.target.value }))}
+                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Notes</label>
+                <input
+                  type="text"
+                  value={engForm.notes}
+                  onChange={(e) => setEngForm((f) => ({ ...f, notes: e.target.value }))}
+                  placeholder="Brief summary…"
+                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setShowEngForm(false); setEngForm({ channel: '', objective: '', notes: '', loggedAt: new Date().toISOString().slice(0, 10) }) }}
+                className="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >Cancel</button>
+              <button
+                onClick={() => engForm.channel && engForm.objective && engForm.loggedAt && addEngagement.mutate(engForm)}
+                disabled={!engForm.channel || !engForm.objective || !engForm.loggedAt || addEngagement.isPending}
+                className="px-4 py-1.5 text-xs font-semibold text-white bg-[#5061F6] hover:bg-[#3b4cc4] disabled:opacity-40 rounded-lg transition-colors"
+              >
+                {addEngagement.isPending ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {engagements.length === 0 && !showEngForm ? (
+          <div className="border border-dashed border-gray-200 rounded-xl px-4 py-8 text-center">
+            <p className="text-sm text-gray-400">No interactions logged yet for this account.</p>
+          </div>
+        ) : engagements.length > 0 ? (
+          <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-50">
+            {engagements.map((eng) => (
+              <div key={eng.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 group">
+                <div className="flex-shrink-0 mt-0.5 space-y-1">
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${CHANNEL_COLOR[eng.channel] || 'bg-gray-50 text-gray-600'}`}>
+                    {CHANNEL_LABELS[eng.channel] || eng.channel}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${OBJECTIVE_COLOR[eng.objective] || 'bg-gray-50 text-gray-600'}`}>
+                      {OBJECTIVE_LABELS[eng.objective] || eng.objective}
+                    </span>
+                  </div>
+                  {eng.notes && <p className="text-sm text-gray-700 mt-1 leading-snug">{eng.notes}</p>}
+                  <p className="text-xs text-gray-400 mt-1">
+                    {eng.loggedBy?.name || eng.loggedBy?.email || 'Unknown'} ·{' '}
+                    {new Date(eng.loggedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { if (confirm('Delete this interaction?')) deleteEngagement.mutate(eng.id) }}
+                  className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all text-xs mt-0.5 flex-shrink-0"
+                  title="Delete"
+                >✕</button>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* Activity History */}

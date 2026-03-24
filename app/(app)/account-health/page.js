@@ -152,7 +152,7 @@ export default function AccountHealthPage() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ background: 'linear-gradient(to right, #F5F2FF, #FAFAFA)' }} className="border-b border-gray-100">
-                {['Account', 'Country', 'Phase', 'CSAT (avg)', 'NPS (avg)', 'Task Completion', 'Health Score'].map((h) => (
+                {['Account', 'Country', 'Phase', 'CSAT (avg)', 'NPS (avg)', 'Task Completion', '30d Eng.', 'Last Engaged', 'Health Score'].map((h) => (
                   <th key={h} className="px-4 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-widest text-left whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -160,6 +160,9 @@ export default function AccountHealthPage() {
             <tbody className="divide-y divide-gray-50">
               {sorted.map((r) => {
                 const { text, bg, text_, border } = scoreLabel(r.healthScore)
+                const daysSince = r.lastEngagedAt
+                  ? Math.floor((Date.now() - new Date(r.lastEngagedAt).getTime()) / 86400000)
+                  : null
                 return (
                   <tr key={r.trackerId} className="hover:bg-[#F5F2FF]/40 transition-colors">
                     <td className="px-4 py-3 font-semibold text-gray-800 sticky left-0 bg-white whitespace-nowrap">
@@ -179,6 +182,22 @@ export default function AccountHealthPage() {
                       {r.taskCompletion !== null
                         ? <div className="space-y-0.5"><span className="text-xs text-gray-500">{r.completedTasks}/{r.totalTasks} tasks</span><HealthBar value={r.taskCompletion * 100} /></div>
                         : <span className="text-gray-300 text-xs">No tasks</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={r.engagements30d > 0 ? 'font-semibold text-indigo-600 text-sm' : 'text-gray-300 text-sm'}>
+                        {r.engagements30d ?? 0}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs whitespace-nowrap">
+                      {daysSince === null
+                        ? <span className="text-gray-300">Never</span>
+                        : daysSince === 0
+                          ? <span className="text-emerald-600 font-medium">Today</span>
+                          : daysSince <= 7
+                            ? <span className="text-emerald-600">{daysSince}d ago</span>
+                            : daysSince <= 30
+                              ? <span className="text-amber-600">{daysSince}d ago</span>
+                              : <span className="text-red-400">{daysSince}d ago</span>}
                     </td>
                     <td className="px-4 py-3 min-w-[160px]">
                       <div className="space-y-1">
