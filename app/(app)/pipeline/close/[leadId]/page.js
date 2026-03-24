@@ -213,6 +213,23 @@ export default function CloseDealPage() {
     }
   }, [deal.agentId, agents])
 
+  // ── Mutation ── (declared before the beforeunload effect that reads closeMutation.isSuccess)
+  const closeMutation = useMutation({
+    mutationFn: (data) =>
+      fetch(`/api/pipeline/${leadId}/close`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(data),
+      }).then(async (r) => {
+        const json = await r.json()
+        if (!r.ok) throw new Error(json.error || 'Failed to close deal')
+        return json
+      }),
+    onSuccess: (data) => {
+      router.push(`/accounts/${data.account.id}`)
+    },
+  })
+
   // ── Warn before leaving with unsaved form data ──
   useEffect(() => {
     // Only warn once the form has been pre-filled and before submission succeeds
@@ -312,23 +329,6 @@ export default function CloseDealPage() {
     setStep((s) => s + 1)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
-
-  // ── Mutation ──
-  const closeMutation = useMutation({
-    mutationFn: (data) =>
-      fetch(`/api/pipeline/${leadId}/close`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(data),
-      }).then(async (r) => {
-        const json = await r.json()
-        if (!r.ok) throw new Error(json.error || 'Failed to close deal')
-        return json
-      }),
-    onSuccess: (data) => {
-      router.push(`/accounts/${data.account.id}`)
-    },
-  })
 
   function handleConfirm() {
     closeMutation.mutate({

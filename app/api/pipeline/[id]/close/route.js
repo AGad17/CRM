@@ -25,6 +25,8 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: `Missing required fields: ${missing.join(', ')}` }, { status: 400 })
   }
 
+  try {
+
   // Fetch lead
   const lead = await prisma.lead.findUnique({ where: { id: Number(id) } })
   if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
@@ -139,7 +141,6 @@ export async function POST(request, { params }) {
     }
   }
 
-  try {
     const result = await prisma.$transaction(async (tx) => {
       let account
 

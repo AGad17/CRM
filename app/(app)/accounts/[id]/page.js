@@ -158,7 +158,7 @@ export default function AccountDetailPage() {
   if (!account || account.error) return <div className="text-red-500">Account not found</div>
 
   // ── Pipeline Origin helpers ──
-  const CHANNEL_LABELS = {
+  const PIPELINE_CHANNEL_LABELS = {
     Foodics: 'Foodics', EmployeeReferral: 'Employee Referral', CustomerReferral: 'Customer Referral',
     PartnerReferral: 'Partner Referral', Website: 'Website', AmbassadorReferral: 'Ambassador Referral',
     DirectSales: 'Direct Sales', Sonic: 'Sonic',
@@ -271,7 +271,7 @@ export default function AccountDetailPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wider">Channel</p>
-              <p className="font-medium text-gray-700">{CHANNEL_LABELS[account.lead.channel] || account.lead.channel}</p>
+              <p className="font-medium text-gray-700">{PIPELINE_CHANNEL_LABELS[account.lead.channel] || account.lead.channel}</p>
             </div>
             {account.lead.estimatedValue && (
               <div>
