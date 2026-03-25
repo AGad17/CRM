@@ -397,12 +397,14 @@ export default function SettingsPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
-                          {isAdmin && u.id !== session?.user?.id && (
+                          {isAdmin && (
                             <div className="flex items-center justify-end gap-3">
-                              {u.isActive ? (
-                                <button onClick={() => { if (confirm(`Deactivate ${u.email}?`)) updateUser.mutate({ id: u.id, isActive: false }) }} className="text-xs text-amber-500 hover:text-amber-700">Deactivate</button>
-                              ) : (
-                                <button onClick={() => updateUser.mutate({ id: u.id, isActive: true })} className="text-xs text-indigo-500 hover:text-indigo-700">Reactivate</button>
+                              {u.id !== session?.user?.id && (
+                                u.isActive ? (
+                                  <button onClick={() => { if (confirm(`Deactivate ${u.email}?`)) updateUser.mutate({ id: u.id, isActive: false }) }} className="text-xs text-amber-500 hover:text-amber-700">Deactivate</button>
+                                ) : (
+                                  <button onClick={() => updateUser.mutate({ id: u.id, isActive: true })} className="text-xs text-indigo-500 hover:text-indigo-700">Reactivate</button>
+                                )
                               )}
                               <button
                                 onClick={() => { setPwResetModal(u); setPwResetValue(''); setPwResetError('') }}
@@ -410,15 +412,17 @@ export default function SettingsPage() {
                               >
                                 Reset Pwd
                               </button>
-                              <button
-                                onClick={() => {
-                                  if (confirm(`Permanently remove ${u.email}? This cannot be undone.`))
-                                    deleteUser.mutate(u.id)
-                                }}
-                                className="text-xs text-red-400 hover:text-red-600 font-medium"
-                              >
-                                Remove
-                              </button>
+                              {u.id !== session?.user?.id && (
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Permanently remove ${u.email}? This cannot be undone.`))
+                                      deleteUser.mutate(u.id)
+                                  }}
+                                  className="text-xs text-red-400 hover:text-red-600 font-medium"
+                                >
+                                  Remove
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>
