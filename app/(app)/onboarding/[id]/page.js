@@ -187,6 +187,7 @@ export default function OnboardingDetailPage() {
   if (isLoading) return <div className="animate-pulse h-96 bg-gray-100 rounded-2xl" />
   if (!tracker || tracker.error) return <div className="text-red-500">Tracker not found</div>
 
+  const PRE_LIVE_PHASES   = new Set(['DealClosure', 'Onboarding', 'Training', 'Incubation'])
   const isChurned         = tracker.phase === 'Churned'
   const isExpired         = tracker.phase === 'Expired'
   const currentPhaseIdx   = PHASE_ORDER.indexOf(tracker.phase)
@@ -230,6 +231,32 @@ export default function OnboardingDetailPage() {
           </span>
         )}
       </div>
+
+      {/* ── Go-Live banner ─────────────────────────────────────────────────── */}
+      {tracker.goLiveDate && PRE_LIVE_PHASES.has(tracker.phase) && (() => {
+        const daysUntil = Math.ceil((new Date(tracker.goLiveDate) - Date.now()) / 86400000)
+        const isOverdue = daysUntil < 0
+        const isUrgent  = !isOverdue && daysUntil <= 7
+        return (
+          <div className={`rounded-xl border px-4 py-3 flex items-center justify-between
+            ${isOverdue ? 'border-red-200 bg-red-50' : isUrgent ? 'border-amber-200 bg-amber-50' : 'border-indigo-100 bg-indigo-50'}`}>
+            <div>
+              <p className={`text-sm font-semibold ${isOverdue ? 'text-red-700' : isUrgent ? 'text-amber-700' : 'text-indigo-700'}`}>
+                {isOverdue ? '⚠ Go-Live Overdue' : '🎯 Go-Live Target'}
+              </p>
+              <p className={`text-xs mt-0.5 ${isOverdue ? 'text-red-500' : isUrgent ? 'text-amber-500' : 'text-indigo-500'}`}>
+                {new Date(tracker.goLiveDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {isOverdue
+                  ? ` — ${Math.abs(daysUntil)} days past target`
+                  : ` — ${daysUntil} day${daysUntil !== 1 ? 's' : ''} remaining`}
+              </p>
+            </div>
+            <span className={`text-2xl font-bold ${isOverdue ? 'text-red-600' : isUrgent ? 'text-amber-600' : 'text-indigo-600'}`}>
+              {isOverdue ? `-${Math.abs(daysUntil)}d` : `${daysUntil}d`}
+            </span>
+          </div>
+        )
+      })()}
 
       {/* ── Churned banner ─────────────────────────────────────────────────── */}
       {isChurned && (

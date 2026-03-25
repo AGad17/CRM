@@ -218,10 +218,11 @@ export async function POST(request, { params }) {
       if (!isExistingAccount) {
         const tracker = await tx.onboardingTracker.create({
           data: {
-            accountId: account.id,
-            dealId:    deal.id,
-            startDate: new Date(),
-            tasks:     { create: DEFAULT_TASKS },
+            accountId:  account.id,
+            dealId:     deal.id,
+            startDate:  new Date(),
+            goLiveDate: activationDate,
+            tasks:      { create: DEFAULT_TASKS },
           },
         })
         trackerId = tracker.id

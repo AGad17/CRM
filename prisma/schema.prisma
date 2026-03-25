@@ -451,6 +451,7 @@ model OnboardingTracker {
   phase          OnboardingPhase @default(DealClosure)
   phaseStartedAt DateTime        @default(now())
   startDate      DateTime        @default(now())
+  goLiveDate     DateTime?       // target AccountManagement date = Deal activationDate
   notes          String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt

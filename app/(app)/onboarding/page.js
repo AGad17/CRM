@@ -79,6 +79,18 @@ const PHASES = [
   },
 ]
 
+// ─── Go-Live Urgency Helper ───────────────────────────────────────────────────
+
+const PRE_LIVE_PHASES = new Set(['DealClosure', 'Onboarding', 'Training', 'Incubation'])
+
+function goLiveStatus(tracker) {
+  if (!tracker.goLiveDate || !PRE_LIVE_PHASES.has(tracker.phase)) return null
+  const daysUntil = Math.ceil((new Date(tracker.goLiveDate) - Date.now()) / 86400000)
+  if (daysUntil < 0)  return { type: 'overdue', days: Math.abs(daysUntil) }
+  if (daysUntil <= 7) return { type: 'urgent',  days: daysUntil }
+  return { type: 'ok', date: new Date(tracker.goLiveDate).toLocaleDateString('en-GB') }
+}
+
 // ─── Kanban Card ──────────────────────────────────────────────────────────────
 
 function TrackerCard({ tracker, phase, onClick }) {
@@ -146,6 +158,21 @@ function TrackerCard({ tracker, phase, onClick }) {
         </div>
       </div>
 
+      {(() => {
+        const s = goLiveStatus(tracker)
+        if (!s) return null
+        if (s.type === 'overdue') return (
+          <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
+            ⚠ Go-live {s.days}d overdue
+          </span>
+        )
+        if (s.type === 'urgent') return (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+            ⏳ Go-live in {s.days}d
+          </span>
+        )
+        return <span className="text-xs text-gray-400">Go-live {s.date}</span>
+      })()}
       <p className="text-xs text-gray-300">
         Started {new Date(tracker.startDate).toLocaleDateString('en-GB')}
       </p>
@@ -226,6 +253,18 @@ export default function OnboardingPage() {
     {
       key: 'started', label: 'Started', sortable: true,
       render: (r) => new Date(r.startDate).toLocaleDateString('en-GB'),
+    },
+    {
+      key: 'goLive', label: 'Go-Live', sortable: true,
+      render: (r) => {
+        if (!r.goLiveDate) return <span className="text-gray-300">—</span>
+        const s = goLiveStatus(r)
+        const fmtDate = new Date(r.goLiveDate).toLocaleDateString('en-GB')
+        if (!s)                 return <span className="text-gray-500">{fmtDate}</span>
+        if (s.type === 'overdue') return <span className="font-semibold text-red-600">{fmtDate} ⚠</span>
+        if (s.type === 'urgent')  return <span className="font-semibold text-amber-600">{fmtDate} ⏳</span>
+        return <span className="text-gray-600">{fmtDate}</span>
+      },
     },
     {
       key: 'daysInPhase', label: 'Days in Stage', sortable: true,
