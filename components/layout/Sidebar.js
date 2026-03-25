@@ -87,6 +87,13 @@ function IcSignOut() {
     </svg>
   )
 }
+function IcKey() {
+  return (
+    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+    </svg>
+  )
+}
 
 // ─── Navigation map ───────────────────────────────────────────────────────────
 
@@ -176,6 +183,32 @@ export function Sidebar() {
 
   const toggleGroup = (label) =>
     setOpenGroups(prev => prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label])
+
+  const [pwModal, setPwModal] = useState(false)
+  const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' })
+  const [pwError, setPwError] = useState('')
+  const [pwLoading, setPwLoading] = useState(false)
+  const [pwSuccess, setPwSuccess] = useState(false)
+
+  function openPwModal() { setPwModal(true); setPwForm({ current: '', newPw: '', confirm: '' }); setPwError(''); setPwSuccess(false) }
+  function closePwModal() { setPwModal(false) }
+
+  async function handleChangePw(e) {
+    e.preventDefault()
+    setPwError('')
+    if (pwForm.newPw !== pwForm.confirm) { setPwError('Passwords do not match'); return }
+    if (pwForm.newPw.length < 8) { setPwError('New password must be at least 8 characters'); return }
+    setPwLoading(true)
+    const res = await fetch('/api/users/me/password', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.newPw }),
+    }).then(r => r.json())
+    setPwLoading(false)
+    if (res.error) { setPwError(res.error); return }
+    setPwSuccess(true)
+    setTimeout(() => { closePwModal() }, 1500)
+  }
 
   const initials = () => {
     const name = session?.user?.name || session?.user?.email || 'U'
@@ -338,6 +371,13 @@ export function Sidebar() {
                 {initials()}
               </div>
               <button
+                onClick={openPwModal}
+                title="Change password"
+                className="text-white/30 hover:text-white/80 transition-colors p-1 rounded-lg hover:bg-white/10"
+              >
+                <IcKey />
+              </button>
+              <button
                 onClick={() => signOut({ callbackUrl: '/login' })}
                 title="Sign out"
                 className="text-white/30 hover:text-white/80 transition-colors p-1 rounded-lg hover:bg-white/10"
@@ -359,6 +399,13 @@ export function Sidebar() {
                 </p>
               </div>
               <button
+                onClick={openPwModal}
+                title="Change password"
+                className="text-white/30 hover:text-white/80 transition-colors p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0"
+              >
+                <IcKey />
+              </button>
+              <button
                 onClick={() => signOut({ callbackUrl: '/login' })}
                 title="Sign out"
                 className="text-white/30 hover:text-white/80 transition-colors p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0"
@@ -369,6 +416,69 @@ export function Sidebar() {
           )}
         </div>
       </aside>
+
+      {/* ── Change Password Modal ── */}
+      {pwModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={closePwModal} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h2 className="text-base font-bold text-gray-900 mb-1">Change Password</h2>
+            <p className="text-xs text-gray-400 mb-5">Update your account password.</p>
+
+            {pwSuccess ? (
+              <div className="text-center py-6">
+                <p className="text-2xl mb-2">✓</p>
+                <p className="font-semibold text-emerald-600">Password updated!</p>
+              </div>
+            ) : (
+              <form onSubmit={handleChangePw} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Current Password</label>
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-400"
+                    value={pwForm.current}
+                    onChange={(e) => setPwForm(f => ({ ...f, current: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">New Password</label>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-400"
+                    value={pwForm.newPw}
+                    onChange={(e) => setPwForm(f => ({ ...f, newPw: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Confirm New Password</label>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-400"
+                    value={pwForm.confirm}
+                    onChange={(e) => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+                  />
+                </div>
+                {pwError && <p className="text-xs text-red-500">{pwError}</p>}
+                <div className="flex gap-3 pt-1">
+                  <button type="button" onClick={closePwModal} className="flex-1 px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={pwLoading} className="flex-1 px-4 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                    {pwLoading ? 'Saving…' : 'Update'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </>
   )
 }

@@ -98,6 +98,9 @@ export default function SettingsPage() {
   })
   const [userModal, setUserModal] = useState(null)
   const [permModal, setPermModal] = useState(null)
+  const [pwResetModal, setPwResetModal] = useState(null) // null | user object
+  const [pwResetValue, setPwResetValue] = useState('')
+  const [pwResetError, setPwResetError] = useState('')
 
   const createUser = useMutation({
     mutationFn: (data) => fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then((r) => r.json()),
@@ -119,6 +122,14 @@ export default function SettingsPage() {
         body: JSON.stringify({ permissions }),
       }).then((r) => r.json()),
     onSuccess: () => { qc.invalidateQueries(['users']); setPermModal(null) },
+  })
+  const resetPassword = useMutation({
+    mutationFn: ({ id, password }) =>
+      fetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) }).then((r) => r.json()),
+    onSuccess: (res) => {
+      if (res.error) { setPwResetError(res.error); return }
+      setPwResetModal(null); setPwResetValue(''); setPwResetError('')
+    },
   })
 
   return (
@@ -338,19 +349,19 @@ export default function SettingsPage() {
                         <td className="px-5 py-3 font-medium text-gray-900">{u.name || '\u2014'}</td>
                         <td className="px-4 py-3 text-gray-600 text-xs">{u.email}</td>
                         <td className="px-4 py-3">
-                          {isCCOAdmin ? (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">Admin</span>
-                          ) : isAdmin ? (
+                          {isAdmin && u.id !== session?.user?.id ? (
                             <select
                               className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white max-w-[180px]"
                               value={u.customRole?.id || ''}
                               onChange={(e) => updateUser.mutate({ id: u.id, customRoleId: e.target.value || null })}
                             >
-                              <option value="">\u2014 No Role (Read Only)</option>
+                              <option value="">— No Role (Read Only)</option>
                               {(Array.isArray(customRoles) ? customRoles : []).map((r) => (
                                 <option key={r.id} value={r.id}>{r.name}</option>
                               ))}
                             </select>
+                          ) : isCCOAdmin ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">Admin</span>
                           ) : (
                             u.customRole
                               ? <span className="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-semibold">{u.customRole.name}</span>
@@ -363,7 +374,7 @@ export default function SettingsPage() {
                               onClick={() => setPermModal(u)}
                               className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
                             >
-                              <span>\u270f\ufe0f</span>
+                              <span>✏️</span>
                               {overrideCount > 0 ? (
                                 <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-semibold">
                                   {overrideCount} override{overrideCount !== 1 ? 's' : ''}
@@ -386,13 +397,19 @@ export default function SettingsPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
-                          {isAdmin && !isCCOAdmin && (
+                          {isAdmin && u.id !== session?.user?.id && (
                             <div className="flex items-center justify-end gap-3">
                               {u.isActive ? (
                                 <button onClick={() => { if (confirm(`Deactivate ${u.email}?`)) updateUser.mutate({ id: u.id, isActive: false }) }} className="text-xs text-amber-500 hover:text-amber-700">Deactivate</button>
                               ) : (
                                 <button onClick={() => updateUser.mutate({ id: u.id, isActive: true })} className="text-xs text-indigo-500 hover:text-indigo-700">Reactivate</button>
                               )}
+                              <button
+                                onClick={() => { setPwResetModal(u); setPwResetValue(''); setPwResetError('') }}
+                                className="text-xs text-gray-400 hover:text-indigo-600"
+                              >
+                                Reset Pwd
+                              </button>
                               <button
                                 onClick={() => {
                                   if (confirm(`Permanently remove ${u.email}? This cannot be undone.`))
@@ -442,6 +459,47 @@ export default function SettingsPage() {
           onClose={() => setPermModal(null)}
           saving={updatePerms.isPending}
         />
+      )}
+
+      {/* Reset password modal */}
+      {pwResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setPwResetModal(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h2 className="text-base font-bold text-gray-900 mb-0.5">Reset Password</h2>
+            <p className="text-xs text-gray-400 mb-5">Set a new password for <span className="font-medium text-gray-600">{pwResetModal.email}</span>.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">New Password</label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-400"
+                  value={pwResetValue}
+                  onChange={(e) => { setPwResetValue(e.target.value); setPwResetError('') }}
+                  placeholder="Min. 8 characters"
+                />
+              </div>
+              {pwResetError && <p className="text-xs text-red-500">{pwResetError}</p>}
+              <div className="flex gap-3 pt-1">
+                <button onClick={() => setPwResetModal(null)} className="flex-1 px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+                <button
+                  disabled={resetPassword.isPending}
+                  onClick={() => {
+                    if (!pwResetValue.trim()) { setPwResetError('Password is required'); return }
+                    if (pwResetValue.length < 8) { setPwResetError('Min. 8 characters'); return }
+                    resetPassword.mutate({ id: pwResetModal.id, password: pwResetValue })
+                  }}
+                  className="flex-1 px-4 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  {resetPassword.isPending ? 'Saving…' : 'Set Password'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
