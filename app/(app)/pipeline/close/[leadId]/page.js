@@ -29,6 +29,7 @@ const EMPTY_ACCOUNT = { accountName: '', brands: 1, numberOfBranches: 1, numberO
 const EMPTY_DEAL = {
   brandNames: '', numberOfBrands: 1,
   startDate: new Date().toISOString().slice(0, 10),
+  activationDate: (() => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 10) })(),
   dealType: 'New', posSystem: 'Foodics', countryCode: '',
   salesChannel: 'DirectSales', package: 'Essential',
   paymentType: 'Annual', contractYears: 1, agentId: '',
@@ -213,6 +214,14 @@ export default function CloseDealPage() {
     }
   }, [deal.agentId, agents])
 
+  // Auto-advance activationDate to startDate + 1 month whenever startDate changes
+  useEffect(() => {
+    if (!deal.startDate) return
+    const d = new Date(deal.startDate)
+    d.setMonth(d.getMonth() + 1)
+    setDeal((p) => ({ ...p, activationDate: d.toISOString().slice(0, 10) }))
+  }, [deal.startDate])
+
   // ── Mutation ── (declared before the beforeunload effect that reads closeMutation.isSuccess)
   const closeMutation = useMutation({
     mutationFn: (data) =>
@@ -299,8 +308,9 @@ export default function CloseDealPage() {
     if (!deal.countryCode) e.countryCode = 'Required'
     if (!deal.package)     e.package     = 'Required'
     if (!deal.paymentType) e.paymentType = 'Required'
-    if (!deal.startDate)   e.startDate   = 'Required'
-    if (!deal.agentId)     e.agentId     = 'Required'
+    if (!deal.startDate)      e.startDate      = 'Required'
+    if (!deal.activationDate) e.activationDate = 'Required'
+    if (!deal.agentId)        e.agentId        = 'Required'
     return e
   }
 
@@ -595,9 +605,14 @@ export default function CloseDealPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Contract Activation Date *</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Contract Date *</label>
                 <input type="date" className={fc('startDate')} value={deal.startDate} onChange={setD('startDate')} />
                 {errors.startDate && <p className="text-xs text-red-500 mt-1">{errors.startDate}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Activation Date * <span className="font-normal text-gray-400 normal-case">(subscription go-live)</span></label>
+                <input type="date" className={fc('activationDate')} value={deal.activationDate} onChange={setD('activationDate')} />
+                {errors.activationDate && <p className="text-xs text-red-500 mt-1">{errors.activationDate}</p>}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Sales Agent *</label>
@@ -931,7 +946,8 @@ export default function CloseDealPage() {
                 <div className="flex justify-between"><span className="text-gray-500">Package</span><span>{deal.package}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Sales Channel</span><span>{deal.salesChannel}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Payment Type</span><span>{deal.paymentType}{deal.paymentType === 'Special' ? ` (${deal.contractYears} yr)` : ''}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Contract Activation Date</span><span>{deal.startDate}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Contract Date</span><span>{deal.startDate}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Activation Date</span><span>{deal.activationDate}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Sales Agent</span><span>{agents.find(a => a.id === deal.agentId)?.name || deal.agentId}</span></div>
                 {(Number(deal.normalBranches) > 0) && <div className="flex justify-between"><span className="text-gray-500">Normal Branches</span><span>{deal.normalBranches}</span></div>}
                 {(Number(deal.centralKitchens) > 0) && <div className="flex justify-between"><span className="text-gray-500">Central Kitchens</span><span>{deal.centralKitchens}</span></div>}

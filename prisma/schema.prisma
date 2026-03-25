@@ -141,6 +141,7 @@ model Contract {
   accountId        Int
   contractValue    Decimal      @db.Decimal(14, 2)
   startDate        DateTime
+  activationDate   DateTime?
   endDate          DateTime
   type             ContractType
   cancellationDate DateTime?
@@ -353,6 +354,7 @@ model AddOnPricing {
 model Deal {
   id                    Int            @id @default(autoincrement())
   startDate             DateTime
+  activationDate        DateTime?
   agentId               String?
   accountName           String
   brandNames            String?

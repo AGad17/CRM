@@ -179,9 +179,10 @@ export default function AccountDetailPage() {
   ]
 
   const contractCols = [
-    { key: 'type', label: 'Type', render: (r) => <Badge value={r.type} /> },
-    { key: 'startDate', label: 'Start', render: (r) => new Date(r.startDate).toLocaleDateString() },
-    { key: 'endDate', label: 'End', render: (r) => new Date(r.endDate).toLocaleDateString() },
+    { key: 'type',           label: 'Type',          render: (r) => <Badge value={r.type} /> },
+    { key: 'startDate',      label: 'Contract Date',  render: (r) => new Date(r.startDate).toLocaleDateString() },
+    { key: 'activationDate', label: 'Activation',     render: (r) => r.activationDate ? new Date(r.activationDate).toLocaleDateString() : '—' },
+    { key: 'endDate',        label: 'End',            render: (r) => new Date(r.endDate).toLocaleDateString() },
     { key: 'contractValue', label: 'Value', render: (r) => `USD ${Number(r.contractValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
     { key: 'mrr', label: 'MRR', render: (r) => `USD ${(r.mrr || 0).toFixed(2)}` },
     { key: 'contractStatus', label: 'Status', render: (r) => <Badge value={r.contractStatus} /> },

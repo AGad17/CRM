@@ -25,6 +25,11 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: `Missing required fields: ${missing.join(', ')}` }, { status: 400 })
   }
 
+  // Derive activationDate: use provided value or default to startDate + 1 month
+  const activationDate = body.activationDate
+    ? new Date(body.activationDate)
+    : (() => { const d = new Date(body.startDate); d.setMonth(d.getMonth() + 1); return d })()
+
   try {
 
   // Fetch lead
@@ -166,6 +171,7 @@ export async function POST(request, { params }) {
       const deal = await tx.deal.create({
         data: {
           startDate:               new Date(body.startDate),
+          activationDate:          activationDate,
           agentId:                 body.agentId,
           accountName:             body.accountName.trim(),
           brandNames:              body.brandNames || body.accountName.trim(),
@@ -282,7 +288,8 @@ export async function POST(request, { params }) {
       const CONTRACT_TYPE_MAP = { New: 'New', Renewal: 'Renewal', Upsell: 'Expansion', Expansion: 'Expansion' }
       const contractType = CONTRACT_TYPE_MAP[body.dealType] || 'New'
       const paymentPlan  = body.paymentType === 'Quarterly' ? 'Quarterly' : 'Yearly'
-      const endDate      = new Date(body.startDate)
+      // endDate = activationDate + contractMonths (subscription runs 12m from activation)
+      const endDate = new Date(activationDate)
       endDate.setMonth(endDate.getMonth() + summary.contractMonths)
 
       const items = []
@@ -399,9 +406,10 @@ export async function POST(request, { params }) {
         data: {
           accountId:     account.id,
           contractValue: summary.contractValue,
-          startDate:     new Date(body.startDate),
+          startDate:      new Date(body.startDate),
+          activationDate: activationDate,
           endDate,
-          type:          contractType,
+          type:           contractType,
           usdRate:       usdRate ?? undefined,
           items:         { create: items },
         },
