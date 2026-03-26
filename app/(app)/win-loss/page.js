@@ -8,6 +8,7 @@ import {
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
 import { PageError } from '@/components/ui/PageError'
+import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
 
 function pct(v) { return v != null ? `${(v * 100).toFixed(1)}%` : '—' }
 function usd(v) { return v != null ? `USD ${Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—' }
@@ -40,6 +41,7 @@ function LineTooltip({ active, payload, label: l }) {
 
 export default function WinLossPage() {
   const [country, setCountry] = useState('')
+  const [leadSources, setLeadSources] = useState([])
 
   const { data: countries = [] } = useQuery({
     queryKey: ['countries'],
@@ -47,10 +49,11 @@ export default function WinLossPage() {
   })
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['win-loss', country],
+    queryKey: ['win-loss', country, leadSources],
     queryFn: () => {
       const p = new URLSearchParams()
       if (country) p.set('country', country)
+      if (leadSources.length > 0) p.set('leadSources', leadSources.join(','))
       return fetch(`/api/analytics/win-loss?${p}`).then((r) => {
         if (!r.ok) throw new Error('Failed to load win/loss data')
         return r.json()
@@ -115,13 +118,16 @@ export default function WinLossPage() {
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mr-1">Filter</span>
+        <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
         <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
           value={country} onChange={(e) => setCountry(e.target.value)}>
           <option value="">All Countries</option>
           {countries.filter((c) => c.isActive).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
         </select>
-        {country && <button onClick={() => setCountry('')}
-          className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">Clear</button>}
+        {(country || leadSources.length > 0) && (
+          <button onClick={() => { setCountry(''); setLeadSources([]) }}
+            className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">Clear all</button>
+        )}
       </div>
 
       {/* KPI Strip */}

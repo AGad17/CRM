@@ -2,11 +2,19 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/roleGuard'
 
-export async function GET() {
+export async function GET(req) {
   const { error } = await requirePermission('pipeline', 'view')
   if (error) return error
 
+  const { searchParams } = new URL(req.url)
+  const where = {}
+  const country = searchParams.get('country')
+  if (country) where.countryCode = country
+  const leadSources = searchParams.get('leadSources')?.split(',').filter(Boolean) || []
+  if (leadSources.length > 0) where.channel = { in: leadSources }
+
   const leads = await prisma.lead.findMany({
+    where,
     select: {
       stage: true,
       channel: true,

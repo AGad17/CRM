@@ -92,6 +92,11 @@ export default function NRRBreakdownPage() {
         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mr-1">Filter</span>
         <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
         <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
+          value={country} onChange={(e) => setCountry(e.target.value)}>
+          <option value="">All Countries</option>
+          {countries.filter((c) => c.isActive).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+        </select>
+        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
           value={yearFrom} onChange={(e) => setYearFrom(e.target.value)}>
           <option value="">From Year</option>
           {years.map((y) => <option key={y} value={y}>{y}</option>)}

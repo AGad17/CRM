@@ -1,4 +1,5 @@
 'use client'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import {
@@ -8,6 +9,7 @@ import {
 } from 'recharts'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
+import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
 
 const STAGE_COLORS = {
   Lead:       '#94a3b8',
@@ -98,16 +100,44 @@ function Skeleton() {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function PipelineAnalyticsPage() {
+  const [country, setCountry] = useState('')
+  const [leadSources, setLeadSources] = useState([])
+  const [yearFrom, setYearFrom] = useState('')
+  const [yearTo, setYearTo] = useState('')
+
+  const { data: countries = [] } = useQuery({
+    queryKey: ['countries'],
+    queryFn: () => fetch('/api/countries').then((r) => r.json()),
+  })
+
   const { data, isLoading } = useQuery({
-    queryKey: ['pipeline-analytics'],
-    queryFn:  () => fetch('/api/pipeline/analytics').then(r => r.json()),
+    queryKey: ['pipeline-analytics', country, leadSources],
+    queryFn: () => {
+      const p = new URLSearchParams()
+      if (country) p.set('country', country)
+      if (leadSources.length > 0) p.set('leadSources', leadSources.join(','))
+      return fetch(`/api/pipeline/analytics?${p}`).then(r => r.json())
+    },
     staleTime: 60_000,
   })
 
+  const { summary, byStage, byChannel, byCountry, byOwner, monthlyTrend = [] } = data || {}
+
+  const years = useMemo(
+    () => [...new Set(monthlyTrend.map((r) => Number(r.month.split('-')[0])))].sort(),
+    [monthlyTrend],
+  )
+  const filteredTrend = useMemo(() => monthlyTrend.filter((r) => {
+    const y = Number(r.month.split('-')[0])
+    if (yearFrom && y < Number(yearFrom)) return false
+    if (yearTo && y > Number(yearTo)) return false
+    return true
+  }), [monthlyTrend, yearFrom, yearTo])
+
+  const hasFilters = country || leadSources.length > 0 || yearFrom || yearTo
+
   if (isLoading) return <Skeleton />
   if (!data) return <div className="text-red-500">Failed to load analytics.</div>
-
-  const { summary, byStage, byChannel, byCountry, byOwner, monthlyTrend } = data
 
   return (
     <div className="space-y-8">
@@ -121,6 +151,31 @@ export default function PipelineAnalyticsPage() {
         <Link href="/pipeline" className="text-sm text-indigo-500 hover:text-indigo-700 font-medium">
           ← Pipeline
         </Link>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
+        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mr-1">Filter</span>
+        <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
+        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
+          value={country} onChange={(e) => setCountry(e.target.value)}>
+          <option value="">All Countries</option>
+          {countries.filter((c) => c.isActive).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+        </select>
+        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
+          value={yearFrom} onChange={(e) => setYearFrom(e.target.value)}>
+          <option value="">From Year</option>
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
+          value={yearTo} onChange={(e) => setYearTo(e.target.value)}>
+          <option value="">To Year</option>
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+        {hasFilters && (
+          <button onClick={() => { setCountry(''); setLeadSources([]); setYearFrom(''); setYearTo('') }}
+            className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">Clear all</button>
+        )}
       </div>
 
       {/* KPI Strip */}
@@ -163,7 +218,7 @@ export default function PipelineAnalyticsPage() {
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Monthly Trend (12 months)</h3>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart
-              data={monthlyTrend}
+              data={filteredTrend}
               margin={{ left: 0, right: 16, top: 0, bottom: 0 }}
             >
               <defs>
