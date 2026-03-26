@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/roleGuard'
 import { getAllOutages, createOutage } from '@/lib/db/engagementCases'
+import { createNotifications, getAllActiveUserIds } from '@/lib/db/notifications'
 
 export async function GET() {
   const { error } = await requirePermission('cases', 'view')
@@ -20,5 +21,14 @@ export async function POST(request) {
   }
 
   const outage = await createOutage(body, session.user.id)
+
+  // Broadcast to all active users
+  const userIds = await getAllActiveUserIds()
+  await createNotifications(userIds, {
+    type: 'OutageDeclared',
+    title: `🔴 Outage declared: ${outage.title}`,
+    link: `/outages/${outage.id}`,
+  })
+
   return NextResponse.json(outage, { status: 201 })
 }

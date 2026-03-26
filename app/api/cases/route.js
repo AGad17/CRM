@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/roleGuard'
 import { getCases, createCase } from '@/lib/db/engagementCases'
+import { createNotification } from '@/lib/db/notifications'
 
 export async function GET(request) {
   const { error } = await requirePermission('cases', 'view')
@@ -32,5 +33,16 @@ export async function POST(request) {
   }
 
   const c = await createCase(body, session.user.id)
+
+  // Notify the assignee (skip self-assignment)
+  if (c.assignedToId && c.assignedToId !== session.user.id) {
+    await createNotification({
+      userId: c.assignedToId,
+      type: 'CaseAssigned',
+      title: `Case assigned to you: ${c.title}`,
+      link: `/cases/${c.id}`,
+    })
+  }
+
   return NextResponse.json(c, { status: 201 })
 }

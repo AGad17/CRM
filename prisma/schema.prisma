@@ -270,6 +270,7 @@ model User {
   openedCases     EngagementCase[]    @relation("UserOpenedCases")
   assignedCases   EngagementCase[]    @relation("UserAssignedCases")
   caseFollowUps   CaseFollowUp[]      @relation("UserFollowUps")
+  notifications   Notification[]      @relation("UserNotifications")
 
   @@map("users")
 }
@@ -801,4 +802,36 @@ model CaseFollowUp {
 
   @@index([caseId, loggedAt])
   @@map("case_follow_ups")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+enum NotificationType {
+  CaseAssigned
+  CaseReassigned
+  CaseStatusChanged
+  CaseFollowUpAdded
+  OutageDeclared
+  OutageResolved
+  RenewalDue30
+  RenewalDue14
+  RenewalDue7
+  InvoiceOverdue
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user      User             @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
 }

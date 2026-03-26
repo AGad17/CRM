@@ -1,6 +1,7 @@
 'use client'
 import { usePathname } from 'next/navigation'
 import { useSidebar } from './SidebarContext'
+import { NotificationBell } from './NotificationBell'
 
 const TITLES = {
   '/dashboard':                'CCO Dashboard',
@@ -31,6 +32,7 @@ const TITLES = {
   '/settings':                 'Settings — General',
   '/settings/pricing':         'Pricing Config',
   '/settings/pricing-history': 'Pricing History',
+  '/notifications':            'Notifications',
 }
 
 function IcMenu() {
@@ -69,6 +71,9 @@ export function Topbar() {
       >
         {title}
       </h1>
+
+      {/* Notifications */}
+      <NotificationBell />
 
       {/* Brand dot */}
       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#5061F6' }} />

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/roleGuard'
 import { getOutageWithCases, addFollowUp, resolveOutage } from '@/lib/db/engagementCases'
+import { createNotifications, getAllActiveUserIds } from '@/lib/db/notifications'
 
 export async function GET(request, { params }) {
   const { error } = await requirePermission('cases', 'view')
@@ -25,6 +26,12 @@ export async function PATCH(request, { params }) {
 
   if (body.action === 'resolve') {
     const outage = await resolveOutage(params.id)
+    const userIds = await getAllActiveUserIds()
+    await createNotifications(userIds, {
+      type: 'OutageResolved',
+      title: `✅ Outage resolved: ${outage.title}`,
+      link: `/outages/${outage.id}`,
+    })
     return NextResponse.json(outage)
   }
 
