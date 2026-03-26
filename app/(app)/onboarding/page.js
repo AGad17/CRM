@@ -220,7 +220,7 @@ export default function OnboardingPage() {
   const filtered = trackers.filter((t) => {
     if (phase  && t.phase !== phase) return false
     if (search && !t.account?.name?.toLowerCase().includes(search.toLowerCase())) return false
-    if (leadSources.length > 0 && t.deal?.salesChannel && !leadSources.includes(t.deal.salesChannel)) return false
+    if (leadSources.length > 0 && !leadSources.includes(t.account?.leadSource)) return false
     if (csRep  && t.accountManager?.id !== csRep) return false
     return true
   })
