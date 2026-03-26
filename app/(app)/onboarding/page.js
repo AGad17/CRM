@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { DataTable } from '@/components/ui/DataTable'
+import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
 
 // ─── Phase definitions ────────────────────────────────────────────────────────
 
@@ -185,10 +186,11 @@ function TrackerCard({ tracker, phase, onClick }) {
 export default function OnboardingPage() {
   const router = useRouter()
   const qc = useQueryClient()
-  const [view,   setView]   = useState('kanban')
-  const [phase,  setPhase]  = useState('')
-  const [search, setSearch] = useState('')
-  const [syncMsg, setSyncMsg] = useState(null)
+  const [view,        setView]        = useState('kanban')
+  const [phase,       setPhase]       = useState('')
+  const [search,      setSearch]      = useState('')
+  const [leadSources, setLeadSources] = useState([])
+  const [syncMsg,     setSyncMsg]     = useState(null)
 
   const { data: trackers = [], isLoading } = useQuery({
     queryKey: ['onboarding'],
@@ -210,6 +212,7 @@ export default function OnboardingPage() {
   const filtered = trackers.filter((t) => {
     if (phase  && t.phase !== phase) return false
     if (search && !t.account?.name?.toLowerCase().includes(search.toLowerCase())) return false
+    if (leadSources.length > 0 && !leadSources.includes(t.deal?.salesChannel)) return false
     return true
   })
 
@@ -364,6 +367,7 @@ export default function OnboardingPage() {
         <input type="text" placeholder="Search account…" value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-56 bg-white" />
+        <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
         {view === 'list' && (
           <div className="flex gap-1 flex-wrap">
             {[{ key: '', label: 'All', icon: '' }, ...PHASES].map((p) => (
