@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/roleGuard'
-import { getCase, addFollowUp, resolveOutage } from '@/lib/db/engagementCases'
+import { getOutageWithCases, addFollowUp, resolveOutage } from '@/lib/db/engagementCases'
 
 export async function GET(request, { params }) {
   const { error } = await requirePermission('cases', 'view')
   if (error) return error
 
-  const outage = await getCase(params.id)
+  const outage = await getOutageWithCases(params.id)
   if (!outage) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(outage)
 }

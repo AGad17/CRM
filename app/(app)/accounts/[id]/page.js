@@ -144,7 +144,7 @@ export default function AccountDetailPage() {
   })
 
   const [caseModal, setCaseModal] = useState(false)
-  const [caseForm, setCaseForm]   = useState({ title: '', channel: '', objective: '', description: '', assignedToId: '', openedAt: new Date().toISOString().split('T')[0] })
+  const [caseForm, setCaseForm]   = useState({ title: '', channel: '', objective: '', description: '', assignedToId: '', openedAt: new Date().toISOString().split('T')[0], outageId: '' })
 
   const createCase = useMutation({
     mutationFn: (data) =>
@@ -155,7 +155,7 @@ export default function AccountDetailPage() {
       }).then(r => r.json()),
     onSuccess: () => {
       setCaseModal(false)
-      setCaseForm({ title: '', channel: '', objective: '', description: '', assignedToId: '', openedAt: new Date().toISOString().split('T')[0] })
+      setCaseForm({ title: '', channel: '', objective: '', description: '', assignedToId: '', openedAt: new Date().toISOString().split('T')[0], outageId: '' })
       qc.invalidateQueries({ queryKey: ['account-cases', id] })
     },
   })
@@ -660,6 +660,22 @@ export default function AccountDetailPage() {
                 />
               </div>
             </div>
+            {activeOutages.length > 0 && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Linked Outage
+                  <span className="ml-1 text-xs text-red-500 font-medium">● Active</span>
+                </label>
+                <select
+                  value={caseForm.outageId}
+                  onChange={e => setCaseForm(f => ({ ...f, outageId: e.target.value }))}
+                  className="w-full border border-orange-200 bg-orange-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                >
+                  <option value="">— Not related to an outage —</option>
+                  {activeOutages.map(o => <option key={o.id} value={o.id}>{o.title}</option>)}
+                </select>
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setCaseModal(false)} className="px-4 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
                 Cancel

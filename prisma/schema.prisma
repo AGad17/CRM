@@ -767,16 +767,20 @@ model EngagementCase {
   openedAt     DateTime            @default(now())
   resolvedAt   DateTime?
   outageStatus OutageStatus?
+  outageId     Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  account    Account?       @relation("AccountCases",      fields: [accountId],    references: [id])
-  openedBy   User           @relation("UserOpenedCases",   fields: [openedById],   references: [id])
-  assignedTo User?          @relation("UserAssignedCases", fields: [assignedToId], references: [id])
-  followUps  CaseFollowUp[]
+  account     Account?         @relation("AccountCases",      fields: [accountId],    references: [id])
+  openedBy    User             @relation("UserOpenedCases",   fields: [openedById],   references: [id])
+  assignedTo  User?            @relation("UserAssignedCases", fields: [assignedToId], references: [id])
+  followUps   CaseFollowUp[]
+  outage      EngagementCase?  @relation("OutageCases",       fields: [outageId],     references: [id])
+  linkedCases EngagementCase[] @relation("OutageCases")
 
   @@index([accountId, openedAt])
+  @@index([outageId])
   @@index([status])
   @@index([objective])
   @@map("engagement_cases")

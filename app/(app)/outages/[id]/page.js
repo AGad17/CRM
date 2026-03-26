@@ -2,8 +2,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
-import { CHANNEL_LABELS } from '../../cases/page'
+import { CHANNEL_LABELS, STATUS_LABELS, STATUS_COLORS, OBJECTIVE_COLORS } from '../../cases/page'
 
 function fmtDate(d) {
   if (!d) return '—'
@@ -257,6 +258,42 @@ export default function OutageDetailPage() {
           </div>
         )}
       </div>
+      {/* Impacted Accounts */}
+      {outage.linkedCases?.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">
+            Impacted Accounts
+            <span className="ml-2 text-xs font-normal text-gray-400">{outage.linkedCases.length} case{outage.linkedCases.length !== 1 ? 's' : ''} reported</span>
+          </h3>
+          <div className="divide-y divide-gray-50">
+            {outage.linkedCases.map(c => (
+              <div key={c.id} className="flex items-center gap-3 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {c.account ? (
+                      <Link href={`/accounts/${c.account.id}`} className="text-sm font-medium text-indigo-600 hover:underline truncate">
+                        {c.account.name}
+                      </Link>
+                    ) : (
+                      <span className="text-sm text-gray-400 italic">No account</span>
+                    )}
+                    <span className="text-gray-300">·</span>
+                    <Link href={`/cases/${c.id}`} className="text-sm text-gray-600 hover:text-indigo-600 hover:underline truncate">
+                      {c.title}
+                    </Link>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Opened {fmtDate(c.openedAt)} by {c.openedBy?.name || c.openedBy?.email}
+                  </p>
+                </div>
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${STATUS_COLORS[c.status]}`}>
+                  {STATUS_LABELS[c.status]}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
