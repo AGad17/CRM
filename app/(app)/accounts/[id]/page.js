@@ -2,11 +2,13 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Badge } from '@/components/ui/Badge'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { CHANNEL_LABELS, OBJECTIVE_LABELS } from '@/app/(app)/engagement-logs/page'
+import { STATUS_LABELS, STATUS_COLORS, OBJECTIVE_COLORS, OBJECTIVE_LABELS as CASE_OBJECTIVE_LABELS } from '@/app/(app)/cases/page'
 
 function HandoverField({ label, value }) {
   if (!value) return null
@@ -123,6 +125,42 @@ export default function AccountDetailPage() {
     enabled: !!id,
   })
 
+  // ── Cases ──
+  const { data: cases = [] } = useQuery({
+    queryKey: ['account-cases', id],
+    queryFn: () => fetch(`/api/accounts/${id}/cases`).then((r) => r.json()),
+    enabled: !!id,
+  })
+
+  const { data: activeOutages = [] } = useQuery({
+    queryKey: ['active-outages'],
+    queryFn: () => fetch('/api/outages/active').then(r => r.ok ? r.json() : []).catch(() => []),
+    staleTime: 30 * 1000,
+  })
+
+  const [caseModal, setCaseModal] = useState(false)
+  const [caseForm, setCaseForm]   = useState({ title: '', channel: '', objective: '', description: '', assignedToId: '', openedAt: new Date().toISOString().split('T')[0] })
+
+  const createCase = useMutation({
+    mutationFn: (data) =>
+      fetch('/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, accountId: id }),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      setCaseModal(false)
+      setCaseForm({ title: '', channel: '', objective: '', description: '', assignedToId: '', openedAt: new Date().toISOString().split('T')[0] })
+      qc.invalidateQueries({ queryKey: ['account-cases', id] })
+    },
+  })
+
+  const { data: staffUsers = [] } = useQuery({
+    queryKey: ['staff-users'],
+    queryFn: () => fetch('/api/users/staff').then(r => r.json()),
+    staleTime: 5 * 60 * 1000,
+  })
+
   const [engForm, setEngForm] = useState({ channel: '', objective: '', notes: '', loggedAt: new Date().toISOString().slice(0, 10) })
   const [showEngForm, setShowEngForm] = useState(false)
 
@@ -152,6 +190,7 @@ export default function AccountDetailPage() {
   const OBJECTIVE_COLOR = {
     Inquiry: 'bg-blue-50 text-blue-700', BugReport: 'bg-red-50 text-red-700',
     TrainingRequest: 'bg-amber-50 text-amber-700', NewRequirement: 'bg-indigo-50 text-indigo-700',
+    TechnicalRequest: 'bg-violet-50 text-violet-700', GlobalOutage: 'bg-red-100 text-red-800',
   }
 
   if (isLoading) return <div className="animate-pulse h-64 bg-gray-200 rounded-2xl" />
@@ -463,6 +502,165 @@ export default function AccountDetailPage() {
           )}
         </div>
       </div>
+
+      {/* ── Cases ─────────────────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            Open Cases
+            {cases.filter(c => c.status === 'Open' || c.status === 'Escalated').length > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
+                {cases.filter(c => c.status === 'Open' || c.status === 'Escalated').length}
+              </span>
+            )}
+          </h3>
+          <button
+            onClick={() => setCaseModal(true)}
+            className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+          >
+            + Open Case
+          </button>
+        </div>
+
+        {/* Active outage notice */}
+        {activeOutages.length > 0 && (
+          <div className="mb-3 space-y-1">
+            {activeOutages.map(o => (
+              <div key={o.id} className="flex items-center justify-between gap-3 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xs font-bold text-red-700">🔴 OUTAGE</span>
+                  <span className="text-xs text-red-700 font-medium truncate">{o.title}</span>
+                  <span className="text-xs text-red-400">· affecting all accounts</span>
+                </div>
+                <Link href={`/outages/${o.id}`} className="text-xs text-red-600 font-semibold hover:underline flex-shrink-0">
+                  View / Update →
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Cases list */}
+        {cases.length === 0 ? (
+          <div className="border border-dashed border-gray-200 rounded-xl py-8 text-center text-gray-400 text-xs">
+            No cases yet — open a case to track issues and follow-ups
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+            {cases.map(c => (
+              <Link
+                key={c.id}
+                href={`/cases/${c.id}`}
+                className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors"
+              >
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${STATUS_COLORS[c.status]}`}>
+                  {STATUS_LABELS[c.status]}
+                </span>
+                <span className="text-sm text-gray-700 font-medium flex-1 truncate">{c.title}</span>
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${OBJECTIVE_COLORS[c.objective] || 'bg-gray-50 text-gray-500'}`}>
+                  {CASE_OBJECTIVE_LABELS[c.objective] || c.objective}
+                </span>
+                <span className="text-xs text-gray-400 flex-shrink-0">
+                  {new Date(c.openedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Case creation modal */}
+      {caseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-gray-800">Open New Case</h3>
+              <button onClick={() => setCaseModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Title <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={caseForm.title}
+                onChange={e => setCaseForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Short summary of the issue…"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Channel <span className="text-red-500">*</span></label>
+                <select
+                  value={caseForm.channel}
+                  onChange={e => setCaseForm(f => ({ ...f, channel: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                >
+                  <option value="">Select…</option>
+                  {Object.entries(CHANNEL_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Objective <span className="text-red-500">*</span></label>
+                <select
+                  value={caseForm.objective}
+                  onChange={e => setCaseForm(f => ({ ...f, objective: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                >
+                  <option value="">Select…</option>
+                  {Object.entries(CASE_OBJECTIVE_LABELS).filter(([v]) => v !== 'GlobalOutage').map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Description</label>
+              <textarea
+                value={caseForm.description}
+                onChange={e => setCaseForm(f => ({ ...f, description: e.target.value }))}
+                rows={3}
+                placeholder="Detailed notes…"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Assigned To</label>
+                <select
+                  value={caseForm.assignedToId}
+                  onChange={e => setCaseForm(f => ({ ...f, assignedToId: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                >
+                  <option value="">— Unassigned —</option>
+                  {staffUsers.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Opened Date</label>
+                <input
+                  type="date"
+                  value={caseForm.openedAt}
+                  max={new Date().toISOString().split('T')[0]}
+                  onChange={e => setCaseForm(f => ({ ...f, openedAt: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setCaseModal(false)} className="px-4 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                onClick={() => createCase.mutate(caseForm)}
+                disabled={!caseForm.title || !caseForm.channel || !caseForm.objective || createCase.isPending}
+                className="px-4 py-2 rounded-lg text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-50"
+              >
+                {createCase.isPending ? 'Opening…' : 'Open Case'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Engagement Logs */}
       <div>

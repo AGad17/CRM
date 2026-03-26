@@ -146,6 +146,9 @@ const NAV = [
       { href: '/onboarding',       label: 'Customer Journey' },
       { href: '/surveys',          label: 'CSAT & NPS'       },
       { href: '/engagement-logs',  label: 'Engagement Logs'  },
+      { href: '/cases',            label: 'Cases'            },
+      { href: '/cases/report',     label: 'Case Report'      },
+      { href: '/outages',          label: 'Outages'          },
     ],
   },
   {

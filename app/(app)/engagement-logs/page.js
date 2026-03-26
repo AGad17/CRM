@@ -19,6 +19,8 @@ export const OBJECTIVE_LABELS = {
   BugReport:        'Bug Report',
   TrainingRequest:  'Training Request',
   NewRequirement:   'New Requirement',
+  TechnicalRequest: 'Technical Request',
+  // GlobalOutage is intentionally excluded — use the Outages module instead
 }
 
 const CHANNEL_COLORS = {
@@ -31,10 +33,11 @@ const CHANNEL_COLORS = {
 }
 
 const OBJECTIVE_COLORS = {
-  Inquiry:         'bg-blue-50 text-blue-700 border-blue-200',
-  BugReport:       'bg-red-50 text-red-700 border-red-200',
-  TrainingRequest: 'bg-amber-50 text-amber-700 border-amber-200',
-  NewRequirement:  'bg-indigo-50 text-indigo-700 border-indigo-200',
+  Inquiry:          'bg-blue-50 text-blue-700 border-blue-200',
+  BugReport:        'bg-red-50 text-red-700 border-red-200',
+  TrainingRequest:  'bg-amber-50 text-amber-700 border-amber-200',
+  NewRequirement:   'bg-indigo-50 text-indigo-700 border-indigo-200',
+  TechnicalRequest: 'bg-violet-50 text-violet-700 border-violet-200',
 }
 
 function ChannelBadge({ value }) {

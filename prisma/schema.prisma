@@ -130,6 +130,7 @@ model Account {
   notes           AccountNote[]
   brandNames      AccountBrand[]
   engagementLogs  EngagementLog[]
+  cases           EngagementCase[] @relation("AccountCases")
 
   @@map("accounts")
 }
@@ -266,6 +267,9 @@ model User {
   trTrackers      OnboardingTracker[] @relation("TrSpecialist")
   amTrackers      OnboardingTracker[] @relation("AccManager")
   engagementLogs  EngagementLog[]     @relation("UserEngagementLogs")
+  openedCases     EngagementCase[]    @relation("UserOpenedCases")
+  assignedCases   EngagementCase[]    @relation("UserAssignedCases")
+  caseFollowUps   CaseFollowUp[]      @relation("UserFollowUps")
 
   @@map("users")
 }
@@ -689,6 +693,22 @@ enum EngagementObjective {
   BugReport
   TrainingRequest
   NewRequirement
+  TechnicalRequest
+  GlobalOutage
+}
+
+// ─── Case / Ticketing Enums ───────────────────────────────────────────────────
+
+enum CaseStatus {
+  Open
+  Resolved
+  ClosedUnresolved
+  Escalated
+}
+
+enum OutageStatus {
+  Active
+  Resolved
 }
 
 // ─── Account Notes ────────────────────────────────────────────────────────────
@@ -726,4 +746,51 @@ model EngagementLog {
   @@index([accountId, loggedAt])
   @@index([loggedById])
   @@map("engagement_logs")
+}
+
+// ─── Engagement Cases (Ticketing) ─────────────────────────────────────────────
+
+model EngagementCase {
+  id           Int                 @id @default(autoincrement())
+  accountId    Int?
+  openedById   String
+  assignedToId String?
+  channel      CommChannel
+  objective    EngagementObjective
+  title        String
+  description  String?
+  status       CaseStatus          @default(Open)
+  openedAt     DateTime            @default(now())
+  resolvedAt   DateTime?
+  outageStatus OutageStatus?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account    Account?       @relation("AccountCases",      fields: [accountId],    references: [id])
+  openedBy   User           @relation("UserOpenedCases",   fields: [openedById],   references: [id])
+  assignedTo User?          @relation("UserAssignedCases", fields: [assignedToId], references: [id])
+  followUps  CaseFollowUp[]
+
+  @@index([accountId, openedAt])
+  @@index([status])
+  @@index([objective])
+  @@map("engagement_cases")
+}
+
+model CaseFollowUp {
+  id          Int          @id @default(autoincrement())
+  caseId      Int
+  authorId    String
+  channel     CommChannel?
+  actionTaken String?
+  notes       String?
+  loggedAt    DateTime
+  createdAt   DateTime     @default(now())
+
+  case   EngagementCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author User           @relation("UserFollowUps", fields: [authorId], references: [id])
+
+  @@index([caseId, loggedAt])
+  @@map("case_follow_ups")
 }
