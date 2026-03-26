@@ -2,7 +2,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { CHANNEL_LABELS } from '../cases/page'
 
 function fmtDate(d) {
   if (!d) return '—'
@@ -18,9 +17,8 @@ function formatDuration(openedAt, resolvedAt) {
   return `${Math.floor(hrs / 24)}d ${Math.round(hrs % 24)}h`
 }
 
-function DeclareModal({ onClose, onSave }) {
-  const [form, setForm] = useState({ title: '', channel: '', description: '' })
-  const valid = form.title && form.channel
+function DeclareModal({ onClose, onSave, isPending }) {
+  const [form, setForm] = useState({ title: '', description: '' })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
@@ -45,18 +43,6 @@ function DeclareModal({ onClose, onSave }) {
         </div>
 
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Channel <span className="text-red-500">*</span></label>
-          <select
-            value={form.channel}
-            onChange={e => setForm(f => ({ ...f, channel: e.target.value }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 bg-white"
-          >
-            <option value="">Select…</option>
-            {Object.entries(CHANNEL_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </div>
-
-        <div>
           <label className="block text-xs text-gray-500 mb-1">Description</label>
           <textarea
             value={form.description}
@@ -68,15 +54,15 @@ function DeclareModal({ onClose, onSave }) {
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
+          <button onClick={onClose} disabled={isPending} className="px-4 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50">
             Cancel
           </button>
           <button
             onClick={() => onSave(form)}
-            disabled={!valid}
+            disabled={!form.title || isPending}
             className="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-700 text-white font-medium disabled:opacity-50"
           >
-            🚨 Declare Outage
+            {isPending ? 'Declaring…' : '🚨 Declare Outage'}
           </button>
         </div>
       </div>
@@ -220,6 +206,7 @@ export default function OutagesPage() {
         <DeclareModal
           onClose={() => setModal(false)}
           onSave={(form) => createMutation.mutate(form)}
+          isPending={createMutation.isPending}
         />
       )}
     </div>
