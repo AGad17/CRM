@@ -217,13 +217,16 @@ export default function OnboardingPage() {
       .map((t) => [t.accountManager.id, t.accountManager])
   ).values()].sort((a, b) => a.name.localeCompare(b.name))
 
-  const filtered = trackers.filter((t) => {
-    if (phase  && t.phase !== phase) return false
+  // baseFiltered = all active filters except phase (used for score cards)
+  const baseFiltered = trackers.filter((t) => {
     if (search && !t.account?.name?.toLowerCase().includes(search.toLowerCase())) return false
     if (leadSources.length > 0 && !leadSources.includes(t.account?.leadSource)) return false
     if (csRep  && t.accountManager?.id !== csRep) return false
     return true
   })
+
+  // filtered = baseFiltered + phase filter (used for kanban / list content)
+  const filtered = baseFiltered.filter((t) => !phase || t.phase === phase)
 
   const columns = [
     {
@@ -351,7 +354,7 @@ export default function OnboardingPage() {
       {/* Stage summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {PHASES.map((p) => {
-          const phaseTrackers = trackers.filter((t) => t.phase === p.key)
+          const phaseTrackers = baseFiltered.filter((t) => t.phase === p.key)
           const count    = phaseTrackers.length
           const overdue  = phaseTrackers.filter((t) => t.overdueCount > 0).length
           const active   = phase === p.key
