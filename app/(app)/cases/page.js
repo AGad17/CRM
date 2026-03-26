@@ -67,7 +67,7 @@ function formatTTR(openedAt, resolvedAt) {
 
 // ─── Create Case Modal ────────────────────────────────────────────────────────
 
-function CaseModal({ accounts, staffUsers, onClose, onSave, prefillAccountId }) {
+function CaseModal({ accounts, staffUsers, activeOutages = [], onClose, onSave, prefillAccountId }) {
   const [form, setForm] = useState({
     accountId:    prefillAccountId || '',
     title:        '',
@@ -76,6 +76,7 @@ function CaseModal({ accounts, staffUsers, onClose, onSave, prefillAccountId }) 
     description:  '',
     assignedToId: '',
     openedAt:     new Date().toISOString().split('T')[0],
+    outageId:     '',
   })
   const [search, setSearch] = useState('')
 
@@ -200,6 +201,23 @@ function CaseModal({ accounts, staffUsers, onClose, onSave, prefillAccountId }) 
           </div>
         </div>
 
+        {activeOutages.length > 0 && (
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">
+              Linked Outage
+              <span className="ml-1 text-xs text-red-500 font-medium">● Active</span>
+            </label>
+            <select
+              value={form.outageId}
+              onChange={e => setForm(f => ({ ...f, outageId: e.target.value }))}
+              className="w-full border border-orange-200 bg-orange-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            >
+              <option value="">— Not related to an outage —</option>
+              {activeOutages.map(o => <option key={o.id} value={o.id}>{o.title}</option>)}
+            </select>
+          </div>
+        )}
+
         <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}
@@ -248,6 +266,12 @@ export default function CasesPage() {
     queryKey: ['staff-users'],
     queryFn: () => fetch('/api/users/staff').then(r => r.json()),
     staleTime: 5 * 60 * 1000,
+  })
+
+  const { data: activeOutages = [] } = useQuery({
+    queryKey: ['active-outages'],
+    queryFn: () => fetch('/api/outages/active').then(r => r.ok ? r.json() : []).catch(() => []),
+    staleTime: 30 * 1000,
   })
 
   const createMutation = useMutation({
@@ -474,6 +498,7 @@ export default function CasesPage() {
         <CaseModal
           accounts={accounts}
           staffUsers={staffUsers}
+          activeOutages={activeOutages}
           onClose={() => setModal(false)}
           onSave={(form) => createMutation.mutate(form)}
         />

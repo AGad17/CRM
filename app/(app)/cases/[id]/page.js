@@ -25,8 +25,10 @@ export default function CaseDetailPage() {
   const { id } = useParams()
   const qc     = useQueryClient()
 
-  const [showFollowUp, setShowFollowUp] = useState(false)
-  const [fuForm, setFuForm] = useState({ channel: '', actionTaken: '', notes: '', loggedAt: new Date().toISOString().split('T')[0] })
+  const [showFollowUp,  setShowFollowUp]  = useState(false)
+  const [fuForm,        setFuForm]        = useState({ channel: '', actionTaken: '', notes: '', loggedAt: new Date().toISOString().split('T')[0] })
+  const [linkingOutage, setLinkingOutage] = useState(false)
+  const [selectedOutage, setSelectedOutage] = useState('')
 
   const { data: c, isLoading } = useQuery({
     queryKey: ['case', id],
@@ -37,6 +39,26 @@ export default function CaseDetailPage() {
     queryKey: ['staff-users'],
     queryFn: () => fetch('/api/users/staff').then(r => r.json()),
     staleTime: 5 * 60 * 1000,
+  })
+
+  const { data: allOutages = [] } = useQuery({
+    queryKey: ['all-outages'],
+    queryFn: () => fetch('/api/outages').then(r => r.ok ? r.json() : []).catch(() => []),
+    staleTime: 30 * 1000,
+  })
+
+  const linkOutageMutation = useMutation({
+    mutationFn: (outageId) =>
+      fetch(`/api/cases/${id}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: 'update', outageId: outageId || null }),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      setLinkingOutage(false)
+      qc.invalidateQueries({ queryKey: ['case', id] })
+      qc.invalidateQueries({ queryKey: ['outage'] })
+    },
   })
 
   const statusMutation = useMutation({
@@ -105,6 +127,80 @@ export default function CaseDetailPage() {
           <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${STATUS_COLORS[c.status]}`}>
             {STATUS_LABELS[c.status]}
           </span>
+        </div>
+
+        {/* Linked outage */}
+        <div className="border-t border-gray-100 pt-3">
+          {c.outage ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-400">Linked outage:</span>
+              <Link
+                href={`/outages/${c.outage.id}`}
+                className="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full hover:bg-red-100"
+              >
+                🔴 {c.outage.title}
+                {c.outage.outageStatus === 'Active' && <span className="text-red-400">· Active</span>}
+              </Link>
+              {!linkingOutage && (
+                <button
+                  onClick={() => { setSelectedOutage(c.outage.id); setLinkingOutage(true) }}
+                  className="text-xs text-gray-400 hover:text-gray-600 underline"
+                >
+                  Change
+                </button>
+              )}
+              {!linkingOutage && (
+                <button
+                  onClick={() => linkOutageMutation.mutate(null)}
+                  disabled={linkOutageMutation.isPending}
+                  className="text-xs text-red-300 hover:text-red-500 underline"
+                >
+                  Unlink
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">No linked outage.</span>
+              {!linkingOutage && (
+                <button
+                  onClick={() => { setSelectedOutage(''); setLinkingOutage(true) }}
+                  className="text-xs text-indigo-500 hover:text-indigo-700 underline"
+                >
+                  Link to outage
+                </button>
+              )}
+            </div>
+          )}
+          {linkingOutage && (
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <select
+                value={selectedOutage}
+                onChange={e => setSelectedOutage(e.target.value)}
+                className="border border-orange-200 bg-orange-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+              >
+                <option value="">— No outage —</option>
+                {allOutages.map(o => (
+                  <option key={o.id} value={o.id}>
+                    {o.outageStatus === 'Active' ? '🔴 ' : '✓ '}{o.title}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => linkOutageMutation.mutate(selectedOutage || null)}
+                disabled={linkOutageMutation.isPending}
+                className="px-3 py-1.5 rounded-lg text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-50"
+              >
+                {linkOutageMutation.isPending ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={() => setLinkingOutage(false)}
+                className="px-3 py-1.5 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Action buttons */}
