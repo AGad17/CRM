@@ -14,13 +14,36 @@ export const CHANNEL_LABELS = {
   Other:           'Other',
 }
 
+// Full label map used for display/badges (covers all enum values including legacy)
 export const OBJECTIVE_LABELS = {
   Inquiry:          'Inquiry',
+  Onboarding:       'Onboarding',
+  Training:         'Training',
   BugReport:        'Bug Report',
   TrainingRequest:  'Training Request',
   NewRequirement:   'New Requirement',
   TechnicalRequest: 'Technical Request',
-  // GlobalOutage is intentionally excluded — use the Outages module instead
+  GlobalOutage:     'Global Outage',
+}
+
+// Subset shown in the engagement log creation / edit form
+export const LOG_FORM_OBJECTIVES = {
+  Inquiry:    'Inquiry',
+  Onboarding: 'Onboarding',
+  Training:   'Training',
+}
+
+// ─── Duration helper ──────────────────────────────────────────────────────────
+
+export function calcDuration(startTime, endTime) {
+  if (!startTime || !endTime) return null
+  const ms = new Date(endTime) - new Date(startTime)
+  if (ms <= 0) return null
+  const totalMin = Math.round(ms / 60000)
+  if (totalMin < 60) return `${totalMin} min`
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  return m > 0 ? `${h}h ${m}min` : `${h}h`
 }
 
 const CHANNEL_COLORS = {
@@ -34,10 +57,13 @@ const CHANNEL_COLORS = {
 
 const OBJECTIVE_COLORS = {
   Inquiry:          'bg-blue-50 text-blue-700 border-blue-200',
+  Onboarding:       'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Training:         'bg-amber-50 text-amber-700 border-amber-200',
   BugReport:        'bg-red-50 text-red-700 border-red-200',
   TrainingRequest:  'bg-amber-50 text-amber-700 border-amber-200',
   NewRequirement:   'bg-indigo-50 text-indigo-700 border-indigo-200',
   TechnicalRequest: 'bg-violet-50 text-violet-700 border-violet-200',
+  GlobalOutage:     'bg-red-100 text-red-800 border-red-200',
 }
 
 function ChannelBadge({ value }) {
@@ -60,6 +86,17 @@ function ObjectiveBadge({ value }) {
 
 // ─── Log Form Modal ───────────────────────────────────────────────────────────
 
+function toTimeInput(dt) {
+  if (!dt) return ''
+  const d = new Date(dt)
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+}
+
+function combineDateAndTime(date, time) {
+  if (!date || !time) return null
+  return new Date(`${date}T${time}:00`).toISOString()
+}
+
 function LogModal({ accounts, initial, onClose, onSave, isSaving }) {
   const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
@@ -70,6 +107,8 @@ function LogModal({ accounts, initial, onClose, onSave, isSaving }) {
     loggedAt:  initial?.loggedAt
       ? new Date(initial.loggedAt).toISOString().slice(0, 10)
       : today,
+    startTime: initial?.startTime ? toTimeInput(initial.startTime) : '',
+    endTime:   initial?.endTime   ? toTimeInput(initial.endTime)   : '',
   })
   const [accountSearch, setAccountSearch] = useState(
     initial?.account?.name ?? ''
@@ -85,7 +124,20 @@ function LogModal({ accounts, initial, onClose, onSave, isSaving }) {
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })) }
 
+  const duration = calcDuration(
+    form.loggedAt && form.startTime ? combineDateAndTime(form.loggedAt, form.startTime) : null,
+    form.loggedAt && form.endTime   ? combineDateAndTime(form.loggedAt, form.endTime)   : null,
+  )
+
   const valid = form.accountId && form.channel && form.objective && form.loggedAt
+
+  function handleSave() {
+    onSave({
+      ...form,
+      startTime: form.startTime ? combineDateAndTime(form.loggedAt, form.startTime) : null,
+      endTime:   form.endTime   ? combineDateAndTime(form.loggedAt, form.endTime)   : null,
+    })
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
@@ -134,19 +186,48 @@ function LogModal({ accounts, initial, onClose, onSave, isSaving }) {
             )}
           </div>
 
-          {/* Event Date */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Event Date <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="date"
-              value={form.loggedAt}
-              max={today}
-              onChange={(e) => set('loggedAt', e.target.value)}
-              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
-            />
+          {/* Event Date + Times */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                Event Date <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="date"
+                value={form.loggedAt}
+                max={today}
+                onChange={(e) => set('loggedAt', e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                Start Time
+              </label>
+              <input
+                type="time"
+                value={form.startTime}
+                onChange={(e) => set('startTime', e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                End Time
+              </label>
+              <input
+                type="time"
+                value={form.endTime}
+                onChange={(e) => set('endTime', e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
+              />
+            </div>
           </div>
+          {duration && (
+            <p className="text-xs text-indigo-600 font-medium -mt-1">
+              ⏱ Duration: {duration}
+            </p>
+          )}
 
           {/* Channel + Objective */}
           <div className="grid grid-cols-2 gap-3">
@@ -175,7 +256,7 @@ function LogModal({ accounts, initial, onClose, onSave, isSaving }) {
                 className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
               >
                 <option value="">Select…</option>
-                {Object.entries(OBJECTIVE_LABELS).map(([k, v]) => (
+                {Object.entries(LOG_FORM_OBJECTIVES).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
@@ -204,7 +285,7 @@ function LogModal({ accounts, initial, onClose, onSave, isSaving }) {
             Cancel
           </button>
           <button
-            onClick={() => onSave(form)}
+            onClick={handleSave}
             disabled={!valid || isSaving}
             className="px-5 py-2 text-sm font-semibold text-white bg-[#5061F6] hover:bg-[#3b4cc4] disabled:opacity-40 rounded-xl transition-colors"
           >
@@ -218,17 +299,26 @@ function LogModal({ accounts, initial, onClose, onSave, isSaving }) {
 
 // ─── CSV Export ───────────────────────────────────────────────────────────────
 
+function fmtTime(dt) {
+  if (!dt) return ''
+  const d = new Date(dt)
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+}
+
 function exportCsv(logs) {
   function cell(v) {
     const s = v === null || v === undefined ? '' : String(v)
     return s.includes(',') || s.includes('"') || s.includes('\n')
       ? '"' + s.replace(/"/g, '""') + '"' : s
   }
-  const headers = ['Date', 'Account', 'Channel', 'Objective', 'Notes', 'Logged By']
+  const headers = ['Date', 'Start Time', 'End Time', 'Duration', 'Account', 'Channel', 'Objective', 'Notes', 'Logged By']
   const rows = logs.map((r) => [
     new Date(r.loggedAt).toLocaleDateString('en-GB'),
+    fmtTime(r.startTime),
+    fmtTime(r.endTime),
+    calcDuration(r.startTime, r.endTime) ?? '',
     r.account?.name,
-    CHANNEL_LABELS[r.channel]   || r.channel,
+    CHANNEL_LABELS[r.channel]     || r.channel,
     OBJECTIVE_LABELS[r.objective] || r.objective,
     r.notes,
     r.loggedBy?.name || r.loggedBy?.email,
@@ -295,6 +385,17 @@ export default function EngagementLogsPage() {
     acc[l.objective] = (acc[l.objective] || 0) + 1; return acc
   }, {})
   const topObjective = Object.keys(objectiveCounts).sort((a, b) => objectiveCounts[b] - objectiveCounts[a])[0]
+
+  // Total time logged this month (mins)
+  const totalMinsThisMonth = logs
+    .filter((l) => new Date(l.loggedAt) >= thisMonthStart && l.startTime && l.endTime)
+    .reduce((sum, l) => {
+      const ms = new Date(l.endTime) - new Date(l.startTime)
+      return ms > 0 ? sum + ms / 60000 : sum
+    }, 0)
+  const totalTimeLabel = totalMinsThisMonth === 0 ? '—'
+    : totalMinsThisMonth < 60 ? `${Math.round(totalMinsThisMonth)} min`
+    : `${Math.floor(totalMinsThisMonth / 60)}h ${Math.round(totalMinsThisMonth % 60)}min`
 
   // ── Mutations ──
   const createMutation = useMutation({
@@ -368,19 +469,14 @@ export default function EngagementLogsPage() {
 
       {/* ── KPI Strip ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard label="Total Logs"       value={logs.length}     format="integer" subLabel="all time" />
-        <KPICard label="This Month"       value={logsThisMonth}   format="integer" subLabel="interactions" accent="#5061F6" />
+        <KPICard label="Total Logs"         value={logs.length}   format="integer" subLabel="all time" />
+        <KPICard label="This Month"         value={logsThisMonth} format="integer" subLabel="interactions" accent="#5061F6" />
+        <KPICard label="Time Logged (Month)" value={totalTimeLabel} format="text"   subLabel="total interaction time" accent="#5061F6" />
         <KPICard
           label="Top Channel"
           value={topChannel ? CHANNEL_LABELS[topChannel] : '—'}
           format="text"
           subLabel={topChannel ? `${channelCounts[topChannel]} logs` : 'no data'}
-        />
-        <KPICard
-          label="Top Objective"
-          value={topObjective ? OBJECTIVE_LABELS[topObjective] : '—'}
-          format="text"
-          subLabel={topObjective ? `${objectiveCounts[topObjective]} logs` : 'no data'}
         />
       </div>
 
@@ -459,7 +555,7 @@ export default function EngagementLogsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ background: 'linear-gradient(to right, #F5F2FF, #FAFAFA)' }} className="border-b border-gray-100">
-                {['Date', 'Account', 'Channel', 'Objective', 'Notes', 'Logged By', ''].map((h) => (
+                {['Date', 'Duration', 'Account', 'Channel', 'Objective', 'Notes', 'Logged By', ''].map((h) => (
                   <th key={h} className="px-4 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-widest text-left whitespace-nowrap">
                     {h}
                   </th>
@@ -471,6 +567,16 @@ export default function EngagementLogsPage() {
                 <tr key={log.id} className="hover:bg-[#F5F2FF]/40 transition-colors group">
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                     {new Date(log.loggedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {log.startTime && (
+                      <span className="block text-xs text-gray-400">
+                        {fmtTime(log.startTime)}{log.endTime ? ` – ${fmtTime(log.endTime)}` : ''}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {calcDuration(log.startTime, log.endTime)
+                      ? <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">⏱ {calcDuration(log.startTime, log.endTime)}</span>
+                      : <span className="text-gray-300 text-xs">—</span>}
                   </td>
                   <td className="px-4 py-3 font-medium text-gray-900">
                     {log.account?.id

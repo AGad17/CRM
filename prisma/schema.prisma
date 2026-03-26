@@ -695,6 +695,8 @@ enum EngagementObjective {
   NewRequirement
   TechnicalRequest
   GlobalOutage
+  Onboarding
+  Training
 }
 
 // ─── Case / Ticketing Enums ───────────────────────────────────────────────────
@@ -737,6 +739,8 @@ model EngagementLog {
   objective   EngagementObjective
   notes       String?
   loggedAt    DateTime
+  startTime   DateTime?           // interaction start (date + time)
+  endTime     DateTime?           // interaction end (date + time)
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 
