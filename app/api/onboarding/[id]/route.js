@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { requirePermission } from '@/lib/roleGuard'
-import { getOnboardingTracker, advancePhase, setPhase, addNote, assignAccountManager } from '@/lib/db/onboarding'
+import { getOnboardingTracker, advancePhase, setPhase, addNote, assignAccountManager, assignOnboardingTeam } from '@/lib/db/onboarding'
 import { logActivity } from '@/lib/activityLog'
 
 export async function GET(request, { params }) {
@@ -68,7 +68,15 @@ export async function PATCH(request, { params }) {
       return NextResponse.json(tracker)
     }
 
-    return NextResponse.json({ error: 'action must be advance, setPhase, assign, or notes' }, { status: 400 })
+    if (body.action === 'assignTeam') {
+      const tracker = await assignOnboardingTeam(id, {
+        onboardingSpecialistId: body.onboardingSpecialistId,
+        trainingSpecialistId:   body.trainingSpecialistId,
+      })
+      return NextResponse.json(tracker)
+    }
+
+    return NextResponse.json({ error: 'action must be advance, setPhase, assign, assignTeam, or notes' }, { status: 400 })
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 400 })
   }

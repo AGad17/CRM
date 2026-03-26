@@ -94,6 +94,11 @@ export default function OnboardingDetailPage() {
   const [editingAm, setEditingAm]   = useState(false)
   const [inlineAm,  setInlineAm]    = useState('')
 
+  // Inline onboarding team change (any time)
+  const [editingTeam,  setEditingTeam]  = useState(false)
+  const [inlineOb,     setInlineOb]     = useState('')
+  const [inlineTr,     setInlineTr]     = useState('')
+
   const { data: tracker, isLoading } = useQuery({
     queryKey: ['onboarding', id],
     queryFn: () => fetch(`/api/onboarding/${id}`).then(r => r.json()),
@@ -181,6 +186,19 @@ export default function OnboardingDetailPage() {
       setEditingAm(false)
       qc.invalidateQueries({ queryKey: ['onboarding', id] })
       qc.invalidateQueries({ queryKey: ['accounts'] })
+    },
+  })
+
+  const assignTeamMutation = useMutation({
+    mutationFn: ({ onboardingSpecialistId, trainingSpecialistId }) =>
+      fetch(`/api/onboarding/${id}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: 'assignTeam', onboardingSpecialistId, trainingSpecialistId }),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      setEditingTeam(false)
+      qc.invalidateQueries({ queryKey: ['onboarding', id] })
     },
   })
 
@@ -466,16 +484,70 @@ export default function OnboardingDetailPage() {
             </p>
           </div>
         )}
-        {(tracker.onboardingSpecialist || tracker.trainingSpecialist) && (
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wider">Onboarding Team</p>
-            <p className="font-medium text-gray-700 text-xs leading-relaxed">
-              {tracker.onboardingSpecialist && <span>🏗️ {tracker.onboardingSpecialist.name || tracker.onboardingSpecialist.email}</span>}
-              {tracker.onboardingSpecialist && tracker.trainingSpecialist && <br />}
-              {tracker.trainingSpecialist && <span>📚 {tracker.trainingSpecialist.name || tracker.trainingSpecialist.email}</span>}
-            </p>
+        {/* ── Inline Onboarding Team editor ── */}
+        <div className="min-w-[160px]">
+            <div className="flex items-center gap-1.5 mb-1">
+              <p className="text-xs text-gray-400 uppercase tracking-wider">Onboarding Team</p>
+              {!editingTeam && (
+                <button
+                  onClick={() => { setInlineOb(tracker.onboardingSpecialist?.id || ''); setInlineTr(tracker.trainingSpecialist?.id || ''); setEditingTeam(true) }}
+                  className="text-xs text-indigo-400 hover:text-indigo-600"
+                  title="Change onboarding team"
+                >
+                  ✎
+                </button>
+              )}
+            </div>
+            {editingTeam ? (
+              <div className="space-y-1.5">
+                <select
+                  value={inlineOb}
+                  onChange={e => setInlineOb(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                >
+                  <option value="">🏗️ Onboarding — none</option>
+                  {staffUsers.map(u => (
+                    <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                  ))}
+                </select>
+                <select
+                  value={inlineTr}
+                  onChange={e => setInlineTr(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                >
+                  <option value="">📚 Training — none</option>
+                  {staffUsers.map(u => (
+                    <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                  ))}
+                </select>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => assignTeamMutation.mutate({ onboardingSpecialistId: inlineOb, trainingSpecialistId: inlineTr })}
+                    disabled={assignTeamMutation.isPending}
+                    className="px-2 py-1 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+                  >
+                    {assignTeamMutation.isPending ? '…' : '✓ Save'}
+                  </button>
+                  <button
+                    onClick={() => setEditingTeam(false)}
+                    className="px-2 py-1 rounded-lg text-xs border border-gray-200 text-gray-500 hover:bg-gray-50"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="font-medium text-gray-700 text-xs leading-relaxed">
+                {tracker.onboardingSpecialist
+                  ? <span>🏗️ {tracker.onboardingSpecialist.name || tracker.onboardingSpecialist.email}</span>
+                  : <span className="text-gray-300 italic">Onboarding — not assigned</span>}
+                <br />
+                {tracker.trainingSpecialist
+                  ? <span>📚 {tracker.trainingSpecialist.name || tracker.trainingSpecialist.email}</span>
+                  : <span className="text-gray-300 italic">Training — not assigned</span>}
+              </p>
+            )}
           </div>
-        )}
         {/* ── Inline Account Manager editor ── */}
         <div className="min-w-[160px]">
           <div className="flex items-center gap-1.5 mb-1">
