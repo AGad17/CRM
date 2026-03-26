@@ -21,6 +21,15 @@ export const OBJECTIVE_LABELS = {
   NewRequirement:   'New Requirement',
   TechnicalRequest: 'Technical Request',
   GlobalOutage:     'Global Outage',
+  Onboarding:       'Onboarding',
+  Training:         'Training',
+}
+
+// Objectives available when creating a case
+export const CASE_FORM_OBJECTIVES = {
+  BugReport:        'Bug Report',
+  TechnicalRequest: 'Technical Request',
+  NewRequirement:   'New Requirement',
 }
 
 export const STATUS_LABELS = {
@@ -146,7 +155,7 @@ function CaseModal({ accounts, staffUsers, onClose, onSave, prefillAccountId }) 
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
             >
               <option value="">Select…</option>
-              {Object.entries(OBJECTIVE_LABELS).filter(([v]) => v !== 'GlobalOutage').map(([v, l]) => (
+              {Object.entries(CASE_FORM_OBJECTIVES).map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}
             </select>

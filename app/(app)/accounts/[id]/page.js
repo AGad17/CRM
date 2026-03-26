@@ -7,8 +7,8 @@ import { Badge } from '@/components/ui/Badge'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
-import { CHANNEL_LABELS, OBJECTIVE_LABELS } from '@/app/(app)/engagement-logs/page'
-import { STATUS_LABELS, STATUS_COLORS, OBJECTIVE_COLORS, OBJECTIVE_LABELS as CASE_OBJECTIVE_LABELS } from '@/app/(app)/cases/page'
+import { CHANNEL_LABELS, OBJECTIVE_LABELS, LOG_FORM_OBJECTIVES, calcDuration } from '@/app/(app)/engagement-logs/page'
+import { STATUS_LABELS, STATUS_COLORS, OBJECTIVE_COLORS, OBJECTIVE_LABELS as CASE_OBJECTIVE_LABELS, CASE_FORM_OBJECTIVES } from '@/app/(app)/cases/page'
 
 function HandoverField({ label, value }) {
   if (!value) return null
@@ -27,6 +27,11 @@ function HandoverSection({ title, children }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>
     </div>
   )
+}
+
+function combineDateAndTime(date, time) {
+  if (!date || !time) return null
+  return new Date(`${date}T${time}:00`).toISOString()
 }
 
 export default function AccountDetailPage() {
@@ -161,7 +166,7 @@ export default function AccountDetailPage() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const [engForm, setEngForm] = useState({ channel: '', objective: '', notes: '', loggedAt: new Date().toISOString().slice(0, 10) })
+  const [engForm, setEngForm] = useState({ channel: '', objective: '', notes: '', loggedAt: new Date().toISOString().slice(0, 10), startTime: '', endTime: '' })
   const [showEngForm, setShowEngForm] = useState(false)
 
   const addEngagement = useMutation({
@@ -171,7 +176,7 @@ export default function AccountDetailPage() {
       body: JSON.stringify({ ...data, accountId: id }),
     }).then((r) => r.json()),
     onSuccess: () => {
-      setEngForm({ channel: '', objective: '', notes: '', loggedAt: new Date().toISOString().slice(0, 10) })
+      setEngForm({ channel: '', objective: '', notes: '', loggedAt: new Date().toISOString().slice(0, 10), startTime: '', endTime: '' })
       setShowEngForm(false)
       qc.invalidateQueries({ queryKey: ['account-engagements', id] })
     },
@@ -181,6 +186,15 @@ export default function AccountDetailPage() {
     mutationFn: (eid) => fetch(`/api/engagement-logs/${eid}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['account-engagements', id] }),
   })
+
+  function handleEngSave() {
+    if (!engForm.channel || !engForm.objective || !engForm.loggedAt) return
+    addEngagement.mutate({
+      ...engForm,
+      startTime: engForm.startTime ? combineDateAndTime(engForm.loggedAt, engForm.startTime) : null,
+      endTime:   engForm.endTime   ? combineDateAndTime(engForm.loggedAt, engForm.endTime)   : null,
+    })
+  }
 
   const CHANNEL_COLOR = {
     Whatsapp: 'bg-emerald-50 text-emerald-700', Call: 'bg-blue-50 text-blue-700',
@@ -607,7 +621,7 @@ export default function AccountDetailPage() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
                 >
                   <option value="">Select…</option>
-                  {Object.entries(CASE_OBJECTIVE_LABELS).filter(([v]) => v !== 'GlobalOutage').map(([v, l]) => (
+                  {Object.entries(CASE_FORM_OBJECTIVES).map(([v, l]) => (
                     <option key={v} value={v}>{l}</option>
                   ))}
                 </select>
@@ -703,13 +717,13 @@ export default function AccountDetailPage() {
                   className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30"
                 >
                   <option value="">Select…</option>
-                  {Object.entries(OBJECTIVE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  {Object.entries(LOG_FORM_OBJECTIVES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Event Date *</label>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date *</label>
                 <input
                   type="date"
                   value={engForm.loggedAt}
@@ -719,23 +733,52 @@ export default function AccountDetailPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Notes</label>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Start Time</label>
                 <input
-                  type="text"
-                  value={engForm.notes}
-                  onChange={(e) => setEngForm((f) => ({ ...f, notes: e.target.value }))}
-                  placeholder="Brief summary…"
+                  type="time"
+                  value={engForm.startTime}
+                  onChange={(e) => setEngForm((f) => ({ ...f, startTime: e.target.value }))}
+                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">End Time</label>
+                <input
+                  type="time"
+                  value={engForm.endTime}
+                  onChange={(e) => setEngForm((f) => ({ ...f, endTime: e.target.value }))}
                   className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30"
                 />
               </div>
             </div>
+            {calcDuration(
+              engForm.loggedAt && engForm.startTime ? combineDateAndTime(engForm.loggedAt, engForm.startTime) : null,
+              engForm.loggedAt && engForm.endTime   ? combineDateAndTime(engForm.loggedAt, engForm.endTime)   : null,
+            ) && (
+              <p className="text-xs text-indigo-600">
+                ⏱ Duration: {calcDuration(
+                  combineDateAndTime(engForm.loggedAt, engForm.startTime),
+                  combineDateAndTime(engForm.loggedAt, engForm.endTime),
+                )}
+              </p>
+            )}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Notes</label>
+              <input
+                type="text"
+                value={engForm.notes}
+                onChange={(e) => setEngForm((f) => ({ ...f, notes: e.target.value }))}
+                placeholder="Brief summary…"
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30"
+              />
+            </div>
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => { setShowEngForm(false); setEngForm({ channel: '', objective: '', notes: '', loggedAt: new Date().toISOString().slice(0, 10) }) }}
+                onClick={() => { setShowEngForm(false); setEngForm({ channel: '', objective: '', notes: '', loggedAt: new Date().toISOString().slice(0, 10), startTime: '', endTime: '' }) }}
                 className="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >Cancel</button>
               <button
-                onClick={() => engForm.channel && engForm.objective && engForm.loggedAt && addEngagement.mutate(engForm)}
+                onClick={handleEngSave}
                 disabled={!engForm.channel || !engForm.objective || !engForm.loggedAt || addEngagement.isPending}
                 className="px-4 py-1.5 text-xs font-semibold text-white bg-[#5061F6] hover:bg-[#3b4cc4] disabled:opacity-40 rounded-lg transition-colors"
               >

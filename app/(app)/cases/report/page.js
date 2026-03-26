@@ -107,7 +107,7 @@ export default function CaseReportPage() {
             className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
           >
             <option value="">All Objectives</option>
-            {Object.entries(OBJECTIVE_LABELS).filter(([v]) => v !== 'GlobalOutage').map(([v, l]) => (
+            {Object.entries(OBJECTIVE_LABELS).filter(([v]) => ['BugReport','TechnicalRequest','NewRequirement'].includes(v)).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
             ))}
           </select>
