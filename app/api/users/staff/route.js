@@ -3,15 +3,15 @@ import { requirePermission } from '@/lib/roleGuard'
 import { prisma } from '@/lib/prisma'
 
 // GET /api/users/staff
-// Returns active staff users (non-READ_ONLY) for assignment dropdowns.
+// Returns active users for assignment dropdowns.
 // Requires only read-level auth so ops pages can populate selects.
 export async function GET() {
   const { error } = await requirePermission('onboarding', 'view')
   if (error) return error
 
   const users = await prisma.user.findMany({
-    where:   { isActive: true, role: { not: 'READ_ONLY' } },
-    select:  { id: true, name: true, email: true, role: true },
+    where:   { isActive: true },
+    select:  { id: true, name: true, email: true, role: true, customRole: { select: { name: true } } },
     orderBy: { name: 'asc' },
   })
 

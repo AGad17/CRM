@@ -646,7 +646,7 @@ export default function OnboardingDetailPage() {
                       <option value="">— select —</option>
                       {staffUsers.map(u => (
                         <option key={u.id} value={u.id}>
-                          {u.name || u.email} ({u.role.replace('_', ' ')})
+                          {u.name || u.email}{u.customRole?.name ? ` (${u.customRole.name})` : u.role === 'CCO_ADMIN' ? ' (Admin)' : ''}
                         </option>
                       ))}
                     </select>
@@ -663,7 +663,7 @@ export default function OnboardingDetailPage() {
                       <option value="">— select —</option>
                       {staffUsers.map(u => (
                         <option key={u.id} value={u.id}>
-                          {u.name || u.email} ({u.role.replace('_', ' ')})
+                          {u.name || u.email}{u.customRole?.name ? ` (${u.customRole.name})` : u.role === 'CCO_ADMIN' ? ' (Admin)' : ''}
                         </option>
                       ))}
                     </select>
