@@ -50,6 +50,8 @@ export default function ContractsPage() {
     { key: 'id', label: '#', render: (r) => <span className="text-xs text-gray-400 font-mono">#{r.id}</span>, getValue: (r) => r.id },
     { key: 'accountName', label: 'Account', rtl: true, render: (r) => <span className="font-medium">{r.account?.name}</span>, getValue: (r) => r.account?.name || '' },
     { key: 'country', label: 'Country', render: (r) => r.account?.countryCode, getValue: (r) => r.account?.countryCode || '' },
+    { key: 'branches', label: 'Branches', render: (r) => r.account?.numberOfBranches ?? <span className="text-gray-300">—</span>, getValue: (r) => r.account?.numberOfBranches ?? '' },
+    { key: 'costCentres', label: 'Cost Centers', render: (r) => r.account?.numberOfCostCentres ?? <span className="text-gray-300">—</span>, getValue: (r) => r.account?.numberOfCostCentres ?? '' },
     { key: 'type', label: 'Type', render: (r) => <Badge value={r.type} />, getValue: (r) => r.type },
     { key: 'startDate', label: 'Start', render: (r) => new Date(r.startDate).toLocaleDateString(), getValue: (r) => r.startDate ? new Date(r.startDate).toLocaleDateString('en-GB') : '' },
     { key: 'endDate', label: 'End', render: (r) => new Date(r.endDate).toLocaleDateString(), getValue: (r) => r.endDate ? new Date(r.endDate).toLocaleDateString('en-GB') : '' },

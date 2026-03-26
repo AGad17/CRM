@@ -66,6 +66,13 @@ export default function AccountsPage() {
       ? `USD ${(r.totalMRR || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
       : <span className="text-xs text-gray-400">Last: USD {(r.lastMRR || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
     },
+    { key: 'arr', label: 'ARR', render: (r) => {
+      const base = r.status === 'Active' ? (r.totalMRR || 0) : (r.lastMRR || 0)
+      const arr = base * 12
+      return r.status === 'Active'
+        ? `USD ${arr.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+        : <span className="text-xs text-gray-400">Last: USD {arr.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
+    }, getValue: (r) => ((r.status === 'Active' ? r.totalMRR : r.lastMRR) || 0) * 12 },
     { key: 'accountManager', label: 'Account Manager', render: (r) => r.accountManager ? (r.accountManager.name || r.accountManager.email) : <span className="text-gray-300">—</span> },
     { key: 'journey', label: 'Journey Stage', render: (r) => {
       const phase = r.onboarding?.phase
