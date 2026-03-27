@@ -92,6 +92,10 @@ export default function OnboardingDetailPage() {
   const [assignTr, setAssignTr] = useState('') // Training Specialist
   const [assignAm, setAssignAm] = useState('') // Account Manager (phase change)
 
+  // Churn capture (required when moving to Churned)
+  const [churnReason, setChurnReason] = useState('')
+  const [churnNote,   setChurnNote]   = useState('')
+
   // Inline account manager change (any time)
   const [editingAm, setEditingAm]   = useState(false)
   const [inlineAm,  setInlineAm]    = useState('')
@@ -119,7 +123,7 @@ export default function OnboardingDetailPage() {
   })
 
   const setPhaseMutation = useMutation({
-    mutationFn: ({ phase, onboardingSpecialistId, trainingSpecialistId, accountManagerId }) =>
+    mutationFn: ({ phase, onboardingSpecialistId, trainingSpecialistId, accountManagerId, churnReason, churnNote }) =>
       fetch(`/api/onboarding/${id}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -128,11 +132,14 @@ export default function OnboardingDetailPage() {
           onboardingSpecialistId: onboardingSpecialistId || undefined,
           trainingSpecialistId:   trainingSpecialistId   || undefined,
           accountManagerId:       accountManagerId       || undefined,
+          churnReason:            churnReason            || undefined,
+          churnNote:              churnNote              || undefined,
         }),
       }).then(r => r.json()),
     onSuccess: () => {
       setPendingPhase(null)
       setAssignOb(''); setAssignTr(''); setAssignAm('')
+      setChurnReason(''); setChurnNote('')
       qc.invalidateQueries({ queryKey: ['onboarding', id] })
       qc.invalidateQueries({ queryKey: ['onboarding'] })
     },
@@ -701,6 +708,47 @@ export default function OnboardingDetailPage() {
             </div>
           </div>
 
+          {/* ── Churn reason (required only when moving to Churned) ── */}
+          {pendingPhase.phase === 'Churned' && (
+            <div className="border-t border-gray-200 pt-3 space-y-2.5">
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Churn Details</p>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Churn Reason <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={churnReason}
+                  onChange={(e) => setChurnReason(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-300 bg-white"
+                >
+                  <option value="">— select a reason —</option>
+                  <option value="PriceTooHigh">Price / Cost Concerns</option>
+                  <option value="LowAdoption">Low Adoption / Poor Usage</option>
+                  <option value="SwitchedCompetitor">Switched to Competitor</option>
+                  <option value="BusinessClosed">Business Closed or Shutdown</option>
+                  <option value="ContractNotRenewed">Contract Not Renewed</option>
+                  <option value="PoorSupport">Poor Support Experience</option>
+                  <option value="MissingFeatures">Missing Required Features</option>
+                  <option value="TechnicalIssues">Technical / Stability Issues</option>
+                  <option value="BudgetCut">Budget Cut / Financial Constraints</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Additional Notes <span className="text-gray-400">(optional)</span>
+                </label>
+                <textarea
+                  value={churnNote}
+                  onChange={(e) => setChurnNote(e.target.value)}
+                  rows={2}
+                  placeholder="Any additional context about why the account churned…"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-300 bg-white resize-none"
+                />
+              </div>
+            </div>
+          )}
+
           {/* ── Staff assignment dropdowns (only for specific phase transitions) ── */}
           {(needsObTr || needsAm) && (
             <div className="border-t border-gray-200 pt-3 space-y-2.5">
@@ -769,7 +817,7 @@ export default function OnboardingDetailPage() {
 
           <div className="flex gap-2 justify-end">
             <button
-              onClick={() => { setPendingPhase(null); setAssignOb(''); setAssignTr(''); setAssignAm('') }}
+              onClick={() => { setPendingPhase(null); setAssignOb(''); setAssignTr(''); setAssignAm(''); setChurnReason(''); setChurnNote('') }}
               className="px-4 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">
               Cancel
             </button>
@@ -779,8 +827,15 @@ export default function OnboardingDetailPage() {
                 onboardingSpecialistId: assignOb || undefined,
                 trainingSpecialistId:   assignTr || undefined,
                 accountManagerId:       assignAm || undefined,
+                churnReason:            churnReason || undefined,
+                churnNote:              churnNote   || undefined,
               })}
-              disabled={setPhaseMutation.isPending || !assignmentComplete || (pendingDirection === 'forward' && !allCurrentDone && !isChurned && pendingPhase?.phase !== 'Churned')}
+              disabled={
+                setPhaseMutation.isPending ||
+                !assignmentComplete ||
+                (pendingDirection === 'forward' && !allCurrentDone && !isChurned && pendingPhase?.phase !== 'Churned') ||
+                (pendingPhase?.phase === 'Churned' && !churnReason)
+              }
               title={
                 pendingDirection === 'forward' && !allCurrentDone && !isChurned && pendingPhase?.phase !== 'Churned'
                   ? `Complete all tasks in ${PHASE_LABELS[tracker.phase]} first`

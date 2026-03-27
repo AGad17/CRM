@@ -46,6 +46,8 @@ export async function PATCH(request, { params }) {
         onboardingSpecialistId: body.onboardingSpecialistId,
         trainingSpecialistId:   body.trainingSpecialistId,
         accountManagerId:       body.accountManagerId,
+        churnReason:            body.churnReason,
+        churnNote:              body.churnNote,
       }
       const tracker = await setPhase(id, body.phase, assignments)
       await logActivity({

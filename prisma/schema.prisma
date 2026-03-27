@@ -271,6 +271,7 @@ model User {
   assignedCases   EngagementCase[]    @relation("UserAssignedCases")
   caseFollowUps   CaseFollowUp[]      @relation("UserFollowUps")
   notifications   Notification[]      @relation("UserNotifications")
+  leadComments    LeadComment[]       @relation("LeadCommentAuthor")
 
   @@map("users")
 }
@@ -466,6 +467,10 @@ model OnboardingTracker {
   trainingSpecialistId   String?
   accountManagerId       String?
 
+  // Churn capture
+  churnReason  ChurnReason?
+  churnNote    String?
+
   account              Account            @relation(fields: [accountId], references: [id])
   deal                 Deal?              @relation(fields: [dealId], references: [id])
   tasks                OnboardingTask[]
@@ -569,7 +574,24 @@ model Lead {
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
+  comments LeadComment[]
+
   @@map("leads")
+}
+
+model LeadComment {
+  id        Int      @id @default(autoincrement())
+  leadId    Int
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author User @relation("LeadCommentAuthor", fields: [authorId], references: [id])
+
+  @@index([leadId])
+  @@map("lead_comments")
 }
 
 // ─── Activity Log ─────────────────────────────────────────────────────────────
@@ -818,6 +840,20 @@ enum NotificationType {
   RenewalDue7
   InvoiceOverdue
   UserMentioned
+  MentionInLeadComment
+}
+
+enum ChurnReason {
+  PriceTooHigh
+  LowAdoption
+  SwitchedCompetitor
+  BusinessClosed
+  ContractNotRenewed
+  PoorSupport
+  MissingFeatures
+  TechnicalIssues
+  BudgetCut
+  Other
 }
 
 model Notification {

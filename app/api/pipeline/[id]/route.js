@@ -3,16 +3,19 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { requirePermission } from '@/lib/roleGuard'
 import { getLead, updateLead, updateLeadStage, deleteLead, linkLeadToAccount } from '@/lib/db/pipeline'
-import { logActivity } from '@/lib/activityLog'
+import { logActivity, getActivityLog } from '@/lib/activityLog'
 
 export async function GET(request, { params }) {
   const { error } = await requirePermission('pipeline', 'view')
   if (error) return error
 
   const { id } = await params
-  const lead = await getLead(id)
+  const [lead, activityLog] = await Promise.all([
+    getLead(id),
+    getActivityLog('Lead', Number(id), 50),
+  ])
   if (!lead) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  return NextResponse.json(lead)
+  return NextResponse.json({ ...lead, activityLog })
 }
 
 export async function PUT(request, { params }) {

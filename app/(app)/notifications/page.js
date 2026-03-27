@@ -14,7 +14,8 @@ const TYPE_ICONS = {
   RenewalDue14:      '📅',
   RenewalDue7:       '⚠️',
   InvoiceOverdue:    '💸',
-  UserMentioned:     '@',
+  UserMentioned:        '@',
+  MentionInLeadComment: '💬',
 }
 
 const TYPE_CATEGORY = {
@@ -23,6 +24,7 @@ const TYPE_CATEGORY = {
   RenewalDue30: 'renewals', RenewalDue14: 'renewals', RenewalDue7: 'renewals',
   InvoiceOverdue: 'invoices',
   UserMentioned: 'mentions',
+  MentionInLeadComment: 'mentions',
 }
 
 const TABS = [

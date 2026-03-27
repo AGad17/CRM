@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
@@ -7,6 +7,8 @@ import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
 import { Modal } from '@/components/ui/Modal'
 import { calcDealSummary } from '@/lib/invoicingCalc'
+import { MentionTextarea } from '@/components/ui/MentionTextarea'
+import { RenderedNote } from '@/components/ui/RenderedNote'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -369,6 +371,10 @@ export default function PipelinePage() {
   const [formData, setFormData] = useState(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState({})
   const [migrateResult, setMigrateResult] = useState(null)
+
+  // Edit modal tabs: 'details' | 'comments'
+  const [modalTab, setModalTab]       = useState('details')
+  const [commentText, setCommentText] = useState('')
   // New Opportunity flow
   const [oppType, setOppType] = useState(null)           // null | 'New' | 'Expansion' | 'Renewal'
   const [accountSearch, setAccountSearch] = useState('')
@@ -432,6 +438,33 @@ export default function PipelinePage() {
   const migrateM = useMutation({
     mutationFn: () => fetch('/api/pipeline/migrate', { method: 'POST' }).then((r) => r.json()),
     onSuccess: (data) => { invalidate(); setMigrateResult(data) },
+  })
+
+  // ── Lead Comments ──
+  const editLeadId = modal?.edit?.id ?? null
+
+  const { data: commentsData, isLoading: commentsLoading } = useQuery({
+    queryKey: ['lead-comments', editLeadId],
+    queryFn:  () => fetch(`/api/pipeline/${editLeadId}/comments`).then((r) => r.json()),
+    enabled:  !!editLeadId && modalTab === 'comments',
+  })
+  const { data: activityData } = useQuery({
+    queryKey: ['lead-activity', editLeadId],
+    queryFn:  () => fetch(`/api/pipeline/${editLeadId}`).then((r) => r.json()),
+    enabled:  !!editLeadId && modalTab === 'comments',
+  })
+
+  const commentM = useMutation({
+    mutationFn: ({ leadId, content }) =>
+      fetch(`/api/pipeline/${leadId}/comments`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ content }),
+      }).then((r) => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lead-comments', editLeadId] })
+      setCommentText('')
+    },
   })
 
   // ── KPIs ──
@@ -991,19 +1024,116 @@ export default function PipelinePage() {
       </Modal>
 
       {/* Edit Lead */}
-      <Modal isOpen={!!modal?.edit} onClose={() => setModal(null)} title="Edit Opportunity">
-        <div className="space-y-5">
-          <LeadForm form={formData} setForm={setFormData} errors={formErrors} agents={agents} pricing={pricing} />
-          {updateM.data?.error && (
-            <p className="text-sm text-red-500">{updateM.data.error}</p>
-          )}
-          <div className="flex gap-3 pt-2">
-            <button onClick={handleSubmit} disabled={updateM.isPending} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors">
-              {updateM.isPending ? 'Saving…' : 'Save Changes'}
+      <Modal isOpen={!!modal?.edit} onClose={() => { setModal(null); setModalTab('details') }} title="Edit Opportunity">
+        {/* Tab bar */}
+        <div className="flex border-b border-gray-200 -mt-1 mb-4">
+          {[{ key: 'details', label: '📋 Details' }, { key: 'comments', label: '💬 Comments & Activity' }].map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setModalTab(t.key)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                modalTab === t.key
+                  ? 'border-indigo-600 text-indigo-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
             </button>
-            <button onClick={() => setModal(null)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-          </div>
+          ))}
         </div>
+
+        {/* Details tab */}
+        {modalTab === 'details' && (
+          <div className="space-y-5">
+            <LeadForm form={formData} setForm={setFormData} errors={formErrors} agents={agents} pricing={pricing} />
+            {updateM.data?.error && (
+              <p className="text-sm text-red-500">{updateM.data.error}</p>
+            )}
+            <div className="flex gap-3 pt-2">
+              <button onClick={handleSubmit} disabled={updateM.isPending} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors">
+                {updateM.isPending ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button onClick={() => { setModal(null); setModalTab('details') }} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* Comments & Activity tab */}
+        {modalTab === 'comments' && (
+          <div className="flex flex-col gap-4">
+            {/* Timeline */}
+            <div className="max-h-80 overflow-y-auto space-y-3 pr-1">
+              {commentsLoading ? (
+                <div className="animate-pulse h-20 bg-gray-100 rounded-xl" />
+              ) : (() => {
+                const comments = (commentsData?.comments ?? []).map((c) => ({ ...c, _type: 'comment' }))
+                const logs     = (activityData?.activityLog ?? []).map((l) => ({ ...l, _type: 'log' }))
+                const timeline = [...comments, ...logs].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+                if (!timeline.length) return (
+                  <p className="text-sm text-gray-400 text-center py-6">No comments or activity yet.</p>
+                )
+                return timeline.map((item) => {
+                  if (item._type === 'comment') return (
+                    <div key={`c-${item.id}`} className="flex gap-3">
+                      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
+                        {(item.author?.name || '?')[0].toUpperCase()}
+                      </div>
+                      <div className="flex-1 bg-gray-50 rounded-xl px-3 py-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold text-gray-700">{item.author?.name || item.author?.email}</span>
+                          <span className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                        </div>
+                        <RenderedNote content={item.content} className="text-sm text-gray-700 leading-relaxed" />
+                      </div>
+                    </div>
+                  )
+                  // Activity log entry
+                  const meta = item.meta || {}
+                  const desc = meta.from && meta.to
+                    ? `Moved from ${meta.from} to ${meta.to}`
+                    : item.action?.replace(/_/g, ' ')
+                  return (
+                    <div key={`l-${item.id}`} className="flex gap-3 items-start">
+                      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center text-xs">⚡</div>
+                      <div className="flex-1 py-1">
+                        <span className="text-xs text-gray-500">
+                          <span className="font-medium text-gray-600">{item.actorName || 'System'}</span>
+                          {' '}{desc}
+                        </span>
+                        <span className="ml-2 text-xs text-gray-400">{new Date(item.createdAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+
+            {/* Comment input */}
+            <div className="border-t border-gray-100 pt-3 space-y-2">
+              <MentionTextarea
+                value={commentText}
+                onChange={setCommentText}
+                placeholder="Add a comment… use @ to mention a teammate"
+                rows={3}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && commentText.trim()) {
+                    e.preventDefault()
+                    commentM.mutate({ leadId: editLeadId, content: commentText.trim() })
+                  }
+                }}
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={() => commentM.mutate({ leadId: editLeadId, content: commentText.trim() })}
+                  disabled={!commentText.trim() || commentM.isPending}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors"
+                >
+                  {commentM.isPending ? 'Posting…' : 'Post'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Confirm Lost */}
