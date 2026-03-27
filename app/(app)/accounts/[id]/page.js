@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/Badge'
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { MentionTextarea } from '@/components/ui/MentionTextarea'
+import { RenderedNote } from '@/components/ui/RenderedNote'
 import { CHANNEL_LABELS, OBJECTIVE_LABELS, LOG_FORM_OBJECTIVES, calcDuration } from '@/app/(app)/engagement-logs/page'
 import { STATUS_LABELS, STATUS_COLORS, OBJECTIVE_COLORS, OBJECTIVE_LABELS as CASE_OBJECTIVE_LABELS, CASE_FORM_OBJECTIVES } from '@/app/(app)/cases/page'
 
@@ -472,15 +474,15 @@ export default function AccountDetailPage() {
         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Notes</h3>
         <div className="space-y-3">
           <div className="flex gap-2">
-            <textarea
+            <MentionTextarea
               value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
+              onChange={setNoteText}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && noteText.trim()) {
                   addNote.mutate(noteText)
                 }
               }}
-              placeholder="Add a note… (Cmd+Enter to save)"
+              placeholder="Add a note… use @ to mention a teammate (Cmd+Enter to save)"
               rows={2}
               className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
             />
@@ -497,7 +499,7 @@ export default function AccountDetailPage() {
               {notes.map((note) => (
                 <div key={note.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 group">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.content}</p>
+                    <RenderedNote content={note.content} className="text-sm text-gray-800" />
                     <p className="text-xs text-gray-400 mt-1">
                       {note.authorName && <span>{note.authorName} · </span>}
                       {new Date(note.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}

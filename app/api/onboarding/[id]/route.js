@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { requirePermission } from '@/lib/roleGuard'
 import { getOnboardingTracker, advancePhase, setPhase, addNote, assignAccountManager, assignOnboardingTeam } from '@/lib/db/onboarding'
 import { logActivity } from '@/lib/activityLog'
+import { createNotification } from '@/lib/db/notifications'
+import { parseMentions } from '@/lib/mentions'
 
 export async function GET(request, { params }) {
   const { error } = await requirePermission('onboarding', 'view')
@@ -60,6 +62,18 @@ export async function PATCH(request, { params }) {
       const session = await getServerSession(authOptions)
       const author  = session?.user?.name || session?.user?.email || null
       const note    = await addNote(id, body.content.trim(), author)
+      // @mention notifications
+      for (const { userId } of parseMentions(body.content)) {
+        if (userId !== session?.user?.id) {
+          await createNotification({
+            userId,
+            type:  'UserMentioned',
+            title: `${author || 'Someone'} mentioned you in an Onboarding note`,
+            body:  body.content.slice(0, 120),
+            link:  `/onboarding/${id}`,
+          })
+        }
+      }
       return NextResponse.json(note)
     }
 

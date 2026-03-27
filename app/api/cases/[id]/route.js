@@ -7,7 +7,8 @@ import {
   addFollowUp,
   deleteCase,
 } from '@/lib/db/engagementCases'
-import { createNotifications } from '@/lib/db/notifications'
+import { createNotification, createNotifications } from '@/lib/db/notifications'
+import { parseMentions } from '@/lib/mentions'
 
 const STATUS_LABELS = {
   Open: 'Open', Resolved: 'Resolved', ClosedUnresolved: 'Closed (Unresolved)', Escalated: 'Escalated',
@@ -72,6 +73,20 @@ export async function PATCH(request, { params }) {
         title: `Follow-up added on: ${c.title}`,
         link: `/cases/${c.id}`,
       })
+    }
+    // @mention notifications
+    const mentionText = [body.notes, body.actionTaken].filter(Boolean).join(' ')
+    const actorName   = session.user.name || session.user.email
+    for (const { userId } of parseMentions(mentionText)) {
+      if (userId !== session.user.id) {
+        await createNotification({
+          userId,
+          type:  'UserMentioned',
+          title: `${actorName} mentioned you in Case: ${c.title}`,
+          body:  body.notes?.slice(0, 120) || undefined,
+          link:  `/cases/${c.id}`,
+        })
+      }
     }
     return NextResponse.json(fu, { status: 201 })
   }

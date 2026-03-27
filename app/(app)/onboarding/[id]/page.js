@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { MentionTextarea } from '@/components/ui/MentionTextarea'
+import { RenderedNote } from '@/components/ui/RenderedNote'
 
 const PHASE_ORDER = ['DealClosure', 'Onboarding', 'Training', 'Incubation', 'AccountManagement', 'Expired']
 
@@ -1012,7 +1014,7 @@ export default function OnboardingDetailPage() {
                       </>
                     )}
                   </div>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{note.content}</p>
+                  <RenderedNote content={note.content} className="text-sm text-gray-700 leading-relaxed" />
                 </div>
               )
             })
@@ -1021,15 +1023,15 @@ export default function OnboardingDetailPage() {
 
         {/* New note input */}
         <div className="flex flex-col gap-2">
-          <textarea
+          <MentionTextarea
             value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
+            onChange={setNewNote}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && newNote.trim()) {
                 notesMutation.mutate(newNote.trim())
               }
             }}
-            placeholder="Write a note… (Cmd/Ctrl + Enter to save)"
+            placeholder="Write a note… use @ to mention a teammate (Cmd/Ctrl + Enter to save)"
             rows={3}
             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
           />

@@ -14,6 +14,7 @@ const TYPE_ICONS = {
   RenewalDue14:      '📅',
   RenewalDue7:       '⚠️',
   InvoiceOverdue:    '💸',
+  UserMentioned:     '@',
 }
 
 function relativeTime(dateStr) {

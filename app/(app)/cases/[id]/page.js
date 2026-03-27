@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { MentionTextarea } from '@/components/ui/MentionTextarea'
+import { RenderedNote } from '@/components/ui/RenderedNote'
 import { CHANNEL_LABELS, OBJECTIVE_LABELS, STATUS_LABELS, STATUS_COLORS, OBJECTIVE_COLORS } from '../page'
 
 function formatTTR(openedAt, resolvedAt) {
@@ -302,7 +304,7 @@ export default function CaseDetailPage() {
                     </p>
                   )}
                   {fu.notes && (
-                    <p className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">{fu.notes}</p>
+                    <RenderedNote content={fu.notes} className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2" />
                   )}
                 </div>
               </div>
@@ -369,11 +371,11 @@ export default function CaseDetailPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Notes</label>
-                  <textarea
+                  <MentionTextarea
                     value={fuForm.notes}
-                    onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))}
+                    onChange={(v) => setFuForm(f => ({ ...f, notes: v }))}
                     rows={2}
-                    placeholder="Additional context…"
+                    placeholder="Additional context… use @ to mention a teammate"
                     className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
                   />
                 </div>

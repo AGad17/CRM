@@ -817,6 +817,7 @@ enum NotificationType {
   RenewalDue14
   RenewalDue7
   InvoiceOverdue
+  UserMentioned
 }
 
 model Notification {

@@ -14,6 +14,7 @@ const TYPE_ICONS = {
   RenewalDue14:      '📅',
   RenewalDue7:       '⚠️',
   InvoiceOverdue:    '💸',
+  UserMentioned:     '@',
 }
 
 const TYPE_CATEGORY = {
@@ -21,11 +22,13 @@ const TYPE_CATEGORY = {
   OutageDeclared: 'outages', OutageResolved: 'outages',
   RenewalDue30: 'renewals', RenewalDue14: 'renewals', RenewalDue7: 'renewals',
   InvoiceOverdue: 'invoices',
+  UserMentioned: 'mentions',
 }
 
 const TABS = [
   { key: 'all',      label: 'All' },
   { key: 'unread',   label: 'Unread' },
+  { key: 'mentions', label: 'Mentions' },
   { key: 'cases',    label: 'Cases' },
   { key: 'outages',  label: 'Outages' },
   { key: 'renewals', label: 'Renewals' },
