@@ -52,6 +52,33 @@ const OPP_TYPES = [
   { key: 'Renewal',   label: 'Renewal',   desc: 'Existing account renewing their current contract', icon: '🔄' },
 ]
 
+const LOST_REASON_CATEGORIES = [
+  { key: 'Price',        label: 'Price — Too expensive' },
+  { key: 'Timing',       label: 'Timing — Not the right time' },
+  { key: 'Competitor',   label: 'Competitor — Chose another vendor' },
+  { key: 'NoBudget',     label: 'No Budget' },
+  { key: 'Unresponsive', label: 'Unresponsive — Went dark' },
+  { key: 'WrongFit',     label: 'Wrong Fit — Not a good match' },
+  { key: 'Other',        label: 'Other' },
+]
+
+const ACTIVITY_TYPES = [
+  { key: 'Call',         label: '📞 Call' },
+  { key: 'Email',        label: '✉️ Email' },
+  { key: 'Meeting',      label: '🤝 Meeting' },
+  { key: 'Demo',         label: '🖥 Demo' },
+  { key: 'ProposalSent', label: '📄 Proposal Sent' },
+  { key: 'Other',        label: '📝 Other' },
+]
+
+const ACTIVITY_ACTION_LABELS = {
+  stage_changed:   (m) => `Stage: ${m.from} → ${m.to}${m.lostReasonCategory ? ` (${m.lostReasonCategory})` : ''}`,
+  lead_edited:     (m) => `Edited: ${(m.changes || []).map(c => c.field).join(', ')}`,
+  activity_logged: (m) => `${m.type || 'Activity'} logged${m.outcome ? ` — ${m.outcome}` : ''}`,
+  lead_archived:   (m) => `Archived: ${m.reason || ''}`,
+  created:         ()  => 'Lead created',
+}
+
 const OPP_COLORS = {
   New:       'bg-indigo-100 text-indigo-700',
   Expansion: 'bg-emerald-100 text-emerald-700',
@@ -62,7 +89,7 @@ const EMPTY_FORM = {
   companyName: '', contactName: '', contactEmail: '', contactPhone: '',
   channel: '', countryCode: '', estimatedValue: '', packageInterest: '',
   branches: '', opportunityDate: new Date().toISOString().slice(0, 10),
-  expectedCloseDate: '', notes: '', ownerId: '',
+  expectedCloseDate: '', nextActionDate: '', notes: '', ownerId: '',
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -94,7 +121,7 @@ function leadRiskStatus(lead) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   if (lead.expectedCloseDate && new Date(lead.expectedCloseDate) < today) return 'overdue'
   const daysSinceUpdate = Math.floor((Date.now() - new Date(lead.updatedAt).getTime()) / 86400000)
-  if (daysSinceUpdate >= 7) return 'stale'
+  if (daysSinceUpdate >= 14) return 'stale'
   return null
 }
 
@@ -121,7 +148,7 @@ function ChannelBadge({ channel }) {
 
 // ─── Lead Form ───────────────────────────────────────────────────────────────
 
-function LeadForm({ form, setForm, errors, agents, pricing }) {
+function LeadForm({ form, setForm, errors, agents, pricing, onDupCheck, dupWarning = [] }) {
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }))
   const cls = (k) => `w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${errors[k] ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white'}`
 
@@ -163,8 +190,24 @@ function LeadForm({ form, setForm, errors, agents, pricing }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Company Name *</label>
-          <input className={cls('companyName')} value={form.companyName} onChange={set('companyName')} placeholder="e.g. Al Baik Restaurant Group" />
+          <input
+            className={cls('companyName')}
+            value={form.companyName}
+            onChange={set('companyName')}
+            onBlur={() => onDupCheck && form.companyName.trim().length > 1 && onDupCheck(form.companyName.trim())}
+            placeholder="e.g. Al Baik Restaurant Group"
+          />
           {errors.companyName && <p className="text-xs text-red-500 mt-0.5">{errors.companyName}</p>}
+          {dupWarning.length > 0 && (
+            <div className="mt-1.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              <p className="text-xs font-semibold text-amber-700 mb-1">⚠ Similar leads already exist:</p>
+              {dupWarning.map(d => (
+                <p key={d.id} className="text-xs text-amber-600">
+                  #{d.id} {d.companyName} — <span className="font-medium">{d.stage}</span> · {d.owner?.name || 'Unassigned'}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Contact Name</label>
@@ -239,6 +282,10 @@ function LeadForm({ form, setForm, errors, agents, pricing }) {
           <input className={cls('expectedCloseDate')} type="date" value={form.expectedCloseDate} onChange={set('expectedCloseDate')} />
         </div>
         <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Next Action Date</label>
+          <input className={cls('nextActionDate')} type="date" value={form.nextActionDate || ''} onChange={set('nextActionDate')} />
+        </div>
+        <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Owner *</label>
           <select className={cls('ownerId')} value={form.ownerId} onChange={set('ownerId')}>
             <option value="">Assign to…</option>
@@ -309,13 +356,22 @@ function LeadCard({ lead, onStageAction, onEdit, isAdmin }) {
 
       {/* Account link */}
       {lead.account ? (
-        <a href={`/accounts/${lead.account.id}`}
-           onClick={(e) => e.stopPropagation()}
-           className="text-xs text-indigo-600 hover:underline truncate block">
-          🏢 {lead.account.name}
-        </a>
+        <div className="flex items-center justify-between gap-2">
+          <a href={`/accounts/${lead.account.id}`}
+             onClick={(e) => e.stopPropagation()}
+             className="text-xs text-indigo-600 hover:underline truncate">
+            🏢 {lead.account.name}
+          </a>
+          {lead.stage === 'ClosedWon' && (
+            <a href={`/onboarding?account=${lead.account.id}`}
+               onClick={(e) => e.stopPropagation()}
+               className="flex-shrink-0 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 hover:bg-emerald-100 transition-colors font-medium">
+              + Onboarding
+            </a>
+          )}
+        </div>
       ) : (lead.stage === 'ClosedWon') ? (
-        <span className="text-xs text-gray-300 italic">No account linked</span>
+        <span className="text-xs text-amber-500 italic font-medium">⚠ No account linked</span>
       ) : null}
 
       {/* Actions */}
@@ -366,9 +422,13 @@ export default function PipelinePage() {
   const [ownerFilter, setOwnerFilter] = useState('')
 
   // Modals
-  // null | 'create' | { edit: lead } | { confirmLoss: lead } | { confirmChurn: lead } | { closedWonBlocked: lead, missing: string[] } | 'migrate'
+  // null | 'create' | { edit: lead } | { confirmLoss: lead } | { confirmChurn: lead } | { closedWonBlocked: lead, missing: string[] } | 'migrate' | { archive: lead }
   const [modal, setModal] = useState(null)
   const [lostReason, setLostReason] = useState('')
+  const [lostReasonCategory, setLostReasonCategory] = useState('')
+  const [archiveReason, setArchiveReason] = useState('')
+  const [dupWarning, setDupWarning] = useState([])      // duplicate company matches
+  const [activityForm, setActivityForm] = useState({ type: '', notes: '', outcome: '', loggedAt: new Date().toISOString().slice(0, 10) })
   const [formData, setFormData] = useState(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState({})
   const [migrateResult, setMigrateResult] = useState(null)
@@ -436,7 +496,7 @@ export default function PipelinePage() {
 
   const createM = useMutation({
     mutationFn: (data) => fetch('/api/pipeline', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then((r) => r.json()),
-    onSuccess: () => { invalidate(); setModal(null) },
+    onSuccess: () => { invalidate(); setModal(null); setDupWarning([]) },
   })
 
   const updateM = useMutation({
@@ -452,6 +512,26 @@ export default function PipelinePage() {
   const deleteM = useMutation({
     mutationFn: (id) => fetch(`/api/pipeline/${id}`, { method: 'DELETE' }).then((r) => r.json()),
     onSuccess: () => invalidate(),
+  })
+
+  const archiveM = useMutation({
+    mutationFn: ({ id, reason }) => fetch(`/api/pipeline/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'archive', reason }),
+    }).then((r) => r.json()),
+    onSuccess: () => { invalidate(); setModal(null); setArchiveReason('') },
+  })
+
+  const activityM = useMutation({
+    mutationFn: ({ leadId, data }) => fetch(`/api/pipeline/${leadId}/activities`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then((r) => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lead-activities', editLeadId] })
+      qc.invalidateQueries({ queryKey: ['lead-activity', editLeadId] })
+      setActivityForm({ type: '', notes: '', outcome: '', loggedAt: new Date().toISOString().slice(0, 10) })
+    },
   })
 
   const migrateM = useMutation({
@@ -470,7 +550,12 @@ export default function PipelinePage() {
   const { data: activityData } = useQuery({
     queryKey: ['lead-activity', editLeadId],
     queryFn:  () => fetch(`/api/pipeline/${editLeadId}`).then((r) => r.json()),
-    enabled:  !!editLeadId && modalTab === 'comments',
+    enabled:  !!editLeadId && (modalTab === 'comments' || modalTab === 'activities'),
+  })
+  const { data: leadActivities = [], isLoading: activitiesLoading } = useQuery({
+    queryKey: ['lead-activities', editLeadId],
+    queryFn:  () => fetch(`/api/pipeline/${editLeadId}/activities`).then((r) => r.json()),
+    enabled:  !!editLeadId && modalTab === 'activities',
   })
 
   const commentM = useMutation({
@@ -529,6 +614,7 @@ export default function PipelinePage() {
     setOppType(null)
     setAccountSearch('')
     setSelectedAccount(null)
+    setDupWarning([])
     setModal('create')
   }
 
@@ -546,6 +632,7 @@ export default function PipelinePage() {
       packageInterest:  lead.packageInterest  || '',
       opportunityDate:   lead.opportunityDate   ? new Date(lead.opportunityDate).toISOString().slice(0, 10)   : new Date().toISOString().slice(0, 10),
       expectedCloseDate: lead.expectedCloseDate ? new Date(lead.expectedCloseDate).toISOString().slice(0, 10) : '',
+      nextActionDate:    lead.nextActionDate    ? new Date(lead.nextActionDate).toISOString().slice(0, 10)    : '',
       notes:            lead.notes            || '',
       ownerId:          lead.ownerId,
     })
@@ -580,7 +667,7 @@ export default function PipelinePage() {
     if (modal === 'create') {
       createM.mutate(payload)
     } else if (modal?.edit) {
-      updateM.mutate({ id: modal.edit.id, data: { ...formData, numberOfBranches: Number(formData.branches) || null } })
+      updateM.mutate({ id: modal.edit.id, data: { ...formData, numberOfBranches: Number(formData.branches) || null, nextActionDate: formData.nextActionDate || '' } })
     }
   }
 
@@ -607,6 +694,7 @@ export default function PipelinePage() {
 
   function confirmStage(lead, stage, extra = {}) {
     stageM.mutate({ id: lead.id, stage, ...extra })
+    setLostReasonCategory('')
   }
 
   // ── Table columns ──
@@ -641,7 +729,7 @@ export default function PipelinePage() {
           {r.stage === 'Lead'      && <button onClick={() => handleStageAction(r, 'Qualified')}  className="text-xs text-blue-600 hover:text-blue-800 font-medium">Qualify</button>}
           {r.stage === 'Qualified' && <button onClick={() => handleStageAction(r, 'ClosedWon')}  className="text-xs text-emerald-600 hover:text-emerald-800 font-medium">Won</button>}
           {(r.stage === 'Lead' || r.stage === 'Qualified') && <button onClick={() => handleStageAction(r, 'ClosedLost')} className="text-xs text-red-500 hover:text-red-700 font-medium">Lost</button>}
-          {isAdmin && <button onClick={() => { if (confirm('Delete this lead?')) deleteM.mutate(r.id) }} className="text-xs text-gray-400 hover:text-red-500 font-medium">Delete</button>}
+          {isAdmin && <button onClick={() => { setArchiveReason(''); setModal({ archive: r }) }} className="text-xs text-gray-400 hover:text-red-500 font-medium">Archive</button>}
         </div>
       ),
     },
@@ -1025,7 +1113,15 @@ export default function PipelinePage() {
                 </div>
               ) : (
                 /* New: standard lead form */
-                <LeadForm form={formData} setForm={setFormData} errors={formErrors} agents={agents} pricing={pricing} />
+                <LeadForm
+                  form={formData} setForm={setFormData} errors={formErrors}
+                  agents={agents} pricing={pricing}
+                  dupWarning={dupWarning}
+                  onDupCheck={async (name) => {
+                    const res = await fetch(`/api/pipeline?duplicateCheck=${encodeURIComponent(name)}`).then(r => r.json())
+                    setDupWarning(res || [])
+                  }}
+                />
               )}
 
               {(createM.data?.error) && (
@@ -1046,7 +1142,7 @@ export default function PipelinePage() {
       <Modal isOpen={!!modal?.edit} onClose={() => { setModal(null); setModalTab('details') }} title="Edit Opportunity">
         {/* Tab bar */}
         <div className="flex border-b border-gray-200 -mt-1 mb-4">
-          {[{ key: 'details', label: '📋 Details' }, { key: 'comments', label: '💬 Comments & Activity' }].map((t) => (
+          {[{ key: 'details', label: '📋 Details' }, { key: 'activities', label: '📞 Activities' }, { key: 'comments', label: '💬 Comments' }].map((t) => (
             <button
               key={t.key}
               onClick={() => setModalTab(t.key)}
@@ -1072,7 +1168,90 @@ export default function PipelinePage() {
               <button onClick={handleSubmit} disabled={updateM.isPending} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors">
                 {updateM.isPending ? 'Saving…' : 'Save Changes'}
               </button>
+              {isAdmin && (
+                <button onClick={() => { setArchiveReason(''); setModal({ archive: modal.edit }) }} className="px-4 py-2.5 border border-red-200 text-red-500 hover:bg-red-50 rounded-xl text-sm transition-colors">
+                  Archive
+                </button>
+              )}
               <button onClick={() => { setModal(null); setModalTab('details') }} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* Activities tab */}
+        {modalTab === 'activities' && (
+          <div className="flex flex-col gap-4">
+            {/* Log a new activity */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Log Activity</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Type *</label>
+                  <select
+                    value={activityForm.type}
+                    onChange={(e) => setActivityForm((p) => ({ ...p, type: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  >
+                    <option value="">Select…</option>
+                    {ACTIVITY_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Date *</label>
+                  <input type="date" value={activityForm.loggedAt}
+                    onChange={(e) => setActivityForm((p) => ({ ...p, loggedAt: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Outcome</label>
+                  <input type="text" value={activityForm.outcome}
+                    onChange={(e) => setActivityForm((p) => ({ ...p, outcome: e.target.value }))}
+                    placeholder="e.g. Sent proposal, Booked demo…"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Notes</label>
+                  <input type="text" value={activityForm.notes}
+                    onChange={(e) => setActivityForm((p) => ({ ...p, notes: e.target.value }))}
+                    placeholder="Brief notes…"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={() => activityM.mutate({ leadId: editLeadId, data: activityForm })}
+                disabled={!activityForm.type || !activityForm.loggedAt || activityM.isPending}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              >
+                {activityM.isPending ? 'Logging…' : 'Log Activity'}
+              </button>
+            </div>
+
+            {/* Activity history */}
+            <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+              {activitiesLoading ? (
+                <div className="animate-pulse h-16 bg-gray-100 rounded-xl" />
+              ) : leadActivities.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">No activities logged yet.</p>
+              ) : leadActivities.map((a) => {
+                const typeInfo = ACTIVITY_TYPES.find(t => t.key === a.type)
+                return (
+                  <div key={a.id} className="flex gap-3 items-start bg-white border border-gray-100 rounded-xl px-3 py-2.5">
+                    <span className="text-base leading-none mt-0.5">{typeInfo?.label?.split(' ')[0] || '📝'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-semibold text-gray-700">{typeInfo?.label?.split(' ').slice(1).join(' ') || a.type}</span>
+                        {a.outcome && <span className="text-xs text-emerald-600 font-medium">→ {a.outcome}</span>}
+                        <span className="text-xs text-gray-400 ml-auto">{new Date(a.loggedAt).toLocaleDateString('en-GB')}</span>
+                      </div>
+                      {a.notes && <p className="text-xs text-gray-500 mt-0.5 truncate">{a.notes}</p>}
+                      <p className="text-xs text-gray-400 mt-0.5">by {a.actor?.name || a.actor?.email}</p>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -1108,9 +1287,8 @@ export default function PipelinePage() {
                   )
                   // Activity log entry
                   const meta = item.meta || {}
-                  const desc = meta.from && meta.to
-                    ? `Moved from ${meta.from} to ${meta.to}`
-                    : item.action?.replace(/_/g, ' ')
+                  const labelFn = ACTIVITY_ACTION_LABELS[item.action]
+                  const desc = labelFn ? labelFn(meta) : item.action?.replace(/_/g, ' ')
                   return (
                     <div key={`l-${item.id}`} className="flex gap-3 items-start">
                       <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center text-xs">⚡</div>
@@ -1156,20 +1334,67 @@ export default function PipelinePage() {
       </Modal>
 
       {/* Confirm Lost */}
-      <Modal isOpen={!!modal?.confirmLoss} onClose={() => setModal(null)} title="Mark as Closed Lost">
+      <Modal isOpen={!!modal?.confirmLoss} onClose={() => { setModal(null); setLostReasonCategory(''); setLostReason('') }} title="Mark as Closed Lost">
         {modal?.confirmLoss && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">Why was <strong>{modal.confirmLoss.companyName}</strong> lost? (optional)</p>
-            <textarea
-              rows={3} value={lostReason} onChange={(e) => setLostReason(e.target.value)}
-              placeholder="e.g. Chose a competitor, budget constraints…"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
-            />
+            <p className="text-sm text-gray-600">Why was <strong>{modal.confirmLoss.companyName}</strong> lost?</p>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Reason *</label>
+              <select
+                value={lostReasonCategory}
+                onChange={(e) => setLostReasonCategory(e.target.value)}
+                className={`w-full border rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-400 ${!lostReasonCategory ? 'border-gray-200' : 'border-gray-300'}`}
+              >
+                <option value="">Select a reason…</option>
+                {LOST_REASON_CATEGORIES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Additional Notes <span className="font-normal text-gray-400">(optional)</span></label>
+              <textarea
+                rows={2} value={lostReason} onChange={(e) => setLostReason(e.target.value)}
+                placeholder="Any additional context…"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+              />
+            </div>
             <div className="flex gap-3">
-              <button onClick={() => confirmStage(modal.confirmLoss, 'ClosedLost', { lostReason })} disabled={stageM.isPending} className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors">
+              <button
+                onClick={() => confirmStage(modal.confirmLoss, 'ClosedLost', { lostReason, lostReasonCategory })}
+                disabled={!lostReasonCategory || stageM.isPending}
+                className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors"
+              >
                 {stageM.isPending ? 'Saving…' : 'Confirm Lost'}
               </button>
-              <button onClick={() => setModal(null)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={() => { setModal(null); setLostReasonCategory(''); setLostReason('') }} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Archive Lead */}
+      <Modal isOpen={!!modal?.archive} onClose={() => { setModal(null); setArchiveReason('') }} title="Archive Lead">
+        {modal?.archive && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Archive <strong>{modal.archive.companyName}</strong>? It will be hidden from the pipeline but its history will be preserved.
+            </p>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Reason *</label>
+              <textarea
+                rows={2} value={archiveReason} onChange={(e) => setArchiveReason(e.target.value)}
+                placeholder="e.g. Duplicate entry, test lead…"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => archiveM.mutate({ id: modal.archive.id, reason: archiveReason })}
+                disabled={!archiveReason.trim() || archiveM.isPending}
+                className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors"
+              >
+                {archiveM.isPending ? 'Archiving…' : 'Archive Lead'}
+              </button>
+              <button onClick={() => { setModal(null); setArchiveReason('') }} className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
             </div>
           </div>
         )}

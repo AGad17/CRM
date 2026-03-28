@@ -98,12 +98,37 @@ function Skeleton() {
   )
 }
 
+// ── Date range presets ─────────────────────────────────────────────────────────
+function getPreset(key) {
+  const now = new Date()
+  const fmt  = (d) => d.toISOString().slice(0, 10)
+  if (key === 'month') {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1)
+    return { from: fmt(from), to: fmt(now) }
+  }
+  if (key === 'quarter') {
+    const q = Math.floor(now.getMonth() / 3)
+    const from = new Date(now.getFullYear(), q * 3, 1)
+    return { from: fmt(from), to: fmt(now) }
+  }
+  if (key === 'year') {
+    return { from: `${now.getFullYear()}-01-01`, to: fmt(now) }
+  }
+  return { from: '', to: '' } // all time
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function PipelineAnalyticsPage() {
   const [country, setCountry] = useState('')
   const [leadSources, setLeadSources] = useState([])
-  const [yearFrom, setYearFrom] = useState('')
-  const [yearTo, setYearTo] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo,   setDateTo]   = useState('')
+  const [preset,   setPreset]   = useState('') // 'month'|'quarter'|'year'|''
+
+  function applyPreset(key) {
+    const { from, to } = getPreset(key)
+    setDateFrom(from); setDateTo(to); setPreset(key)
+  }
 
   const { data: countries = [] } = useQuery({
     queryKey: ['countries'],
@@ -111,30 +136,21 @@ export default function PipelineAnalyticsPage() {
   })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['pipeline-analytics', country, leadSources],
+    queryKey: ['pipeline-analytics', country, leadSources, dateFrom, dateTo],
     queryFn: () => {
       const p = new URLSearchParams()
       if (country) p.set('country', country)
       if (leadSources.length > 0) p.set('leadSources', leadSources.join(','))
+      if (dateFrom) p.set('from', dateFrom)
+      if (dateTo)   p.set('to',   dateTo)
       return fetch(`/api/pipeline/analytics?${p}`).then(r => r.json())
     },
     staleTime: 60_000,
   })
 
-  const { summary, byStage, byChannel, byCountry, byOwner, monthlyTrend = [] } = data || {}
+  const { summary, byStage, byChannel, byCountry, byOwner, monthlyTrend = [], byLostReason = [] } = data || {}
 
-  const years = useMemo(
-    () => [...new Set(monthlyTrend.map((r) => Number(r.month.split('-')[0])))].sort(),
-    [monthlyTrend],
-  )
-  const filteredTrend = useMemo(() => monthlyTrend.filter((r) => {
-    const y = Number(r.month.split('-')[0])
-    if (yearFrom && y < Number(yearFrom)) return false
-    if (yearTo && y > Number(yearTo)) return false
-    return true
-  }), [monthlyTrend, yearFrom, yearTo])
-
-  const hasFilters = country || leadSources.length > 0 || yearFrom || yearTo
+  const hasFilters = country || leadSources.length > 0 || dateFrom || dateTo
 
   if (isLoading) return <Skeleton />
   if (!data) return <div className="text-red-500">Failed to load analytics.</div>
@@ -154,27 +170,35 @@ export default function PipelineAnalyticsPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mr-1">Filter</span>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex flex-wrap items-center gap-3">
+        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Filter</span>
         <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
-        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
+        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
           value={country} onChange={(e) => setCountry(e.target.value)}>
           <option value="">All Countries</option>
           {countries.filter((c) => c.isActive).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
         </select>
-        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
-          value={yearFrom} onChange={(e) => setYearFrom(e.target.value)}>
-          <option value="">From Year</option>
-          {years.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
-          value={yearTo} onChange={(e) => setYearTo(e.target.value)}>
-          <option value="">To Year</option>
-          {years.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+
+        {/* Date range presets */}
+        <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+          {[{ key: '', label: 'All time' }, { key: 'year', label: 'This Year' }, { key: 'quarter', label: 'This Quarter' }, { key: 'month', label: 'This Month' }].map((p) => (
+            <button key={p.key} onClick={() => applyPreset(p.key)}
+              className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${preset === p.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Custom date range */}
+        <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPreset('custom') }}
+          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        <span className="text-xs text-gray-400">to</span>
+        <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPreset('custom') }}
+          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+
         {hasFilters && (
-          <button onClick={() => { setCountry(''); setLeadSources([]); setYearFrom(''); setYearTo('') }}
-            className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2">Clear all</button>
+          <button onClick={() => { setCountry(''); setLeadSources([]); setDateFrom(''); setDateTo(''); setPreset('') }}
+            className="text-xs text-indigo-500 hover:text-indigo-700 font-semibold underline underline-offset-2">Clear all</button>
         )}
       </div>
 
@@ -218,7 +242,7 @@ export default function PipelineAnalyticsPage() {
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Monthly Trend (12 months)</h3>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart
-              data={filteredTrend}
+              data={monthlyTrend}
               margin={{ left: 0, right: 16, top: 0, bottom: 0 }}
             >
               <defs>
@@ -268,6 +292,31 @@ export default function PipelineAnalyticsPage() {
         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">By Owner</h3>
         <DataTable columns={ownerCols()} data={byOwner} exportFilename="pipeline-by-owner.csv" />
       </section>
+
+      {/* Lost by Reason */}
+      {byLostReason.length > 0 && (
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Lost by Reason</h3>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={byLostReason} layout="vertical" margin={{ left: 16, right: 32, top: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                <YAxis type="category" dataKey="reason" width={120} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => [v, 'Leads']} />
+                <Bar dataKey="count" fill="#ef4444" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {byLostReason.map((r) => (
+                <span key={r.reason} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-red-50 text-red-700 border border-red-100 font-medium">
+                  {r.reason} <span className="font-bold">{r.count}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
     </div>
   )

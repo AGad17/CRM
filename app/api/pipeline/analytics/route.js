@@ -7,11 +7,20 @@ export async function GET(req) {
   if (error) return error
 
   const { searchParams } = new URL(req.url)
-  const where = {}
+  const where = { archived: false }
   const country = searchParams.get('country')
   if (country) where.countryCode = country
   const leadSources = searchParams.get('leadSources')?.split(',').filter(Boolean) || []
   if (leadSources.length > 0) where.channel = { in: leadSources }
+
+  // Date range filter (applies to createdAt)
+  const from = searchParams.get('from')
+  const to   = searchParams.get('to')
+  if (from || to) {
+    where.createdAt = {}
+    if (from) where.createdAt.gte = new Date(from)
+    if (to)   where.createdAt.lte = new Date(to + 'T23:59:59.999Z')
+  }
 
   const leads = await prisma.lead.findMany({
     where,
@@ -24,6 +33,7 @@ export async function GET(req) {
       createdAt: true,
       updatedAt: true,
       expectedCloseDate: true,
+      lostReasonCategory: true,
       ownerId: true,
       owner: { select: { name: true } },
     },
@@ -67,10 +77,20 @@ function computeAnalytics(leads) {
     return d.getFullYear() * 100 + d.getMonth() === thisMonthKey
   }).length
 
-  const pipelineValue    = qualified.reduce((s, l) => s + toNum(l.estimatedValue), 0)
+  const pipelineValue = qualified.reduce((s, l) => s + toNum(l.estimatedValue), 0)
+
+  // Use actual win rates per channel for weighted forecast
+  const channelWinRates = {}
+  const allChannels = [...new Set(leads.map(l => l.channel).filter(Boolean))]
+  for (const ch of allChannels) {
+    const chWon  = leads.filter(l => l.channel === ch && l.stage === 'ClosedWon').length
+    const chLost = leads.filter(l => l.channel === ch && l.stage === 'ClosedLost').length
+    const total  = chWon + chLost
+    channelWinRates[ch] = total > 0 ? chWon / total : 0.3 // fallback 30% if no history
+  }
   const weightedForecast =
-    qualified.reduce((s, l) => s + toNum(l.estimatedValue) * 0.5, 0) +
-    active.reduce((s, l)    => s + toNum(l.estimatedValue) * 0.1, 0)
+    qualified.reduce((s, l) => s + toNum(l.estimatedValue) * (channelWinRates[l.channel] ?? 0.3), 0) +
+    active.reduce((s, l)    => s + toNum(l.estimatedValue) * (channelWinRates[l.channel] ?? 0.3) * 0.3, 0)
 
   const summary = {
     total: leads.length,
@@ -176,5 +196,15 @@ function computeAnalytics(leads) {
     }
   }
 
-  return { summary, byStage, byChannel, byCountry, byOwner, monthlyTrend: months }
+  // ── Lost by Reason ───────────────────────────────────────────────────────────
+  const lostReasonMap = {}
+  for (const l of lost) {
+    const key = l.lostReasonCategory || 'Not specified'
+    lostReasonMap[key] = (lostReasonMap[key] || 0) + 1
+  }
+  const byLostReason = Object.entries(lostReasonMap)
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count)
+
+  return { summary, byStage, byChannel, byCountry, byOwner, monthlyTrend: months, byLostReason }
 }

@@ -55,6 +55,15 @@ enum LeadStage {
   Churned
 }
 
+enum LeadActivityType {
+  Call
+  Email
+  Meeting
+  Demo
+  ProposalSent
+  Other
+}
+
 // ─── Invoicing Enums ──────────────────────────────────────────────────────────
 
 enum POSSystem {
@@ -271,7 +280,8 @@ model User {
   assignedCases   EngagementCase[]    @relation("UserAssignedCases")
   caseFollowUps   CaseFollowUp[]      @relation("UserFollowUps")
   notifications   Notification[]      @relation("UserNotifications")
-  leadComments    LeadComment[]       @relation("LeadCommentAuthor")
+  leadComments      LeadComment[]       @relation("LeadCommentAuthor")
+  leadActivities    LeadActivity[]      @relation("LeadActivityActor")
 
   @@map("users")
 }
@@ -561,20 +571,25 @@ model Lead {
   numberOfBranches  Int?
   packageInterest   InvoicePkg?
   stage             LeadStage   @default(Lead)
-  lostReason        String?
-  notes             String?
-  opportunityDate   DateTime    @default(now())
-  expectedCloseDate DateTime?
-  ownerId           String
-  owner             User        @relation("UserLeads", fields: [ownerId], references: [id])
-  opportunityType   DealType?
-  accountId         Int?
-  account           Account?    @relation(fields: [accountId], references: [id])
-  convertedAt       DateTime?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  lostReason          String?
+  lostReasonCategory  String?
+  notes               String?
+  nextActionDate      DateTime?
+  archived            Boolean     @default(false)
+  archiveReason       String?
+  opportunityDate     DateTime    @default(now())
+  expectedCloseDate   DateTime?
+  ownerId             String
+  owner               User        @relation("UserLeads", fields: [ownerId], references: [id])
+  opportunityType     DealType?
+  accountId           Int?
+  account             Account?    @relation(fields: [accountId], references: [id])
+  convertedAt         DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
-  comments LeadComment[]
+  comments   LeadComment[]
+  activities LeadActivity[]
 
   @@map("leads")
 }
@@ -592,6 +607,23 @@ model LeadComment {
 
   @@index([leadId])
   @@map("lead_comments")
+}
+
+model LeadActivity {
+  id        Int              @id @default(autoincrement())
+  leadId    Int
+  type      LeadActivityType
+  notes     String?
+  outcome   String?
+  loggedAt  DateTime
+  actorId   String
+  createdAt DateTime         @default(now())
+
+  lead  Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  actor User @relation("LeadActivityActor", fields: [actorId], references: [id])
+
+  @@index([leadId, loggedAt])
+  @@map("lead_activities")
 }
 
 // ─── Activity Log ─────────────────────────────────────────────────────────────
@@ -845,6 +877,7 @@ enum NotificationType {
   MentionInLeadComment
   OnboardingTaskOverdue
   CaseOverdue
+  LeadAssignmentChanged
 }
 
 enum ChurnReason {

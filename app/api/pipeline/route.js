@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/roleGuard'
-import { getLeads, createLead } from '@/lib/db/pipeline'
+import { getLeads, createLead, findDuplicateLeads } from '@/lib/db/pipeline'
 import { logActivity } from '@/lib/activityLog'
 
 export async function GET(request) {
@@ -8,11 +8,21 @@ export async function GET(request) {
   if (error) return error
 
   const { searchParams } = new URL(request.url)
+
+  // Duplicate-check mode: ?duplicateCheck=CompanyName
+  const dupCheck = searchParams.get('duplicateCheck')
+  if (dupCheck) {
+    const matches = await findDuplicateLeads(dupCheck)
+    return NextResponse.json(matches)
+  }
+
   const filters = {
-    stage:       searchParams.get('stage')       || undefined,
-    channel:     searchParams.get('channel')     || undefined,
-    countryCode: searchParams.get('countryCode') || undefined,
-    ownerId:     searchParams.get('ownerId')     || undefined,
+    stage:          searchParams.get('stage')          || undefined,
+    channel:        searchParams.get('channel')        || undefined,
+    countryCode:    searchParams.get('countryCode')    || undefined,
+    ownerId:        searchParams.get('ownerId')        || undefined,
+    q:              searchParams.get('q')              || undefined,
+    includeArchived: searchParams.get('includeArchived') === 'true',
   }
 
   const leads = await getLeads(filters)
