@@ -6,13 +6,14 @@ import {
   updateCaseStatus,
   addFollowUp,
   deleteCase,
+  voidCase,
 } from '@/lib/db/engagementCases'
 import { createNotification, createNotifications } from '@/lib/db/notifications'
 import { parseMentions } from '@/lib/mentions'
-import { logActivity } from '@/lib/activityLog'
+import { logActivity, getActivityLog } from '@/lib/activityLog'
 
 const STATUS_LABELS = {
-  Open: 'Open', Resolved: 'Resolved', ClosedUnresolved: 'Closed (Unresolved)', Escalated: 'Escalated',
+  Open: 'Open', Resolved: 'Resolved', ClosedUnresolved: 'Closed (Unresolved)', Escalated: 'Escalated', Voided: 'Voided',
 }
 
 /** Collect unique recipient IDs, excluding the actor themselves. */
@@ -26,7 +27,8 @@ export async function GET(request, { params }) {
 
   const c = await getCase(params.id)
   if (!c) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  return NextResponse.json(c)
+  const activityLog = await getActivityLog('Case', params.id)
+  return NextResponse.json({ ...c, activityLog })
 }
 
 export async function PATCH(request, { params }) {
@@ -55,12 +57,57 @@ export async function PATCH(request, { params }) {
   }
 
   if (body.action === 'update') {
+    // Fetch before update to diff changes
+    const old = await getCase(params.id)
     const c = await updateCase(params.id, body)
+
+    // Build human-readable diff
+    const changes = []
+    if (body.title !== undefined && body.title !== old.title)
+      changes.push({ field: 'Title', from: old.title, to: body.title })
+    if (body.channel !== undefined && body.channel !== old.channel)
+      changes.push({ field: 'Channel', from: old.channel, to: body.channel })
+    if (body.objective !== undefined && body.objective !== old.objective)
+      changes.push({ field: 'Objective', from: old.objective, to: body.objective })
+    if (body.description !== undefined && (body.description || null) !== old.description)
+      changes.push({ field: 'Description', from: old.description || '(none)', to: body.description || '(none)' })
+    if (body.assignedToId !== undefined && (body.assignedToId || null) !== old.assignedToId)
+      changes.push({ field: 'Assigned To', from: old.assignedTo?.name || 'Unassigned', to: c.assignedTo?.name || 'Unassigned' })
+    if (body.accountId !== undefined && (body.accountId ? Number(body.accountId) : null) !== old.accountId)
+      changes.push({ field: 'Account', from: old.account?.name || '(none)', to: c.account?.name || '(none)' })
+
+    if (changes.length) {
+      await logActivity({
+        entity: 'Case', entityId: c.id, accountId: c.accountId,
+        action: 'case_edited', actorId: session.user.id, actorName: session.user.name,
+        meta: { title: c.title, changes },
+      })
+    }
+
     // Notify newly assigned person (if reassigned and not self)
-    if (body.assignedToId && body.assignedToId !== session.user.id) {
+    if (body.assignedToId && body.assignedToId !== session.user.id && body.assignedToId !== old.assignedToId) {
       await createNotifications([body.assignedToId], {
         type: 'CaseReassigned',
         title: `Case reassigned to you: ${c.title}`,
+        link: `/cases/${c.id}`,
+      })
+    }
+    return NextResponse.json(c)
+  }
+
+  if (body.action === 'void') {
+    if (!body.reason?.trim()) return NextResponse.json({ error: 'reason is required' }, { status: 400 })
+    const c = await voidCase(params.id, body.reason.trim())
+    await logActivity({
+      entity: 'Case', entityId: c.id, accountId: c.accountId,
+      action: 'case_voided', actorId: session.user.id, actorName: session.user.name,
+      meta: { title: c.title, reason: body.reason.trim() },
+    })
+    const recs = recipients(c, session.user.id)
+    if (recs.length) {
+      await createNotifications(recs, {
+        type: 'CaseStatusChanged',
+        title: `Case voided: ${c.title}`,
         link: `/cases/${c.id}`,
       })
     }

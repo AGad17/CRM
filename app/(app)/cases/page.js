@@ -25,7 +25,7 @@ export const OBJECTIVE_LABELS = {
   Training:         'Training',
 }
 
-// Objectives available when creating a case
+// Objectives available when creating/editing a case
 export const CASE_FORM_OBJECTIVES = {
   BugReport:        'Bug Report',
   TechnicalRequest: 'Technical Request',
@@ -37,6 +37,7 @@ export const STATUS_LABELS = {
   Resolved:         'Resolved',
   ClosedUnresolved: 'Closed – Unresolved',
   Escalated:        'Escalated',
+  Voided:           'Voided',
 }
 
 export const STATUS_COLORS = {
@@ -44,6 +45,7 @@ export const STATUS_COLORS = {
   Resolved:         'bg-emerald-50 text-emerald-700',
   ClosedUnresolved: 'bg-gray-100 text-gray-500',
   Escalated:        'bg-orange-50 text-orange-700',
+  Voided:           'bg-red-50 text-red-400',
 }
 
 export const OBJECTIVE_COLORS = {
@@ -238,6 +240,180 @@ function CaseModal({ accounts, staffUsers, activeOutages = [], onClose, onSave, 
   )
 }
 
+// ─── Edit Case Modal ──────────────────────────────────────────────────────────
+
+function EditCaseModal({ caseData, accounts, staffUsers, onClose, onSave, isPending }) {
+  const [form, setForm] = useState({
+    accountId:    caseData.account ? String(caseData.account.id) : '',
+    title:        caseData.title || '',
+    channel:      caseData.channel || '',
+    objective:    caseData.objective || '',
+    description:  caseData.description || '',
+    assignedToId: caseData.assignedTo?.id || '',
+  })
+  const [search, setSearch] = useState(caseData.account?.name || '')
+
+  const filtered = useMemo(() => {
+    if (!search) return accounts
+    return accounts.filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
+  }, [accounts, search])
+
+  const valid = form.title && form.channel && form.objective
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gray-800">Edit Case #{caseData.id}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        {/* Account */}
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Account</label>
+          <input
+            type="text"
+            placeholder="Search account…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setForm(f => ({ ...f, accountId: '' })) }}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          />
+          {search && !form.accountId && (
+            <div className="border border-gray-200 rounded-lg overflow-y-auto max-h-40 bg-white shadow-sm">
+              {filtered.slice(0, 20).map(a => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => { setForm(f => ({ ...f, accountId: String(a.id) })); setSearch(a.name) }}
+                  className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-indigo-50"
+                >
+                  {a.name}
+                </button>
+              ))}
+              {filtered.length === 0 && <p className="px-3 py-2 text-xs text-gray-400">No accounts found</p>}
+            </div>
+          )}
+        </div>
+
+        {/* Title */}
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Title <span className="text-red-500">*</span></label>
+          <input
+            type="text"
+            value={form.title}
+            onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Channel <span className="text-red-500">*</span></label>
+            <select
+              value={form.channel}
+              onChange={e => setForm(f => ({ ...f, channel: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+            >
+              <option value="">Select…</option>
+              {Object.entries(CHANNEL_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Objective <span className="text-red-500">*</span></label>
+            <select
+              value={form.objective}
+              onChange={e => setForm(f => ({ ...f, objective: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+            >
+              <option value="">Select…</option>
+              {Object.entries(CASE_FORM_OBJECTIVES).map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Description</label>
+          <textarea
+            value={form.description}
+            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+            rows={3}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Assigned To</label>
+          <select
+            value={form.assignedToId}
+            onChange={e => setForm(f => ({ ...f, assignedToId: e.target.value }))}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+          >
+            <option value="">— Unassigned —</option>
+            {staffUsers.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+          </select>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button
+            onClick={() => onSave(form)}
+            disabled={!valid || isPending}
+            className="px-4 py-2 rounded-lg text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-50"
+          >
+            {isPending ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Void Case Modal ──────────────────────────────────────────────────────────
+
+function VoidModal({ caseData, onClose, onConfirm, isPending }) {
+  const [reason, setReason] = useState('')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gray-800">Void Case #{caseData.id}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+        <p className="text-sm text-gray-600">
+          Voiding marks this case as raised by mistake. It will be kept as a record but excluded from open case counts.
+        </p>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Reason <span className="text-red-500">*</span></label>
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            rows={3}
+            placeholder="Why is this case being voided? (e.g. misunderstood issue, wrong account, duplicate)"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 resize-none"
+          />
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(reason)}
+            disabled={!reason.trim() || isPending}
+            className="px-4 py-2 rounded-lg text-sm bg-red-500 hover:bg-red-600 text-white font-medium disabled:opacity-50"
+          >
+            {isPending ? 'Voiding…' : 'Void Case'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CasesPage() {
@@ -246,13 +422,15 @@ export default function CasesPage() {
   const [filters, setFilters] = useState({ status: '', objective: '', assignedToId: '', from: '', to: '' })
   const [search,  setSearch]  = useState('')
   const [modal,   setModal]   = useState(false)
+  const [editCase,  setEditCase]  = useState(null) // case object to edit
+  const [voidCase,  setVoidCase]  = useState(null) // case object to void
 
   const { data: cases = [], isLoading } = useQuery({
     queryKey: ['cases', filters],
     queryFn: () => {
       const p = new URLSearchParams()
       Object.entries(filters).forEach(([k, v]) => v && p.set(k, v))
-      return fetch(`/api/cases?${p}`).then(r => r.json())
+      return fetch(`/api/cases?${p}`).then(r => r.json()).then(d => Array.isArray(d) ? d : [])
     },
   })
 
@@ -281,21 +459,31 @@ export default function CasesPage() {
     onSuccess: () => { setModal(false); qc.invalidateQueries({ queryKey: ['cases'] }) },
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => fetch(`/api/cases/${id}`, { method: 'DELETE' }).then(r => r.json()),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cases'] }),
+  const editMutation = useMutation({
+    mutationFn: ({ id, body }) =>
+      fetch(`/api/cases/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update', ...body }) })
+        .then(r => r.json()),
+    onSuccess: () => { setEditCase(null); qc.invalidateQueries({ queryKey: ['cases'] }) },
   })
 
-  // Derived KPIs
+  const voidMutation = useMutation({
+    mutationFn: ({ id, reason }) =>
+      fetch(`/api/cases/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'void', reason }) })
+        .then(r => r.json()),
+    onSuccess: () => { setVoidCase(null); qc.invalidateQueries({ queryKey: ['cases'] }) },
+  })
+
+  // Derived KPIs — exclude Voided from all counts
   const kpis = useMemo(() => {
-    const now   = new Date()
-    const month = new Date(now.getFullYear(), now.getMonth(), 1)
+    const now    = new Date()
+    const month  = new Date(now.getFullYear(), now.getMonth(), 1)
+    const active = cases.filter(c => c.status !== 'Voided')
     return {
-      open:       cases.filter(c => c.status === 'Open').length,
-      resolvedTM: cases.filter(c => c.status === 'Resolved' && new Date(c.resolvedAt) >= month).length,
-      escalated:  cases.filter(c => c.status === 'Escalated').length,
+      open:       active.filter(c => c.status === 'Open').length,
+      resolvedTM: active.filter(c => c.status === 'Resolved' && new Date(c.resolvedAt) >= month).length,
+      escalated:  active.filter(c => c.status === 'Escalated').length,
       avgTTR: (() => {
-        const resolved = cases.filter(c => c.resolvedAt)
+        const resolved = active.filter(c => c.resolvedAt)
         if (!resolved.length) return null
         const avgMs = resolved.reduce((s, c) => s + (new Date(c.resolvedAt) - new Date(c.openedAt)), 0) / resolved.length
         const hrs = avgMs / (1000 * 60 * 60)
@@ -438,12 +626,20 @@ export default function CasesPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {displayed.map(c => {
-                  const ttr = formatTTR(c.openedAt, c.resolvedAt)
+                  const ttr      = formatTTR(c.openedAt, c.resolvedAt)
+                  const isVoided = c.status === 'Voided'
+                  const canEdit  = !isVoided
+                  const canVoid  = c.status === 'Open' || c.status === 'Escalated'
                   return (
-                    <tr key={c.id} className="hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => window.location.href = `/cases/${c.id}`}>
+                    <tr
+                      key={c.id}
+                      className={`hover:bg-gray-50 transition-colors cursor-pointer group ${isVoided ? 'opacity-60' : ''}`}
+                      onClick={() => window.location.href = `/cases/${c.id}`}
+                    >
                       <td className="px-4 py-3 text-gray-400 font-mono text-xs">#{c.id}</td>
-                      <td className="px-4 py-3 font-medium text-gray-800 max-w-[220px] truncate">{c.title}</td>
+                      <td className={`px-4 py-3 font-medium text-gray-800 max-w-[220px] truncate ${isVoided ? 'line-through text-gray-400' : ''}`}>
+                        {c.title}
+                      </td>
                       <td className="px-4 py-3 text-gray-600">
                         {c.account
                           ? <Link href={`/accounts/${c.account.id}`} onClick={e => e.stopPropagation()} className="text-indigo-600 hover:underline">{c.account.name}</Link>
@@ -468,14 +664,27 @@ export default function CasesPage() {
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                         {ttr || <span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={e => { e.stopPropagation(); if (confirm('Delete this case?')) deleteMutation.mutate(c.id) }}
-                          className="text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100"
-                          title="Delete"
-                        >
-                          🗑
-                        </button>
+                      <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {canEdit && (
+                            <button
+                              onClick={() => setEditCase(c)}
+                              title="Edit case"
+                              className="text-xs text-indigo-400 hover:text-indigo-600 px-1.5 py-0.5 rounded hover:bg-indigo-50"
+                            >
+                              ✏️
+                            </button>
+                          )}
+                          {canVoid && (
+                            <button
+                              onClick={() => setVoidCase(c)}
+                              title="Void case"
+                              className="text-xs text-red-400 hover:text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50"
+                            >
+                              ⊘
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -502,6 +711,28 @@ export default function CasesPage() {
           onClose={() => setModal(false)}
           onSave={(form) => createMutation.mutate(form)}
           isPending={createMutation.isPending}
+        />
+      )}
+
+      {/* Edit Modal */}
+      {editCase && (
+        <EditCaseModal
+          caseData={editCase}
+          accounts={accounts}
+          staffUsers={staffUsers}
+          onClose={() => setEditCase(null)}
+          onSave={(form) => editMutation.mutate({ id: editCase.id, body: form })}
+          isPending={editMutation.isPending}
+        />
+      )}
+
+      {/* Void Modal */}
+      {voidCase && (
+        <VoidModal
+          caseData={voidCase}
+          onClose={() => setVoidCase(null)}
+          onConfirm={(reason) => voidMutation.mutate({ id: voidCase.id, reason })}
+          isPending={voidMutation.isPending}
         />
       )}
     </div>

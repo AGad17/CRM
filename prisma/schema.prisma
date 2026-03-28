@@ -729,6 +729,7 @@ enum CaseStatus {
   Resolved
   ClosedUnresolved
   Escalated
+  Voided
 }
 
 enum OutageStatus {
@@ -787,6 +788,7 @@ model EngagementCase {
   title        String
   description  String?
   status       CaseStatus          @default(Open)
+  voidReason   String?
   openedAt     DateTime            @default(now())
   resolvedAt   DateTime?
   outageStatus OutageStatus?
