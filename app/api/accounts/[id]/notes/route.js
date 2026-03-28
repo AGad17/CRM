@@ -40,15 +40,20 @@ export async function POST(request, { params }) {
   })
   // @mention notifications
   const actorName = session?.user?.name || session?.user?.email || 'Someone'
-  for (const { userId } of parseMentions(body.content)) {
-    if (userId !== session?.user?.id) {
-      await createNotification({
-        userId,
-        type:  'UserMentioned',
-        title: `${actorName} mentioned you in an Account note`,
-        body:  body.content.slice(0, 120),
-        link:  `/accounts/${id}`,
-      })
+  const mentions = parseMentions(body.content)
+  if (mentions.length) {
+    const account = await prisma.account.findUnique({ where: { id: Number(id) }, select: { name: true } })
+    const accountName = account?.name || 'an account'
+    for (const { userId } of mentions) {
+      if (userId !== session?.user?.id) {
+        await createNotification({
+          userId,
+          type:  'UserMentioned',
+          title: `${actorName} mentioned you in a note on "${accountName}"`,
+          body:  body.content.slice(0, 120),
+          link:  `/accounts/${id}#note-${note.id}`,
+        })
+      }
     }
   }
   return NextResponse.json(note, { status: 201 })

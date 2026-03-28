@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/roleGuard'
 import { getLeadComments, createLeadComment } from '@/lib/db/leadComments'
 import { parseMentions } from '@/lib/mentions'
 import { createNotification } from '@/lib/db/notifications'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request, { params }) {
   const { error } = await requirePermission('pipeline', 'view')
@@ -37,15 +38,20 @@ export async function POST(request, { params }) {
   })
 
   // Fire @mention notifications (in-app + email via createNotification)
-  for (const { userId } of parseMentions(body.content)) {
-    if (userId !== authorId) {
-      await createNotification({
-        userId,
-        type:  'MentionInLeadComment',
-        title: `${authorName} mentioned you in a lead comment`,
-        body:  body.content.slice(0, 120),
-        link:  '/pipeline',
-      })
+  const mentions = parseMentions(body.content)
+  if (mentions.length) {
+    const lead = await prisma.lead.findUnique({ where: { id: Number(id) }, select: { companyName: true } })
+    const leadName = lead?.companyName || 'a lead'
+    for (const { userId } of mentions) {
+      if (userId !== authorId) {
+        await createNotification({
+          userId,
+          type:  'MentionInLeadComment',
+          title: `${authorName} mentioned you in a comment on "${leadName}"`,
+          body:  body.content.slice(0, 120),
+          link:  `/pipeline?lead=${id}&comment=${comment.id}`,
+        })
+      }
     }
   }
 

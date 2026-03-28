@@ -71,7 +71,7 @@ export async function PATCH(request, { params }) {
       await createNotifications(recs, {
         type: 'CaseFollowUpAdded',
         title: `Follow-up added on: ${c.title}`,
-        link: `/cases/${c.id}`,
+        link: `/cases/${c.id}#followup-${fu.id}`,
       })
     }
     // @mention notifications
@@ -82,9 +82,9 @@ export async function PATCH(request, { params }) {
         await createNotification({
           userId,
           type:  'UserMentioned',
-          title: `${actorName} mentioned you in Case: ${c.title}`,
+          title: `${actorName} mentioned you in a follow-up on "${c.title}"`,
           body:  body.notes?.slice(0, 120) || undefined,
-          link:  `/cases/${c.id}`,
+          link:  `/cases/${c.id}#followup-${fu.id}`,
         })
       }
     }

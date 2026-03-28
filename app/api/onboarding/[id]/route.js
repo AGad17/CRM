@@ -4,8 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { requirePermission } from '@/lib/roleGuard'
 import { getOnboardingTracker, advancePhase, setPhase, addNote, assignAccountManager, assignOnboardingTeam } from '@/lib/db/onboarding'
 import { logActivity } from '@/lib/activityLog'
-import { createNotification } from '@/lib/db/notifications'
+import { createNotification, createNotifications } from '@/lib/db/notifications'
 import { parseMentions } from '@/lib/mentions'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request, { params }) {
   const { error } = await requirePermission('onboarding', 'view')
@@ -60,20 +61,25 @@ export async function PATCH(request, { params }) {
 
     if (body.action === 'notes') {
       if (!body.content?.trim()) return NextResponse.json({ error: 'content is required' }, { status: 400 })
-      // Capture the author name from the current session
-      const session = await getServerSession(authOptions)
-      const author  = session?.user?.name || session?.user?.email || null
-      const note    = await addNote(id, body.content.trim(), author)
+      const author = session?.user?.name || session?.user?.email || null
+      const note   = await addNote(id, body.content.trim(), author)
       // @mention notifications
-      for (const { userId } of parseMentions(body.content)) {
-        if (userId !== session?.user?.id) {
-          await createNotification({
-            userId,
-            type:  'UserMentioned',
-            title: `${author || 'Someone'} mentioned you in an Onboarding note`,
-            body:  body.content.slice(0, 120),
-            link:  `/onboarding/${id}`,
-          })
+      const mentions = parseMentions(body.content)
+      if (mentions.length) {
+        const tracker = await prisma.onboardingTracker.findUnique({
+          where: { id: Number(id) }, select: { account: { select: { name: true } } },
+        })
+        const accountName = tracker?.account?.name || 'an account'
+        for (const { userId } of mentions) {
+          if (userId !== session?.user?.id) {
+            await createNotification({
+              userId,
+              type:  'UserMentioned',
+              title: `${author || 'Someone'} mentioned you in an Onboarding note for "${accountName}"`,
+              body:  body.content.slice(0, 120),
+              link:  `/onboarding/${id}#note-${note.id}`,
+            })
+          }
         }
       }
       return NextResponse.json(note)
@@ -81,6 +87,16 @@ export async function PATCH(request, { params }) {
 
     if (body.action === 'assign') {
       const tracker = await assignAccountManager(id, body.accountManagerId)
+      // Notify the newly assigned account manager
+      if (body.accountManagerId && body.accountManagerId !== session?.user?.id) {
+        const accountName = tracker?.account?.name || 'an account'
+        await createNotification({
+          userId: body.accountManagerId,
+          type:   'CaseAssigned',
+          title:  `${actor.actorName} assigned you as Account Manager for "${accountName}"`,
+          link:   `/onboarding/${id}`,
+        })
+      }
       return NextResponse.json(tracker)
     }
 
@@ -89,6 +105,18 @@ export async function PATCH(request, { params }) {
         onboardingSpecialistId: body.onboardingSpecialistId,
         trainingSpecialistId:   body.trainingSpecialistId,
       })
+      // Notify newly assigned team members
+      const accountName = tracker?.account?.name || 'an account'
+      const assignees = [body.onboardingSpecialistId, body.trainingSpecialistId]
+        .filter(Boolean)
+        .filter((uid) => uid !== session?.user?.id)
+      if (assignees.length) {
+        await createNotifications(assignees, {
+          type:  'CaseAssigned',
+          title: `${actor.actorName} assigned you to the Onboarding team for "${accountName}"`,
+          link:  `/onboarding/${id}`,
+        })
+      }
       return NextResponse.json(tracker)
     }
 

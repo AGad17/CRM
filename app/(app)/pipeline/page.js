@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
 import { KPICard } from '@/components/ui/KPICard'
@@ -346,8 +346,9 @@ function CardActions({ lead, onStageAction, isAdmin }) {
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function PipelinePage() {
-  const router   = useRouter()
-  const qc       = useQueryClient()
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+  const qc           = useQueryClient()
   const { data: session } = useSession()
   const isAdmin  = session?.user?.role === 'CCO_ADMIN'
 
@@ -385,6 +386,24 @@ export default function PipelinePage() {
     queryKey: ['pipeline-leads'],
     queryFn: () => fetch('/api/pipeline').then((r) => r.json()),
   })
+
+  // Auto-open edit modal + comments tab from notification deep-link (?lead=ID&comment=ID)
+  useEffect(() => {
+    const leadId    = searchParams.get('lead')
+    const commentId = searchParams.get('comment')
+    if (!leadId || !leads.length) return
+    const lead = leads.find((l) => String(l.id) === String(leadId))
+    if (!lead) return
+    setModal({ edit: lead })
+    setModalTab('comments')
+    // After comments render, scroll to the specific comment
+    if (commentId) {
+      setTimeout(() => {
+        const el = document.getElementById(`comment-${commentId}`)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 600)
+    }
+  }, [leads, searchParams])
 
   const { data: agents = [] } = useQuery({
     queryKey: ['invoicing-agents'],
@@ -1074,7 +1093,7 @@ export default function PipelinePage() {
                 )
                 return timeline.map((item) => {
                   if (item._type === 'comment') return (
-                    <div key={`c-${item.id}`} className="flex gap-3">
+                    <div key={`c-${item.id}`} id={`comment-${item.id}`} className="flex gap-3 scroll-mt-4">
                       <div className="flex-shrink-0 w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
                         {(item.author?.name || '?')[0].toUpperCase()}
                       </div>

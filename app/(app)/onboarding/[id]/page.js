@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
@@ -109,6 +109,15 @@ export default function OnboardingDetailPage() {
     queryKey: ['onboarding', id],
     queryFn: () => fetch(`/api/onboarding/${id}`).then(r => r.json()),
   })
+
+  // Scroll to a specific note when navigated via notification deep-link (#note-{id})
+  useEffect(() => {
+    if (!tracker?.noteEntries?.length) return
+    const hash = window.location.hash
+    if (!hash.startsWith('#note-')) return
+    const el = document.getElementById(hash.slice(1))
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [tracker?.noteEntries])
 
   const { data: staffUsers = [] } = useQuery({
     queryKey: ['staff-users'],
@@ -1057,7 +1066,7 @@ export default function OnboardingDetailPage() {
               const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
               const timeStr = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
               return (
-                <div key={note.id} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                <div key={note.id} id={`note-${note.id}`} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 scroll-mt-24">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <span className="text-xs font-semibold text-gray-700">{dateStr}</span>
                     <span className="text-gray-300 text-xs">·</span>

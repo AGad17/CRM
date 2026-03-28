@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -105,6 +105,15 @@ export default function AccountDetailPage() {
     queryFn: () => fetch(`/api/accounts/${id}/notes`).then((r) => r.json()),
     enabled: !!id,
   })
+
+  // Scroll to a specific note when navigated via notification deep-link (#note-{id})
+  useEffect(() => {
+    if (!notes.length) return
+    const hash = window.location.hash
+    if (!hash.startsWith('#note-')) return
+    const el = document.getElementById(hash.slice(1))
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [notes])
 
   const addNote = useMutation({
     mutationFn: (content) =>
@@ -497,7 +506,7 @@ export default function AccountDetailPage() {
           {notes.length > 0 && (
             <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-50">
               {notes.map((note) => (
-                <div key={note.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 group">
+                <div key={note.id} id={`note-${note.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 group scroll-mt-24">
                   <div className="flex-1 min-w-0">
                     <RenderedNote content={note.content} className="text-sm text-gray-800" />
                     <p className="text-xs text-gray-400 mt-1">

@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -36,6 +36,15 @@ export default function CaseDetailPage() {
     queryKey: ['case', id],
     queryFn: () => fetch(`/api/cases/${id}`).then(r => r.json()),
   })
+
+  // Scroll to a specific follow-up when navigated via notification deep-link (#followup-{id})
+  useEffect(() => {
+    if (!c?.followUps?.length) return
+    const hash = window.location.hash
+    if (!hash.startsWith('#followup-')) return
+    const el = document.getElementById(hash.slice(1))
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [c])
 
   const { data: staffUsers = [] } = useQuery({
     queryKey: ['staff-users'],
@@ -277,7 +286,7 @@ export default function CaseDetailPage() {
 
             {/* Follow-ups */}
             {c.followUps?.map(fu => (
-              <div key={fu.id} className="relative flex gap-4 pb-5 group">
+              <div key={fu.id} id={`followup-${fu.id}`} className="relative flex gap-4 pb-5 group scroll-mt-24">
                 <div className="relative z-10 w-6 h-6 rounded-full bg-gray-100 border-2 border-gray-200 flex-shrink-0 flex items-center justify-center">
                   <span className="text-xs">💬</span>
                 </div>
