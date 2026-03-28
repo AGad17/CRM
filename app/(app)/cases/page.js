@@ -67,7 +67,7 @@ function formatTTR(openedAt, resolvedAt) {
 
 // ─── Create Case Modal ────────────────────────────────────────────────────────
 
-function CaseModal({ accounts, staffUsers, activeOutages = [], onClose, onSave, prefillAccountId }) {
+function CaseModal({ accounts, staffUsers, activeOutages = [], onClose, onSave, prefillAccountId, isPending }) {
   const [form, setForm] = useState({
     accountId:    prefillAccountId || '',
     title:        '',
@@ -227,10 +227,10 @@ function CaseModal({ accounts, staffUsers, activeOutages = [], onClose, onSave, 
           </button>
           <button
             onClick={() => onSave(form)}
-            disabled={!valid}
+            disabled={!valid || isPending}
             className="px-4 py-2 rounded-lg text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-50"
           >
-            Open Case
+            {isPending ? 'Opening…' : 'Open Case'}
           </button>
         </div>
       </div>
@@ -501,6 +501,7 @@ export default function CasesPage() {
           activeOutages={activeOutages}
           onClose={() => setModal(false)}
           onSave={(form) => createMutation.mutate(form)}
+          isPending={createMutation.isPending}
         />
       )}
     </div>
