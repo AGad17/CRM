@@ -9,6 +9,7 @@ import {
 } from '@/lib/db/engagementCases'
 import { createNotification, createNotifications } from '@/lib/db/notifications'
 import { parseMentions } from '@/lib/mentions'
+import { logActivity } from '@/lib/activityLog'
 
 const STATUS_LABELS = {
   Open: 'Open', Resolved: 'Resolved', ClosedUnresolved: 'Closed (Unresolved)', Escalated: 'Escalated',
@@ -45,6 +46,11 @@ export async function PATCH(request, { params }) {
         link: `/cases/${c.id}`,
       })
     }
+    await logActivity({
+      entity: 'Case', entityId: c.id, accountId: c.accountId,
+      action: 'status_changed', actorId: session.user.id, actorName: session.user.name,
+      meta: { to: body.status, title: c.title },
+    })
     return NextResponse.json(c)
   }
 
@@ -88,6 +94,11 @@ export async function PATCH(request, { params }) {
         })
       }
     }
+    await logActivity({
+      entity: 'Case', entityId: Number(params.id), accountId: c.accountId,
+      action: 'follow_up_added', actorId: session.user.id, actorName: session.user.name,
+      meta: { title: c.title },
+    })
     return NextResponse.json(fu, { status: 201 })
   }
 

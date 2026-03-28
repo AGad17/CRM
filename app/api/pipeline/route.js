@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/roleGuard'
 import { getLeads, createLead } from '@/lib/db/pipeline'
+import { logActivity } from '@/lib/activityLog'
 
 export async function GET(request) {
   const { error } = await requirePermission('pipeline', 'view')
@@ -19,7 +20,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const { error } = await requirePermission('pipeline', 'create')
+  const { error, session } = await requirePermission('pipeline', 'create')
   if (error) return error
 
   const body = await request.json()
@@ -40,5 +41,10 @@ export async function POST(request) {
   }
 
   const lead = await createLead(body)
+  await logActivity({
+    entity: 'Lead', entityId: lead.id, accountId: lead.accountId || null,
+    action: 'created', actorId: session?.user?.id, actorName: session?.user?.name,
+    meta: { companyName: lead.companyName, channel: lead.channel },
+  })
   return NextResponse.json(lead, { status: 201 })
 }

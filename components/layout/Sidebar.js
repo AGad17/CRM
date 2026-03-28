@@ -56,6 +56,13 @@ function IcOperations() {
     </svg>
   )
 }
+function IcTeam() {
+  return (
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-5.477-3.722M17 20H7m10 0v-2c0-.894-.195-1.74-.543-2.5M7 20H2v-2a4 4 0 015.477-3.722M7 20v-2c0-.894.195-1.74.543-2.5m7.914 0A7.966 7.966 0 0012 13c-1.657 0-3.182.506-4.457 1.378m7.914 0A8.003 8.003 0 0112 13c-1.107 0-2.162.226-3.114.635M12 11a4 4 0 100-8 4 4 0 000 8z" />
+    </svg>
+  )
+}
 function IcSettings() {
   return (
     <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
@@ -149,6 +156,13 @@ const NAV = [
       { href: '/cases',            label: 'Cases'            },
       { href: '/cases/report',     label: 'Case Report'      },
       { href: '/outages',          label: 'Outages'          },
+    ],
+  },
+  {
+    label: 'Team', icon: IcTeam,
+    children: [
+      { href: '/team/workload', label: 'Workload'      },
+      { href: '/team/activity', label: 'Activity Feed' },
     ],
   },
   {

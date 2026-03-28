@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/roleGuard'
 import { getCases, createCase } from '@/lib/db/engagementCases'
 import { createNotification } from '@/lib/db/notifications'
+import { logActivity } from '@/lib/activityLog'
 
 export async function GET(request) {
   const { error } = await requirePermission('cases', 'view')
@@ -33,6 +34,12 @@ export async function POST(request) {
   }
 
   const c = await createCase(body, session.user.id)
+
+  await logActivity({
+    entity: 'Case', entityId: c.id, accountId: c.accountId,
+    action: 'opened', actorId: session.user.id, actorName: session.user.name,
+    meta: { title: c.title, objective: c.objective },
+  })
 
   // Notify the assignee (skip self-assignment)
   if (c.assignedToId && c.assignedToId !== session.user.id) {

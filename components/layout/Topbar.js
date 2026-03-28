@@ -33,6 +33,8 @@ const TITLES = {
   '/settings/pricing':         'Pricing Config',
   '/settings/pricing-history': 'Pricing History',
   '/notifications':            'Notifications',
+  '/team/workload':            'Team Workload',
+  '/team/activity':            'Activity Feed',
 }
 
 function IcMenu() {
