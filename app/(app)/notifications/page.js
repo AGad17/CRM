@@ -16,6 +16,8 @@ const TYPE_ICONS = {
   InvoiceOverdue:    '💸',
   UserMentioned:        '@',
   MentionInLeadComment: '💬',
+  OnboardingTaskOverdue: '⏰',
+  CaseOverdue:           '🔔',
 }
 
 const TYPE_CATEGORY = {
@@ -25,6 +27,8 @@ const TYPE_CATEGORY = {
   InvoiceOverdue: 'invoices',
   UserMentioned: 'mentions',
   MentionInLeadComment: 'mentions',
+  OnboardingTaskOverdue: 'overdue',
+  CaseOverdue:           'overdue',
 }
 
 const TABS = [
@@ -35,6 +39,7 @@ const TABS = [
   { key: 'outages',  label: 'Outages' },
   { key: 'renewals', label: 'Renewals' },
   { key: 'invoices', label: 'Invoices' },
+  { key: 'overdue',  label: '⏰ Overdue' },
 ]
 
 function relativeTime(dateStr) {
