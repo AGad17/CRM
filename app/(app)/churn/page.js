@@ -95,6 +95,28 @@ function LensSummaryTable({ s }) {
       cumulativeRate: s.branches.cumulativeRate,
     },
     {
+      lens:    '🍳 Central Kitchens',
+      unit:    'kitchens',
+      total:   num(s.centralKitchens.total),
+      active:  num(s.centralKitchens.active),
+      cancelled: num(s.centralKitchens.churned),
+      expired: num(s.centralKitchens.expired),
+      lost:    num(s.centralKitchens.lost),
+      churnRate:      s.centralKitchens.churnRate,
+      cumulativeRate: s.centralKitchens.cumulativeRate,
+    },
+    {
+      lens:    '🏭 Warehouses',
+      unit:    'warehouses',
+      total:   num(s.warehouses.total),
+      active:  num(s.warehouses.active),
+      cancelled: num(s.warehouses.churned),
+      expired: num(s.warehouses.expired),
+      lost:    num(s.warehouses.lost),
+      churnRate:      s.warehouses.churnRate,
+      cumulativeRate: s.warehouses.cumulativeRate,
+    },
+    {
       lens:    '💵 MRR',
       unit:    'usd',
       total:   usd(s.mrr.total),
@@ -252,6 +274,20 @@ export default function ChurnPage() {
         : <span className="text-gray-300">—</span>,
       getValue: (r) => r.numberOfBranches ?? 0,
     },
+    {
+      key: 'centralKitchens', label: 'CKs',
+      render: (r) => r.centralKitchens
+        ? <span className="font-semibold text-gray-700">{r.centralKitchens}</span>
+        : <span className="text-gray-300">—</span>,
+      getValue: (r) => r.centralKitchens ?? 0,
+    },
+    {
+      key: 'warehouses', label: 'Warehouses',
+      render: (r) => r.warehouses
+        ? <span className="font-semibold text-gray-700">{r.warehouses}</span>
+        : <span className="text-gray-300">—</span>,
+      getValue: (r) => r.warehouses ?? 0,
+    },
     { key: 'country',    label: 'Country',  render: (r) => r.country },
     { key: 'leadSource', label: 'Source',   render: (r) => r.leadSource?.replace(/([A-Z])/g, ' $1').trim() },
     { key: 'status',     label: 'Status',   render: (r) => <StatusBadge status={r.status} /> },
@@ -385,11 +421,13 @@ export default function ChurnPage() {
           {/* Visual: churn % by lens */}
           {summary && (() => {
             const chartData = [
-              { lens: 'Accounts',       churnRate: summary.accounts.churnRate * 100,      cumRate: summary.accounts.cumulativeRate * 100 },
-              { lens: 'Branches',       churnRate: summary.branches.churnRate * 100,      cumRate: summary.branches.cumulativeRate * 100 },
-              { lens: 'MRR',            churnRate: summary.mrr.churnRate * 100,           cumRate: summary.mrr.cumulativeRate * 100 },
-              { lens: 'ARR',            churnRate: summary.arr.churnRate * 100,           cumRate: summary.arr.cumulativeRate * 100 },
-              { lens: 'Contract Value', churnRate: summary.contractValue.churnRate * 100, cumRate: summary.contractValue.cumulativeRate * 100 },
+              { lens: 'Accounts',       churnRate: summary.accounts.churnRate * 100,        cumRate: summary.accounts.cumulativeRate * 100 },
+              { lens: 'Branches',       churnRate: summary.branches.churnRate * 100,        cumRate: summary.branches.cumulativeRate * 100 },
+              { lens: 'CKs',            churnRate: summary.centralKitchens.churnRate * 100, cumRate: summary.centralKitchens.cumulativeRate * 100 },
+              { lens: 'Warehouses',     churnRate: summary.warehouses.churnRate * 100,      cumRate: summary.warehouses.cumulativeRate * 100 },
+              { lens: 'MRR',            churnRate: summary.mrr.churnRate * 100,             cumRate: summary.mrr.cumulativeRate * 100 },
+              { lens: 'ARR',            churnRate: summary.arr.churnRate * 100,             cumRate: summary.arr.cumulativeRate * 100 },
+              { lens: 'Contract Value', churnRate: summary.contractValue.churnRate * 100,   cumRate: summary.contractValue.cumulativeRate * 100 },
             ]
             return (
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 pt-5 pb-4">
