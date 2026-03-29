@@ -133,14 +133,14 @@ export default function ChurnPage() {
   const accountCols = [
     {
       key: 'name', label: 'Account',
-      render: (r) => (
-        <div>
-          <p className="font-semibold text-gray-900 text-sm">{r.name}</p>
-          {r.brands?.length > 0 && (
-            <p className="text-xs text-gray-400 truncate max-w-[180px]">{r.brands.join(', ')}</p>
-          )}
-        </div>
-      ),
+      render: (r) => <p className="font-semibold text-gray-900 text-sm">{r.name}</p>,
+    },
+    {
+      key: 'numberOfBranches', label: 'Branches',
+      render: (r) => r.numberOfBranches
+        ? <span className="font-semibold text-gray-700">{r.numberOfBranches}</span>
+        : <span className="text-gray-300">—</span>,
+      getValue: (r) => r.numberOfBranches ?? 0,
     },
     { key: 'country',    label: 'Country',     render: (r) => r.country },
     { key: 'leadSource', label: 'Source',      render: (r) => r.leadSource?.replace(/([A-Z])/g, ' $1').trim() },
