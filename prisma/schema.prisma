@@ -46,6 +46,11 @@ enum PaymentPlan {
 
 // ─── Pipeline Enums ───────────────────────────────────────────────────────────
 
+enum ServicePricingType {
+  Fixed   // price locked; always billed at this rate
+  Custom  // default is a suggestion; rep enters agreed price per deal
+}
+
 enum LeadStage {
   Lead
   Qualified
@@ -588,6 +593,8 @@ model Lead {
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
+  lineItems  Json?          // [{ id, category, productKey, serviceItemId, name, qty, unitPrice, isOneTime, pricingType, subtotal }]
+
   comments   LeadComment[]
   activities LeadActivity[]
 
@@ -624,6 +631,21 @@ model LeadActivity {
 
   @@index([leadId, loggedAt])
   @@map("lead_activities")
+}
+
+// ─── Service Item Catalog (one-time fees) ─────────────────────────────────────
+
+model ServiceItem {
+  id           Int                @id @default(autoincrement())
+  name         String
+  description  String?
+  defaultPrice Decimal            @db.Decimal(12, 2) @default(0)
+  pricingType  ServicePricingType @default(Custom)
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@map("service_items")
 }
 
 // ─── Activity Log ─────────────────────────────────────────────────────────────

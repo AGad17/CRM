@@ -71,6 +71,15 @@ const ACTIVITY_TYPES = [
   { key: 'Other',        label: '📝 Other' },
 ]
 
+const ADDON_MODULES = [
+  { key: 'CentralKitchen',      label: 'Central Kitchen',       unitLabel: 'kitchens' },
+  { key: 'Warehouse',           label: 'Warehouse',             unitLabel: 'warehouses' },
+  { key: 'AccountingMain',      label: 'Accounting',            unitLabel: 'module' },
+  { key: 'AccountingExtra',     label: 'Accounting Extra Branches', unitLabel: 'branches' },
+  { key: 'Butchering',          label: 'Butchering',            unitLabel: 'module' },
+  { key: 'AIAgent',             label: 'AI Agent',              unitLabel: 'users' },
+]
+
 const ACTIVITY_ACTION_LABELS = {
   stage_changed:   (m) => `Stage: ${m.from} → ${m.to}${m.lostReasonCategory ? ` (${m.lostReasonCategory})` : ''}`,
   lead_edited:     (m) => `Edited: ${(m.changes || []).map(c => c.field).join(', ')}`,
@@ -87,9 +96,10 @@ const OPP_COLORS = {
 
 const EMPTY_FORM = {
   companyName: '', contactName: '', contactEmail: '', contactPhone: '',
-  channel: '', countryCode: '', estimatedValue: '', packageInterest: '',
-  branches: '', opportunityDate: new Date().toISOString().slice(0, 10),
+  channel: '', countryCode: '', estimatedValue: '',
+  opportunityDate: new Date().toISOString().slice(0, 10),
   expectedCloseDate: '', nextActionDate: '', notes: '', ownerId: '',
+  lineItems: [],
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -146,48 +156,338 @@ function ChannelBadge({ channel }) {
   )
 }
 
-// ─── Lead Form ───────────────────────────────────────────────────────────────
+// ─── Line-Item Builder ────────────────────────────────────────────────────────
 
-function LeadForm({ form, setForm, errors, agents, pricing, onDupCheck, dupWarning = [] }) {
-  const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }))
-  const cls = (k) => `w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${errors[k] ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white'}`
+function LineItemBuilder({ items = [], onChange, pricing, serviceItems = [], countryCode, channel }) {
+  const [showPicker, setShowPicker] = useState(false)
+  const [pickerTab, setPickerTab]   = useState('package')
+  const [pkgForm,   setPkgForm]     = useState({ package: '', qty: '' })
+  const [addonForm, setAddonForm]   = useState({ key: '', qty: '', unitPrice: '' })
+  const [svcForm,   setSvcForm]     = useState({ serviceItemId: '', qty: 1, unitPrice: '' })
 
-  // Auto-calculate estimated value from branches + package + country + channel
-  const estSummary = useMemo(() => {
-    if (!pricing || !form.countryCode || !form.channel || !form.packageInterest || !form.branches) return null
-    const country = (pricing.countries || []).find((c) => c.code === form.countryCode)
+  const currency = COUNTRY_CURRENCY[countryCode] || ''
+
+  // Auto-calculate package price
+  const pkgEstimate = useMemo(() => {
+    if (!pricing || !countryCode || !channel || !pkgForm.package || !pkgForm.qty) return null
+    const country = (pricing.countries || []).find((c) => c.code === countryCode)
     if (!country) return null
     try {
       return calcDealSummary({
-        normalBranches:          Number(form.branches) || 0,
-        centralKitchens:         0, warehouses: 0,
-        hasAccounting:           false, extraAccountingBranches: 0,
-        hasButchering:           false, aiAgentUsers: 0,
-        countryCode:             form.countryCode,
-        salesChannel:            form.channel,
-        package:                 form.packageInterest,
-        paymentType:             'Annual', contractYears: 1,
-        vatRate:                 Number(country.vatRate || 0),
-        discount:                0, lineDiscounts: {},
-        inventoryPricing:        pricing.inventoryPricing || [],
-        addOnPricing:            pricing.addOnPricing || [],
+        normalBranches: Number(pkgForm.qty) || 0, centralKitchens: 0, warehouses: 0,
+        hasAccounting: false, extraAccountingBranches: 0, hasButchering: false, aiAgentUsers: 0,
+        countryCode, salesChannel: channel, package: pkgForm.package,
+        paymentType: 'Annual', contractYears: 1,
+        vatRate: Number(country.vatRate || 0), discount: 0, lineDiscounts: {},
+        inventoryPricing: pricing.inventoryPricing || [], addOnPricing: pricing.addOnPricing || [],
       })
     } catch { return null }
-  }, [pricing, form.countryCode, form.channel, form.packageInterest, form.branches])
+  }, [pricing, countryCode, channel, pkgForm.package, pkgForm.qty])
 
-  // Sync calculated value to estimatedValue form field
-  useEffect(() => {
-    if (estSummary) {
-      setForm((p) => ({ ...p, estimatedValue: String(Math.round(estSummary.effectiveAnnual)) }))
-    }
-  }, [estSummary, setForm])
+  function addItem(item) {
+    onChange([...items, { ...item, _key: `${Date.now()}-${Math.random()}` }])
+    setShowPicker(false)
+  }
+  function removeItem(key) { onChange(items.filter((i) => i._key !== key)) }
+  function updateItem(key, field, val) {
+    onChange(items.map((i) => {
+      if (i._key !== key) return i
+      const u = { ...i, [field]: val }
+      u.subtotal = Number(u.qty || 0) * Number(u.unitPrice || 0)
+      return u
+    }))
+  }
 
-  const currency = COUNTRY_CURRENCY[form.countryCode] || ''
-  const canCalc  = form.countryCode && form.channel && form.packageInterest && form.branches
+  const recurringTotal = items.filter((i) => !i.isOneTime).reduce((s, i) => s + (Number(i.qty || 0) * Number(i.unitPrice || 0)), 0)
+  const onetimeTotal   = items.filter((i) =>  i.isOneTime).reduce((s, i) => s + (Number(i.qty || 0) * Number(i.unitPrice || 0)), 0)
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Products / Line Items</label>
+        <button
+          type="button"
+          onClick={() => setShowPicker((v) => !v)}
+          className="text-xs font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors"
+        >
+          <span className="text-base leading-none">+</span> Add Line Item
+        </button>
+      </div>
+
+      {/* Picker panel */}
+      {showPicker && (
+        <div className="border border-indigo-200 rounded-xl bg-white shadow-sm overflow-hidden">
+          {/* Category tabs */}
+          <div className="flex border-b border-gray-100">
+            {[{ key: 'package', label: '📦 Package' }, { key: 'addon', label: '🔧 Add-on' }, { key: 'service', label: '💼 Service' }].map((t) => (
+              <button key={t.key} type="button" onClick={() => setPickerTab(t.key)}
+                className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${pickerTab === t.key ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-700'}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-4 space-y-3">
+
+            {/* ── Package tab ── */}
+            {pickerTab === 'package' && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Package *</label>
+                    <select value={pkgForm.package} onChange={(e) => setPkgForm((p) => ({ ...p, package: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                      <option value="">Select…</option>
+                      {PACKAGES.map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Branches *</label>
+                    <input type="number" min="1" value={pkgForm.qty}
+                      onChange={(e) => setPkgForm((p) => ({ ...p, qty: e.target.value }))}
+                      placeholder="e.g. 5"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  </div>
+                </div>
+                {(!countryCode || !channel) && (
+                  <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5">⚠ Set country and channel above to auto-calculate price</p>
+                )}
+                {pkgEstimate && Number(pkgForm.qty) > 0 && (
+                  <div className="bg-indigo-50 rounded-lg px-3 py-2 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-indigo-700">{pkgForm.package} · {pkgForm.qty} branches · Annual</p>
+                      <p className="text-xs text-indigo-400">{currency} {Math.round(pkgEstimate.effectiveAnnual / Number(pkgForm.qty)).toLocaleString('en-US')} / branch / yr</p>
+                    </div>
+                    <p className="text-sm font-bold text-indigo-700">{currency} {Math.round(pkgEstimate.effectiveAnnual).toLocaleString('en-US')}</p>
+                  </div>
+                )}
+                <button type="button"
+                  disabled={!pkgForm.package || !pkgForm.qty || !pkgEstimate}
+                  onClick={() => {
+                    const qty    = Number(pkgForm.qty)
+                    const annual = Math.round(pkgEstimate.effectiveAnnual)
+                    addItem({ category: 'package', productKey: pkgForm.package, serviceItemId: null,
+                      name: `${pkgForm.package} (${qty} branches)`, qty,
+                      unitPrice: Math.round(annual / qty), pricingType: 'Fixed', isOneTime: false })
+                    setPkgForm({ package: '', qty: '' })
+                  }}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                >
+                  Add Package
+                </button>
+              </div>
+            )}
+
+            {/* ── Add-on tab ── */}
+            {pickerTab === 'addon' && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Module *</label>
+                    <select value={addonForm.key} onChange={(e) => {
+                      const mod = ADDON_MODULES.find((m) => m.key === e.target.value)
+                      setAddonForm((p) => ({ ...p, key: e.target.value, qty: mod?.unitLabel === 'module' ? '1' : p.qty }))
+                    }}
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                      <option value="">Select…</option>
+                      {ADDON_MODULES.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      Qty {addonForm.key && `(${ADDON_MODULES.find((m) => m.key === addonForm.key)?.unitLabel})`}
+                    </label>
+                    <input type="number" min="1" value={addonForm.qty}
+                      onChange={(e) => setAddonForm((p) => ({ ...p, qty: e.target.value }))}
+                      placeholder="1"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Annual Price {currency ? `(${currency})` : ''}</label>
+                  <input type="number" min="0" value={addonForm.unitPrice}
+                    onChange={(e) => setAddonForm((p) => ({ ...p, unitPrice: e.target.value }))}
+                    placeholder="Enter agreed annual price…"
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                </div>
+                <button type="button"
+                  disabled={!addonForm.key || !addonForm.qty || addonForm.unitPrice === ''}
+                  onClick={() => {
+                    const mod = ADDON_MODULES.find((m) => m.key === addonForm.key)
+                    addItem({ category: 'addon', productKey: addonForm.key, serviceItemId: null,
+                      name: `${mod?.label} (${addonForm.qty} ${mod?.unitLabel})`,
+                      qty: Number(addonForm.qty), unitPrice: Number(addonForm.unitPrice),
+                      pricingType: 'Custom', isOneTime: false })
+                    setAddonForm({ key: '', qty: '', unitPrice: '' })
+                  }}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                >
+                  Add Add-on
+                </button>
+              </div>
+            )}
+
+            {/* ── Service tab ── */}
+            {pickerTab === 'service' && (
+              <div className="space-y-3">
+                {serviceItems.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-3">
+                    No services configured.{' '}
+                    <a href="/settings/pricing" className="underline text-indigo-500">Add services in Settings → Pricing.</a>
+                  </p>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Service *</label>
+                      <select value={svcForm.serviceItemId} onChange={(e) => {
+                        const svc = serviceItems.find((s) => String(s.id) === e.target.value)
+                        setSvcForm((p) => ({ ...p, serviceItemId: e.target.value, unitPrice: svc ? String(Number(svc.defaultPrice)) : '' }))
+                      }}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                        <option value="">Select…</option>
+                        {serviceItems.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name} {s.pricingType === 'Fixed' ? '🔒' : '✏️'}</option>
+                        ))}
+                      </select>
+                      {svcForm.serviceItemId && (() => {
+                        const svc = serviceItems.find((s) => String(s.id) === svcForm.serviceItemId)
+                        if (!svc) return null
+                        return (
+                          <p className="text-xs mt-1 text-gray-400">
+                            {svc.pricingType === 'Fixed' ? '🔒 Fixed price — always billed at default rate' : '✏️ Custom per deal — enter the agreed price below'}
+                            {svc.description ? ` · ${svc.description}` : ''}
+                          </p>
+                        )
+                      })()}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Qty</label>
+                        <input type="number" min="1" value={svcForm.qty}
+                          onChange={(e) => setSvcForm((p) => ({ ...p, qty: Number(e.target.value) }))}
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">
+                          Price {currency ? `(${currency})` : ''}
+                          {serviceItems.find((s) => String(s.id) === svcForm.serviceItemId)?.pricingType === 'Fixed' && (
+                            <span className="ml-1 text-[10px] text-gray-300 font-normal">locked</span>
+                          )}
+                        </label>
+                        <input type="number" min="0"
+                          disabled={serviceItems.find((s) => String(s.id) === svcForm.serviceItemId)?.pricingType === 'Fixed'}
+                          value={svcForm.unitPrice}
+                          onChange={(e) => setSvcForm((p) => ({ ...p, unitPrice: e.target.value }))}
+                          placeholder="Agreed price…"
+                          className={`w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 ${serviceItems.find((s) => String(s.id) === svcForm.serviceItemId)?.pricingType === 'Fixed' ? 'bg-gray-100 border-gray-100 text-gray-500' : 'border-gray-200'}`}
+                        />
+                      </div>
+                    </div>
+                    <button type="button"
+                      disabled={!svcForm.serviceItemId || svcForm.unitPrice === ''}
+                      onClick={() => {
+                        const svc = serviceItems.find((s) => String(s.id) === svcForm.serviceItemId)
+                        addItem({ category: 'service', productKey: null, serviceItemId: svc.id,
+                          name: svc.name, qty: Number(svcForm.qty || 1),
+                          unitPrice: Number(svcForm.unitPrice),
+                          pricingType: svc.pricingType, isOneTime: true })
+                        setSvcForm({ serviceItemId: '', qty: 1, unitPrice: '' })
+                      }}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                    >
+                      Add Service
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="px-4 pb-3 flex justify-end border-t border-gray-50 pt-2">
+            <button type="button" onClick={() => setShowPicker(false)} className="text-xs text-gray-400 hover:text-gray-600 underline">Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Line items list */}
+      {items.length > 0 && (
+        <div className="space-y-1.5">
+          {/* Header row */}
+          <div className="grid grid-cols-12 gap-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-1">
+            <div className="col-span-5">Product</div>
+            <div className="col-span-2 text-right">Qty</div>
+            <div className="col-span-2 text-right">Unit Price</div>
+            <div className="col-span-2 text-right">Subtotal</div>
+            <div className="col-span-1" />
+          </div>
+          {items.map((item) => (
+            <div key={item._key} className="grid grid-cols-12 gap-1 items-center bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+              <div className="col-span-5 min-w-0">
+                <p className="text-xs font-semibold text-gray-800 leading-tight truncate">{item.name}</p>
+                <span className={`text-[10px] font-medium ${item.isOneTime ? 'text-amber-600' : 'text-indigo-600'}`}>
+                  {item.isOneTime ? '⚡ One-time' : '🔄 Annual'}
+                </span>
+              </div>
+              <div className="col-span-2">
+                <input type="number" min="1" value={item.qty}
+                  onChange={(e) => updateItem(item._key, 'qty', Number(e.target.value))}
+                  className="w-full text-right text-xs border border-gray-200 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                />
+              </div>
+              <div className="col-span-2">
+                <input type="number" min="0" value={item.unitPrice}
+                  disabled={item.pricingType === 'Fixed' && item.category !== 'package'}
+                  onChange={(e) => updateItem(item._key, 'unitPrice', Number(e.target.value))}
+                  className={`w-full text-right text-xs border rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 ${item.pricingType === 'Fixed' && item.category !== 'package' ? 'bg-gray-100 border-gray-100 text-gray-500' : 'bg-white border-gray-200'}`}
+                />
+              </div>
+              <div className="col-span-2 text-right">
+                <span className="text-xs font-semibold text-gray-700">
+                  {(Number(item.qty || 0) * Number(item.unitPrice || 0)).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+              <div className="col-span-1 flex justify-end">
+                <button type="button" onClick={() => removeItem(item._key)} className="text-gray-300 hover:text-red-500 transition-colors text-sm leading-none">✕</button>
+              </div>
+            </div>
+          ))}
+
+          {/* Totals */}
+          <div className="border-t border-gray-100 pt-2 space-y-1 text-right pr-1">
+            {recurringTotal > 0 && (
+              <p className="text-xs text-gray-500">🔄 Annual recurring: <span className="font-semibold text-gray-700">{currency} {recurringTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span></p>
+            )}
+            {onetimeTotal > 0 && (
+              <p className="text-xs text-gray-500">⚡ One-time fees: <span className="font-semibold text-gray-700">{currency} {onetimeTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span></p>
+            )}
+            <p className="text-xs font-bold text-gray-900">
+              Grand Total: {currency} {(recurringTotal + onetimeTotal).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {items.length === 0 && !showPicker && (
+        <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center">
+          <p className="text-sm text-gray-400">No products added yet</p>
+          <p className="text-xs text-gray-300 mt-0.5">Click &quot;+ Add Line Item&quot; to build the deal</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Lead Form ───────────────────────────────────────────────────────────────
+
+function LeadForm({ form, setForm, errors, agents, pricing, serviceItems = [], onDupCheck, dupWarning = [] }) {
+  const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }))
+  const cls = (k) => `w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${errors[k] ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white'}`
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
+
+        {/* Company */}
         <div className="col-span-2">
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Company Name *</label>
           <input
@@ -201,7 +501,7 @@ function LeadForm({ form, setForm, errors, agents, pricing, onDupCheck, dupWarni
           {dupWarning.length > 0 && (
             <div className="mt-1.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
               <p className="text-xs font-semibold text-amber-700 mb-1">⚠ Similar leads already exist:</p>
-              {dupWarning.map(d => (
+              {dupWarning.map((d) => (
                 <p key={d.id} className="text-xs text-amber-600">
                   #{d.id} {d.companyName} — <span className="font-medium">{d.stage}</span> · {d.owner?.name || 'Unassigned'}
                 </p>
@@ -209,6 +509,8 @@ function LeadForm({ form, setForm, errors, agents, pricing, onDupCheck, dupWarni
             </div>
           )}
         </div>
+
+        {/* Contact */}
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Contact Name</label>
           <input className={cls('contactName')} value={form.contactName} onChange={set('contactName')} placeholder="Full name" />
@@ -221,6 +523,8 @@ function LeadForm({ form, setForm, errors, agents, pricing, onDupCheck, dupWarni
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Contact Email</label>
           <input className={cls('contactEmail')} type="email" value={form.contactEmail} onChange={set('contactEmail')} placeholder="contact@company.com" />
         </div>
+
+        {/* Channel + Country */}
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Channel *</label>
           <select className={cls('channel')} value={form.channel} onChange={set('channel')}>
@@ -236,43 +540,8 @@ function LeadForm({ form, setForm, errors, agents, pricing, onDupCheck, dupWarni
             {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Package Interest</label>
-          <select className={cls('packageInterest')} value={form.packageInterest} onChange={set('packageInterest')}>
-            <option value="">Any</option>
-            {PACKAGES.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Est. Branches</label>
-          <input className={cls('branches')} type="number" min="0" value={form.branches} onChange={set('branches')} placeholder="0" />
-        </div>
-        {/* Deal value: auto-calculated card or manual fallback */}
-        <div className="col-span-2">
-          {estSummary ? (
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-0.5">Auto-calculated Deal Value</p>
-                <p className="text-base font-bold text-indigo-700">
-                  {currency} {Math.round(estSummary.effectiveAnnual).toLocaleString('en-US')}
-                  <span className="text-xs font-normal text-indigo-400 ml-1">/ year excl. VAT</span>
-                </p>
-                <p className="text-xs text-indigo-400 mt-0.5">
-                  MRR {currency} {Math.round(estSummary.totalMRR).toLocaleString('en-US')} · {form.branches} branch{Number(form.branches) !== 1 ? 'es' : ''} · {form.packageInterest}
-                </p>
-              </div>
-              <span className="text-indigo-200 text-3xl font-light">≈</span>
-            </div>
-          ) : (
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                Est. Value {currency ? `(${currency})` : ''}
-                {!canCalc && <span className="text-gray-300 font-normal ml-1 normal-case">· set country, channel, package & branches to auto-calculate</span>}
-              </label>
-              <input className={cls('estimatedValue')} type="number" min="0" value={form.estimatedValue} onChange={set('estimatedValue')} placeholder="0" />
-            </div>
-          )}
-        </div>
+
+        {/* Dates */}
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Opportunity Date *</label>
           <input className={cls('opportunityDate')} type="date" max={new Date().toISOString().slice(0, 10)} value={form.opportunityDate} onChange={set('opportunityDate')} />
@@ -285,6 +554,8 @@ function LeadForm({ form, setForm, errors, agents, pricing, onDupCheck, dupWarni
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Next Action Date</label>
           <input className={cls('nextActionDate')} type="date" value={form.nextActionDate || ''} onChange={set('nextActionDate')} />
         </div>
+
+        {/* Owner */}
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Owner *</label>
           <select className={cls('ownerId')} value={form.ownerId} onChange={set('ownerId')}>
@@ -293,11 +564,36 @@ function LeadForm({ form, setForm, errors, agents, pricing, onDupCheck, dupWarni
           </select>
           {errors.ownerId && <p className="text-xs text-red-500 mt-0.5">{errors.ownerId}</p>}
         </div>
+
+        {/* Notes */}
         <div className="col-span-2">
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Notes</label>
-          <textarea className={cls('notes')} rows={3} value={form.notes} onChange={set('notes')} placeholder="Optional notes…" />
+          <textarea className={cls('notes')} rows={2} value={form.notes} onChange={set('notes')} placeholder="Optional notes…" />
         </div>
       </div>
+
+      {/* ── Line Items ── */}
+      <div className="border-t border-gray-100 pt-4">
+        <LineItemBuilder
+          items={form.lineItems || []}
+          onChange={(items) => setForm((p) => ({ ...p, lineItems: items }))}
+          pricing={pricing}
+          serviceItems={serviceItems}
+          countryCode={form.countryCode}
+          channel={form.channel}
+        />
+      </div>
+
+      {/* Manual estimated value (only when no line items) */}
+      {(!form.lineItems || form.lineItems.length === 0) && (
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+            Est. Deal Value {COUNTRY_CURRENCY[form.countryCode] ? `(${COUNTRY_CURRENCY[form.countryCode]})` : ''}
+            <span className="text-gray-300 font-normal ml-1 normal-case">· or add line items above to auto-calculate</span>
+          </label>
+          <input className={cls('estimatedValue')} type="number" min="0" value={form.estimatedValue} onChange={set('estimatedValue')} placeholder="0" />
+        </div>
+      )}
     </div>
   )
 }
@@ -481,6 +777,12 @@ export default function PipelinePage() {
     staleTime: 60_000,
   })
 
+  const { data: serviceItems = [] } = useQuery({
+    queryKey: ['service-items'],
+    queryFn: () => fetch('/api/service-items').then((r) => r.json()),
+    staleTime: 60_000,
+  })
+
   // Expired Accounts tab data
   const { data: allAccounts = [], isLoading: expiredLoading } = useQuery({
     queryKey: ['all-accounts-expired-tab'],
@@ -619,22 +921,24 @@ export default function PipelinePage() {
   }
 
   function openEdit(lead) {
+    // Restore _key for each stored line item so React can track them
+    const storedItems = Array.isArray(lead.lineItems) && lead.lineItems.length > 0
+      ? lead.lineItems.map((item, idx) => ({ ...item, _key: `${idx}-${Date.now()}` }))
+      : []
     setFormData({
-      companyName:      lead.companyName,
-      contactName:      lead.contactName      || '',
-      contactEmail:     lead.contactEmail     || '',
-      contactPhone:     lead.contactPhone     || '',
-      channel:          lead.channel,
-      countryCode:      lead.countryCode      || '',
-      estimatedValue:   lead.estimatedValue   != null ? String(lead.estimatedValue) : '',
-      numberOfBranches: lead.numberOfBranches != null ? String(lead.numberOfBranches) : '',
-      branches:         lead.numberOfBranches != null ? String(lead.numberOfBranches) : '',
-      packageInterest:  lead.packageInterest  || '',
+      companyName:       lead.companyName,
+      contactName:       lead.contactName      || '',
+      contactEmail:      lead.contactEmail     || '',
+      contactPhone:      lead.contactPhone     || '',
+      channel:           lead.channel,
+      countryCode:       lead.countryCode      || '',
+      estimatedValue:    storedItems.length === 0 && lead.estimatedValue != null ? String(lead.estimatedValue) : '',
       opportunityDate:   lead.opportunityDate   ? new Date(lead.opportunityDate).toISOString().slice(0, 10)   : new Date().toISOString().slice(0, 10),
       expectedCloseDate: lead.expectedCloseDate ? new Date(lead.expectedCloseDate).toISOString().slice(0, 10) : '',
       nextActionDate:    lead.nextActionDate    ? new Date(lead.nextActionDate).toISOString().slice(0, 10)    : '',
-      notes:            lead.notes            || '',
-      ownerId:          lead.ownerId,
+      notes:             lead.notes            || '',
+      ownerId:           lead.ownerId,
+      lineItems:         storedItems,
     })
     setFormErrors({})
     setModal({ edit: lead })
@@ -654,10 +958,28 @@ export default function PipelinePage() {
     const e = validateForm()
     if (Object.keys(e).length > 0) { setFormErrors(e); return }
     const isExpRen = oppType === 'Expansion' || oppType === 'Renewal'
+
+    // Strip internal _key before sending to API
+    const cleanLineItems = (formData.lineItems || []).map(({ _key, ...rest }) => ({
+      ...rest,
+      subtotal: Number(rest.qty || 0) * Number(rest.unitPrice || 0),
+    }))
+
+    // Derive estimatedValue from line items total; fall back to manual field
+    const lineItemTotal   = cleanLineItems.reduce((s, i) => s + (i.subtotal || 0), 0)
+    const estimatedValue  = lineItemTotal > 0 ? lineItemTotal : (Number(formData.estimatedValue) || null)
+
+    // Derive packageInterest + numberOfBranches from package line item (backward compat)
+    const pkgItem = cleanLineItems.find((i) => i.category === 'package')
+
     const payload = {
       ...formData,
+      lineItems:        cleanLineItems.length > 0 ? cleanLineItems : null,
+      estimatedValue,
+      packageInterest:  pkgItem?.productKey  || null,
+      numberOfBranches: pkgItem ? Number(pkgItem.qty) || null : null,
       opportunityType:  oppType || 'New',
-      numberOfBranches: Number(formData.branches) || null,
+      nextActionDate:   formData.nextActionDate || '',
       ...(isExpRen && selectedAccount && {
         companyName: selectedAccount.name,
         countryCode: selectedAccount.country?.code || formData.countryCode,
@@ -667,7 +989,7 @@ export default function PipelinePage() {
     if (modal === 'create') {
       createM.mutate(payload)
     } else if (modal?.edit) {
-      updateM.mutate({ id: modal.edit.id, data: { ...formData, numberOfBranches: Number(formData.branches) || null, nextActionDate: formData.nextActionDate || '' } })
+      updateM.mutate({ id: modal.edit.id, data: payload })
     }
   }
 
@@ -675,11 +997,16 @@ export default function PipelinePage() {
     if (action === 'ClosedWon') {
       // Gate: required lead fields must be filled before opening the close deal page
       const missing = []
-      if (!lead.contactName?.trim())                          missing.push('Contact Name')
+      // Derive package + branches from either new lineItems or legacy fields
+      const lineItems   = Array.isArray(lead.lineItems) ? lead.lineItems : []
+      const pkgLineItem = lineItems.find((i) => i.category === 'package')
+      const hasPkg      = !!lead.packageInterest || !!pkgLineItem
+      const hasBranches = (lead.numberOfBranches && lead.numberOfBranches >= 1) || (pkgLineItem && pkgLineItem.qty >= 1)
+      if (!lead.contactName?.trim())                               missing.push('Contact Name')
       if (!lead.contactEmail?.trim() && !lead.contactPhone?.trim()) missing.push('Contact Email or Phone')
-      if (!lead.countryCode)                                  missing.push('Country')
-      if (!lead.packageInterest)                              missing.push('Package Interest')
-      if (!lead.numberOfBranches || lead.numberOfBranches < 1) missing.push('Number of Branches')
+      if (!lead.countryCode)                                       missing.push('Country')
+      if (!hasPkg)                                                 missing.push('Package Interest (add a Package line item)')
+      if (!hasBranches)                                            missing.push('Number of Branches')
       if (missing.length > 0) {
         setModal({ closedWonBlocked: lead, missing })
         return
@@ -1115,10 +1442,10 @@ export default function PipelinePage() {
                 /* New: standard lead form */
                 <LeadForm
                   form={formData} setForm={setFormData} errors={formErrors}
-                  agents={agents} pricing={pricing}
+                  agents={agents} pricing={pricing} serviceItems={serviceItems}
                   dupWarning={dupWarning}
                   onDupCheck={async (name) => {
-                    const res = await fetch(`/api/pipeline?duplicateCheck=${encodeURIComponent(name)}`).then(r => r.json())
+                    const res = await fetch(`/api/pipeline?duplicateCheck=${encodeURIComponent(name)}`).then((r) => r.json())
                     setDupWarning(res || [])
                   }}
                 />
@@ -1160,7 +1487,7 @@ export default function PipelinePage() {
         {/* Details tab */}
         {modalTab === 'details' && (
           <div className="space-y-5">
-            <LeadForm form={formData} setForm={setFormData} errors={formErrors} agents={agents} pricing={pricing} />
+            <LeadForm form={formData} setForm={setFormData} errors={formErrors} agents={agents} pricing={pricing} serviceItems={serviceItems} />
             {updateM.data?.error && (
               <p className="text-sm text-red-500">{updateM.data.error}</p>
             )}

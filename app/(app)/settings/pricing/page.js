@@ -58,10 +58,150 @@ function Section({ title, subtitle, children }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+// ─── Services Section ─────────────────────────────────────────────────────────
+
+const EMPTY_SVC = { name: '', description: '', defaultPrice: '', pricingType: 'Custom' }
+
+function ServicesSection({ isAdmin }) {
+  const qc = useQueryClient()
+  const [form, setForm] = useState(EMPTY_SVC)
+  const [editId, setEditId] = useState(null)
+  const [msg, setMsg] = useState(null)
+
+  function flash(m) { setMsg(m); setTimeout(() => setMsg(null), 3000) }
+
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ['service-items-all'],
+    queryFn: () => fetch('/api/service-items?all=true').then(r => r.json()),
+  })
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['service-items-all'] })
+
+  const saveM = useMutation({
+    mutationFn: (data) => editId
+      ? fetch(`/api/service-items/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(r => r.json())
+      : fetch('/api/service-items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(r => r.json()),
+    onSuccess: () => { invalidate(); setForm(EMPTY_SVC); setEditId(null); flash(editId ? 'Service updated!' : 'Service added!') },
+  })
+
+  const toggleM = useMutation({
+    mutationFn: ({ id, isActive }) => fetch(`/api/service-items/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...items.find(i => i.id === id), isActive }),
+    }).then(r => r.json()),
+    onSuccess: () => { invalidate(); flash('Saved!') },
+  })
+
+  function startEdit(item) {
+    setEditId(item.id)
+    setForm({ name: item.name, description: item.description || '', defaultPrice: String(Number(item.defaultPrice)), pricingType: item.pricingType })
+  }
+
+  function cancelEdit() { setEditId(null); setForm(EMPTY_SVC) }
+
+  if (isLoading) return <div className="animate-pulse h-32 bg-gray-100 rounded-xl" />
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        {msg && <span className="text-sm text-emerald-600 font-medium bg-emerald-50 px-3 py-1.5 rounded-lg">{msg}</span>}
+      </div>
+
+      {/* Add / Edit form */}
+      {isAdmin && (
+        <Section title={editId ? 'Edit Service Item' : 'Add Service Item'} subtitle="One-time fee items available to add to any lead.">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-xs text-gray-500 mb-1">Name *</label>
+              <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                placeholder="e.g. API Integration" />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-xs text-gray-500 mb-1">Pricing Type</label>
+              <select value={form.pricingType} onChange={e => setForm(p => ({ ...p, pricingType: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <option value="Fixed">Fixed — price is locked per catalog</option>
+                <option value="Custom">Custom — rep enters agreed price per deal</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">
+                {form.pricingType === 'Fixed' ? 'Price' : 'Default / Suggested Price'}
+              </label>
+              <input type="number" min="0" step="0.01" value={form.defaultPrice}
+                onChange={e => setForm(p => ({ ...p, defaultPrice: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                placeholder="0.00" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Description <span className="text-gray-300">(optional)</span></label>
+              <input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                placeholder="Brief description…" />
+            </div>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button onClick={() => saveM.mutate(form)} disabled={!form.name.trim() || saveM.isPending}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-colors">
+              {saveM.isPending ? 'Saving…' : editId ? 'Update' : 'Add Service Item'}
+            </button>
+            {editId && <button onClick={cancelEdit} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50">Cancel</button>}
+          </div>
+        </Section>
+      )}
+
+      {/* Items list */}
+      <Section title="Service Catalog" subtitle={`${items.filter(i => i.isActive).length} active items`}>
+        {items.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">No service items yet. Add one above.</p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {items.map(item => (
+              <div key={item.id} className={`flex items-center gap-4 py-3 ${!item.isActive ? 'opacity-40' : ''}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-gray-800">{item.name}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${item.pricingType === 'Fixed' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
+                      {item.pricingType}
+                    </span>
+                    {!item.isActive && <span className="text-xs text-gray-400 italic">inactive</span>}
+                  </div>
+                  {item.description && <p className="text-xs text-gray-400 mt-0.5 truncate">{item.description}</p>}
+                </div>
+                <div className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+                  {item.pricingType === 'Fixed' ? (
+                    <span>{Number(item.defaultPrice).toLocaleString('en-US', { minimumFractionDigits: 0 })}</span>
+                  ) : (
+                    <span className="text-gray-400">Agreed per deal{Number(item.defaultPrice) > 0 ? ` (default: ${Number(item.defaultPrice).toLocaleString()})` : ''}</span>
+                  )}
+                </div>
+                {isAdmin && (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={() => startEdit(item)} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
+                    <button onClick={() => toggleM.mutate({ id: item.id, isActive: !item.isActive })}
+                      className={`text-xs font-medium ${item.isActive ? 'text-gray-400 hover:text-red-500' : 'text-emerald-600 hover:text-emerald-800'}`}>
+                      {item.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+    </div>
+  )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function PricingConfigPage() {
   const { data: session } = useSession()
   const qc = useQueryClient()
   const isAdmin = ['CCO_ADMIN', 'REVENUE_MANAGER'].includes(session?.user?.role)
+
+  const [pageTab, setPageTab] = useState('subscription') // 'subscription' | 'services'
 
   const { data: pricing, isLoading } = useQuery({
     queryKey: ['invoicing-pricing'],
@@ -180,12 +320,30 @@ export default function PricingConfigPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Pricing Configuration</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Annual prices by channel. Quarterly = Annual × 1.06 (calculated automatically).</p>
+          <p className="text-sm text-gray-500 mt-0.5">Manage subscription pricing and one-time service items.</p>
         </div>
         {saveMsg && (
           <span className="text-sm text-emerald-600 font-medium bg-emerald-50 px-3 py-1.5 rounded-lg">{saveMsg}</span>
         )}
       </div>
+
+      {/* Top-level tab toggle */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        <button onClick={() => setPageTab('subscription')}
+          className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${pageTab === 'subscription' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+          📦 Subscription Pricing
+        </button>
+        <button onClick={() => setPageTab('services')}
+          className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${pageTab === 'services' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+          🔧 Services & One-time Fees
+        </button>
+      </div>
+
+      {/* Services tab */}
+      {pageTab === 'services' && <ServicesSection isAdmin={isAdmin} />}
+
+      {/* Subscription Pricing tab */}
+      {pageTab === 'subscription' && <>
 
       {/* Country tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
@@ -321,6 +479,8 @@ export default function PricingConfigPage() {
           </Section>
         </>
       )}
+
+      </> /* end subscription tab */}
     </div>
   )
 }
