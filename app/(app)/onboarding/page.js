@@ -124,9 +124,16 @@ function TrackerCard({ tracker, phase, onClick }) {
         <span className="text-xs text-gray-400 truncate">
           {tracker.account?.country?.name || '—'}
         </span>
-        <span className={`flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${daysCls}`}>
-          {tracker.daysInPhase}d
-        </span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {tracker.deal?.totalMRR > 0 && (
+            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+              ${Number(tracker.deal.totalMRR).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+            </span>
+          )}
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${daysCls}`}>
+            {tracker.daysInPhase}d
+          </span>
+        </div>
       </div>
 
       {(tracker.deal?.package || tracker.deal?.posSystem) && (
@@ -425,8 +432,9 @@ export default function OnboardingPage() {
                   <div className="flex items-center justify-between mt-0.5">
                     <p className="text-xs text-gray-400">{p.team}</p>
                     {colMRR > 0 && (
-                      <p className="text-xs font-semibold text-gray-600">
-                        USD {colMRR.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} MRR
+                      <p className="text-xs font-semibold text-gray-700">
+                        ${colMRR.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                        <span className="font-normal text-gray-400 ml-0.5">MRR</span>
                       </p>
                     )}
                   </div>

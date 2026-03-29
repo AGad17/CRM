@@ -46,6 +46,9 @@ const PACKAGES  = ['Essential', 'Operations', 'Enterprise']
 
 const COUNTRY_CURRENCY = { Egypt: 'EGP', KSA: 'SAR', UAE: 'AED', Bahrain: 'BHD', Jordan: 'JOD' }
 
+// Approximate exchange rates → USD (pegged currencies are exact; EGP is approximate)
+const FX_TO_USD = { EGP: 0.020, SAR: 0.2667, AED: 0.2723, BHD: 2.6525, JOD: 1.4104, USD: 1 }
+
 const OPP_TYPES = [
   { key: 'New',       label: 'New',       desc: 'Brand new account — no prior relationship', icon: '✨' },
   { key: 'Expansion', label: 'Expansion', desc: 'Existing account adding more branches or modules', icon: '📈' },
@@ -112,6 +115,18 @@ function fmtValue(v, countryCode) {
   if (!v) return null
   const cur = COUNTRY_CURRENCY[countryCode] || ''
   return `${cur} ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+}
+
+function toUSD(value, countryCode) {
+  if (!value) return 0
+  const cur  = COUNTRY_CURRENCY[countryCode]
+  const rate = FX_TO_USD[cur] ?? 1
+  return Number(value) * rate
+}
+
+function fmtUSD(v) {
+  if (!v) return null
+  return `$${Math.round(v).toLocaleString('en-US')}`
 }
 
 function initials(name) {
@@ -641,7 +656,12 @@ function LeadCard({ lead, onStageAction, onEdit, isAdmin }) {
 
       {/* Value + meta */}
       <div className="flex items-center justify-between text-xs text-gray-400">
-        <span className="font-semibold text-gray-700">{val || '—'}</span>
+        <div>
+          <span className="font-semibold text-gray-800 text-sm">{val || '—'}</span>
+          {lead.estimatedValue && COUNTRY_CURRENCY[lead.countryCode] !== 'USD' && (
+            <p className="text-[10px] text-gray-400 leading-tight">{fmtUSD(toUSD(lead.estimatedValue, lead.countryCode))} USD</p>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <span>{daysAgo(lead.opportunityDate)}</span>
           <span className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
@@ -1171,15 +1191,8 @@ export default function PipelinePage() {
         ) : (
           <div className="grid grid-cols-4 gap-4 items-start">
             {STAGES.map((s) => {
-              const col = byStage(s.key)
-              // Group total value by currency for multi-country columns
-              const byCur = col.reduce((acc, l) => {
-                if (!l.estimatedValue) return acc
-                const c = COUNTRY_CURRENCY[l.countryCode] || '—'
-                acc[c] = (acc[c] || 0) + Number(l.estimatedValue)
-                return acc
-              }, {})
-              const curEntries = Object.entries(byCur).filter(([, v]) => v > 0)
+              const col      = byStage(s.key)
+              const colUSD   = col.reduce((sum, l) => sum + toUSD(l.estimatedValue, l.countryCode), 0)
               return (
                 <div key={s.key} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden flex flex-col">
                   {/* Column header */}
@@ -1191,14 +1204,10 @@ export default function PipelinePage() {
                       </div>
                       <span className="text-xs font-bold text-gray-500 bg-gray-100 rounded-full px-1.5 py-0.5">{col.length}</span>
                     </div>
-                    {curEntries.length > 0 && (
-                      <div className="mt-1 pl-3.5 flex flex-wrap gap-x-2 gap-y-0.5">
-                        {curEntries.map(([cur, val]) => (
-                          <p key={cur} className="text-xs font-semibold text-gray-600">
-                            {cur} {val.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                          </p>
-                        ))}
-                      </div>
+                    {colUSD > 0 && (
+                      <p className="text-xs font-semibold text-gray-600 mt-0.5 pl-3.5">
+                        {fmtUSD(colUSD)} <span className="font-normal text-gray-400">total</span>
+                      </p>
                     )}
                   </div>
                   {/* Cards */}
