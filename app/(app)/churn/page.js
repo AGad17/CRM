@@ -422,7 +422,7 @@ export default function ChurnPage() {
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
         {[
           { key: 'overview',   label: '📊 Overview' },
-          { key: 'accounts',   label: '👤 By Account' },
+          { key: 'accounts',   label: '🔴 Churned Accounts' },
           { key: 'trends',     label: '📈 By Quarter' },
           { key: 'leadsource', label: '🔗 By Source' },
         ].map((t) => (
@@ -472,46 +472,149 @@ export default function ChurnPage() {
         </div>
       )}
 
-      {/* ── BY ACCOUNT ── */}
+      {/* ── CHURNED ACCOUNTS ── */}
       {tab === 'accounts' && (
-        <div className="space-y-6">
-          {/* KPI strip */}
-          {!accountsLoading && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <KPICard label="Total Lost"     value={accounts.length}                                                          format="integer"  accent="#6b7280" />
-              <KPICard label="Cancelled"      value={accounts.filter((a) => a.status === 'Churned').length}                   format="integer"  accent="#ef4444" subLabel="Explicit" />
-              <KPICard label="Expired"        value={accounts.filter((a) => a.status === 'Expired').length}                   format="integer"  accent="#f59e0b" subLabel="Natural lapse" />
-              <KPICard label="MRR Lost"       value={accounts.reduce((s, a) => s + (a.lastMRR || 0), 0)}                     format="currency" accent="#ef4444" />
-              <KPICard label="ARR Lost"       value={accounts.reduce((s, a) => s + (a.lastMRR || 0), 0) * 12}                format="currency" accent="#f97316" />
-              <KPICard label="Contract Value" value={accounts.reduce((s, a) => s + (a.contractValue || 0), 0)}               format="currency" accent="#6b7280" />
+        <div className="space-y-4">
+          {accountsLoading ? (
+            <div className="space-y-3">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="animate-pulse h-20 bg-gray-100 rounded-2xl" />
+              ))}
             </div>
-          )}
-
-          {/* MRR lost by month */}
-          {mrrByMonth.length > 1 && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 pt-5 pb-4">
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">MRR Lost — by Month</p>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={mrrByMonth} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={44} />
-                  <Tooltip formatter={(v) => usd(v)} />
-                  <Bar dataKey="mrrLost" name="MRR Lost" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={36} />
-                </BarChart>
-              </ResponsiveContainer>
+          ) : accounts.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-20 text-center">
+              <p className="text-3xl mb-3">🎉</p>
+              <p className="text-gray-600 font-semibold text-base">No churned or expired accounts</p>
+              <p className="text-gray-400 text-sm mt-1">Try adjusting the filters above.</p>
             </div>
-          )}
+          ) : (
+            <>
+              {/* Summary bar */}
+              <div className="flex flex-wrap items-center gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3 text-sm">
+                <span className="font-bold text-gray-700">{accounts.length} accounts</span>
+                <span className="text-gray-300">|</span>
+                <span className="text-red-600 font-semibold">{accounts.filter(a => a.status === 'Churned').length} cancelled</span>
+                <span className="text-amber-600 font-semibold">{accounts.filter(a => a.status === 'Expired').length} expired</span>
+                <span className="text-gray-300">|</span>
+                <span className="text-gray-600">MRR lost: <span className="font-bold text-red-600">{usd(accounts.reduce((s,a) => s+(a.lastMRR||0),0))}</span></span>
+                <span className="text-gray-600">ARR lost: <span className="font-bold text-orange-600">{usd(accounts.reduce((s,a) => s+(a.lastMRR||0),0)*12)}</span></span>
+                <span className="text-gray-600">Contract value: <span className="font-bold text-gray-800">{usd(accounts.reduce((s,a) => s+(a.contractValue||0),0))}</span></span>
+                <button
+                  onClick={() => {
+                    const headers = ['Account','Status','Exit Date','MRR','ARR','Contract Value','Account Manager','Branches','Central Kitchens','Warehouses','Country','Lead Source','Churn Reason']
+                    const rows = accounts.map(a => [
+                      a.name, a.status,
+                      new Date(a.exitDate).toLocaleDateString('en-GB'),
+                      a.lastMRR?.toFixed(2) ?? '',
+                      (a.lastMRR*12)?.toFixed(2) ?? '',
+                      a.contractValue?.toFixed(2) ?? '',
+                      a.accountManager ?? '',
+                      a.numberOfBranches ?? '',
+                      a.centralKitchens ?? '',
+                      a.warehouses ?? '',
+                      a.country,
+                      a.leadSource ?? '',
+                      a.churnReason ?? '',
+                    ])
+                    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')
+                    const a2 = document.createElement('a')
+                    a2.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}))
+                    a2.download = 'churned-accounts.csv'
+                    a2.click()
+                  }}
+                  className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-semibold border border-indigo-200 rounded-lg px-3 py-1.5 hover:bg-indigo-50 transition-colors"
+                >
+                  ↓ Export CSV
+                </button>
+              </div>
 
-          {accountsLoading
-            ? <div className="animate-pulse space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-14 bg-gray-100 rounded-xl" />)}</div>
-            : accounts.length === 0
-              ? <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-16 text-center">
-                  <p className="text-2xl mb-2">🎉</p>
-                  <p className="text-gray-500 font-medium">No churned or expired accounts match the selected filters.</p>
-                </div>
-              : <DataTable columns={accountCols} data={accounts} exportFilename="churn-by-account.csv" pageSize={25} />
-          }
+              {/* Account rows */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      <th className="px-5 py-3 text-left">Account</th>
+                      <th className="px-4 py-3 text-left">Status</th>
+                      <th className="px-4 py-3 text-left">Exit Date</th>
+                      <th className="px-4 py-3 text-right">MRR</th>
+                      <th className="px-4 py-3 text-right">ARR</th>
+                      <th className="px-4 py-3 text-right">Contract Value</th>
+                      <th className="px-4 py-3 text-left">Acct Manager</th>
+                      <th className="px-4 py-3 text-center">Branches</th>
+                      <th className="px-4 py-3 text-center">CKs</th>
+                      <th className="px-4 py-3 text-center">Warehouses</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {accounts.map((a, i) => (
+                      <tr key={a.id} className={`border-b border-gray-50 hover:bg-gray-50/50 transition-colors ${i % 2 === 0 ? '' : 'bg-gray-50/30'}`}>
+                        {/* Account */}
+                        <td className="px-5 py-3.5">
+                          <p className="font-semibold text-gray-900">{a.name}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{a.country} · {a.leadSource?.replace(/([A-Z])/g,' $1').trim()}</p>
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-4 py-3.5">
+                          <StatusBadge status={a.status} />
+                          {a.churnReason && (
+                            <p className="text-[10px] text-gray-400 mt-0.5">{CHURN_REASON_LABELS[a.churnReason] ?? a.churnReason}</p>
+                          )}
+                        </td>
+
+                        {/* Exit date */}
+                        <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
+                          {new Date(a.exitDate).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })}
+                        </td>
+
+                        {/* MRR */}
+                        <td className="px-4 py-3.5 text-right">
+                          <p className="font-bold text-red-600">{local(a.lastMRR, a.currency)}</p>
+                          <p className="text-[10px] text-gray-400">{usd(a.lastMRR)}</p>
+                        </td>
+
+                        {/* ARR */}
+                        <td className="px-4 py-3.5 text-right">
+                          <p className="font-semibold text-orange-600">{local(a.lastARR, a.currency)}</p>
+                          <p className="text-[10px] text-gray-400">{usd(a.lastARR)}</p>
+                        </td>
+
+                        {/* Contract value */}
+                        <td className="px-4 py-3.5 text-right">
+                          <p className="font-semibold text-gray-800">{local(a.contractValue, a.currency)}</p>
+                          <p className="text-[10px] text-gray-400">{usd(a.contractValue)}</p>
+                        </td>
+
+                        {/* Account manager */}
+                        <td className="px-4 py-3.5">
+                          {a.accountManager
+                            ? <span className="font-medium text-gray-700">{a.accountManager}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+
+                        {/* Branches / CKs / Warehouses */}
+                        <td className="px-4 py-3.5 text-center">
+                          {a.numberOfBranches
+                            ? <span className="font-semibold text-gray-700">{a.numberOfBranches}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          {a.centralKitchens
+                            ? <span className="font-semibold text-gray-700">{a.centralKitchens}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          {a.warehouses
+                            ? <span className="font-semibold text-gray-700">{a.warehouses}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 
