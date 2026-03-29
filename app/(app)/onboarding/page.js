@@ -414,6 +414,7 @@ export default function OnboardingPage() {
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-1 px-1">
           {PHASES.map((p) => {
             const cards = filtered.filter((t) => t.phase === p.key)
+            const colMRR = cards.reduce((sum, t) => sum + (Number(t.deal?.totalMRR) || 0), 0)
             return (
               <div key={p.key} className="flex-none w-64">
                 <div className={`rounded-t-xl px-3 py-2.5 border border-b-0 ${p.light}`}>
@@ -421,7 +422,14 @@ export default function OnboardingPage() {
                     <span className={`text-sm font-semibold ${p.text}`}>{p.icon} {p.label}</span>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${p.badge}`}>{cards.length}</span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">{p.team}</p>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <p className="text-xs text-gray-400">{p.team}</p>
+                    {colMRR > 0 && (
+                      <p className="text-xs font-semibold text-gray-600">
+                        USD {colMRR.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} MRR
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div className={`rounded-b-xl border ${p.light} p-2 space-y-2 min-h-[200px]`}>
                   {cards.length === 0 ? (

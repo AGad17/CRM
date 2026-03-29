@@ -1172,8 +1172,14 @@ export default function PipelinePage() {
           <div className="grid grid-cols-4 gap-4 items-start">
             {STAGES.map((s) => {
               const col = byStage(s.key)
-              const colVal = col.reduce((sum, l) => sum + (l.estimatedValue || 0), 0)
-              const cur    = col[0]?.countryCode ? COUNTRY_CURRENCY[col[0].countryCode] : ''
+              // Group total value by currency for multi-country columns
+              const byCur = col.reduce((acc, l) => {
+                if (!l.estimatedValue) return acc
+                const c = COUNTRY_CURRENCY[l.countryCode] || '—'
+                acc[c] = (acc[c] || 0) + Number(l.estimatedValue)
+                return acc
+              }, {})
+              const curEntries = Object.entries(byCur).filter(([, v]) => v > 0)
               return (
                 <div key={s.key} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden flex flex-col">
                   {/* Column header */}
@@ -1185,8 +1191,14 @@ export default function PipelinePage() {
                       </div>
                       <span className="text-xs font-bold text-gray-500 bg-gray-100 rounded-full px-1.5 py-0.5">{col.length}</span>
                     </div>
-                    {colVal > 0 && (
-                      <p className="text-xs text-gray-400 mt-0.5 pl-3.5">{cur} {colVal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                    {curEntries.length > 0 && (
+                      <div className="mt-1 pl-3.5 flex flex-wrap gap-x-2 gap-y-0.5">
+                        {curEntries.map(([cur, val]) => (
+                          <p key={cur} className="text-xs font-semibold text-gray-600">
+                            {cur} {val.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                          </p>
+                        ))}
+                      </div>
                     )}
                   </div>
                   {/* Cards */}
