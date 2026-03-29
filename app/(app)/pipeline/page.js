@@ -9,6 +9,7 @@ import { Modal } from '@/components/ui/Modal'
 import { calcDealSummary } from '@/lib/invoicingCalc'
 import { MentionTextarea } from '@/components/ui/MentionTextarea'
 import { RenderedNote } from '@/components/ui/RenderedNote'
+import { MultiSelectFilter } from '@/components/ui/MultiSelectFilter'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -736,10 +737,10 @@ export default function PipelinePage() {
 
   // Filters
   const [search,    setSearch]    = useState('')
-  const [stageFilter, setStageFilter] = useState('all')
-  const [channelFilter, setChannelFilter] = useState('')
-  const [countryFilter, setCountryFilter] = useState('')
-  const [ownerFilter, setOwnerFilter] = useState('')
+  const [stageFilter,   setStageFilter]   = useState('all')
+  const [channelFilter, setChannelFilter] = useState([])
+  const [countryFilter, setCountryFilter] = useState([])
+  const [ownerFilter,   setOwnerFilter]   = useState([])
 
   // Modals
   // null | 'create' | { edit: lead } | { confirmLoss: lead } | { confirmChurn: lead } | { closedWonBlocked: lead, missing: string[] } | 'migrate' | { archive: lead }
@@ -919,9 +920,9 @@ export default function PipelinePage() {
     let list = leads
     if (stageFilter === 'at-risk')   list = list.filter((l) => leadRiskStatus(l) !== null)
     else if (stageFilter !== 'all')  list = list.filter((l) => l.stage === stageFilter)
-    if (channelFilter)               list = list.filter((l) => l.channel === channelFilter)
-    if (countryFilter)               list = list.filter((l) => l.countryCode === countryFilter)
-    if (ownerFilter)                 list = list.filter((l) => l.ownerId === ownerFilter)
+    if (channelFilter.length) list = list.filter((l) => channelFilter.includes(l.channel))
+    if (countryFilter.length) list = list.filter((l) => countryFilter.includes(l.countryCode))
+    if (ownerFilter.length)   list = list.filter((l) => ownerFilter.includes(l.ownerId))
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter((l) =>
@@ -1169,20 +1170,20 @@ export default function PipelinePage() {
             ⚠ At Risk{atRiskCount > 0 ? ` (${atRiskCount})` : ''}
           </button>
         </div>
-        <select value={channelFilter} onChange={(e) => setChannelFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
-          <option value="">All Channels</option>
-          {Object.entries(CHANNEL_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <select value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
-          <option value="">All Countries</option>
-          {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
-          <option value="">All Owners</option>
-          {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
-        {(search || stageFilter !== 'all' || channelFilter || countryFilter || ownerFilter) && (
-          <button onClick={() => { setSearch(''); setStageFilter('all'); setChannelFilter(''); setCountryFilter(''); setOwnerFilter('') }} className="text-xs text-gray-400 hover:text-gray-700 underline">Clear</button>
+        <MultiSelectFilter
+          label="Channel" value={channelFilter} onChange={setChannelFilter}
+          options={Object.entries(CHANNEL_LABELS).map(([k, v]) => ({ value: k, label: v }))}
+        />
+        <MultiSelectFilter
+          label="Country" value={countryFilter} onChange={setCountryFilter}
+          options={COUNTRIES.map((c) => ({ value: c, label: c }))}
+        />
+        <MultiSelectFilter
+          label="Owner" value={ownerFilter} onChange={setOwnerFilter}
+          options={agents.map((a) => ({ value: a.id, label: a.name }))}
+        />
+        {(search || stageFilter !== 'all' || channelFilter.length || countryFilter.length || ownerFilter.length) && (
+          <button onClick={() => { setSearch(''); setStageFilter('all'); setChannelFilter([]); setCountryFilter([]); setOwnerFilter([]) }} className="text-xs text-gray-400 hover:text-gray-700 underline">Clear</button>
         )}
         <span className="ml-auto text-xs text-gray-400">{filtered.length} leads</span>
       </div>

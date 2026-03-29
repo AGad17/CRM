@@ -8,8 +8,10 @@ export async function GET(req) {
 
   const { searchParams } = new URL(req.url)
   const where = { archived: false }
-  const country = searchParams.get('country')
-  if (country) where.countryCode = country
+  const countriesRaw = searchParams.get('countries')
+  const countries = countriesRaw ? countriesRaw.split(',').filter(Boolean) : []
+  if (countries.length === 1)      where.countryCode = countries[0]
+  else if (countries.length > 1)   where.countryCode = { in: countries }
   const leadSources = searchParams.get('leadSources')?.split(',').filter(Boolean) || []
   if (leadSources.length > 0) where.channel = { in: leadSources }
 

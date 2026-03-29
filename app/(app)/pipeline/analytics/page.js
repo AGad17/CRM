@@ -10,6 +10,7 @@ import {
 import { KPICard } from '@/components/ui/KPICard'
 import { DataTable } from '@/components/ui/DataTable'
 import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
+import { MultiSelectFilter } from '@/components/ui/MultiSelectFilter'
 
 const STAGE_COLORS = {
   Lead:       '#94a3b8',
@@ -119,7 +120,7 @@ function getPreset(key) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function PipelineAnalyticsPage() {
-  const [country, setCountry] = useState('')
+  const [countries, setCountries] = useState([])
   const [leadSources, setLeadSources] = useState([])
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo,   setDateTo]   = useState('')
@@ -130,16 +131,16 @@ export default function PipelineAnalyticsPage() {
     setDateFrom(from); setDateTo(to); setPreset(key)
   }
 
-  const { data: countries = [] } = useQuery({
+  const { data: countryOptions = [] } = useQuery({
     queryKey: ['countries'],
     queryFn: () => fetch('/api/countries').then((r) => r.json()),
   })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['pipeline-analytics', country, leadSources, dateFrom, dateTo],
+    queryKey: ['pipeline-analytics', countries, leadSources, dateFrom, dateTo],
     queryFn: () => {
       const p = new URLSearchParams()
-      if (country) p.set('country', country)
+      if (countries.length > 0) p.set('countries', countries.join(','))
       if (leadSources.length > 0) p.set('leadSources', leadSources.join(','))
       if (dateFrom) p.set('from', dateFrom)
       if (dateTo)   p.set('to',   dateTo)
@@ -150,7 +151,7 @@ export default function PipelineAnalyticsPage() {
 
   const { summary, byStage, byChannel, byCountry, byOwner, monthlyTrend = [], byLostReason = [] } = data || {}
 
-  const hasFilters = country || leadSources.length > 0 || dateFrom || dateTo
+  const hasFilters = countries.length || leadSources.length > 0 || dateFrom || dateTo
 
   if (isLoading) return <Skeleton />
   if (!data) return <div className="text-red-500">Failed to load analytics.</div>
@@ -173,11 +174,10 @@ export default function PipelineAnalyticsPage() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex flex-wrap items-center gap-3">
         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Filter</span>
         <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
-        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          value={country} onChange={(e) => setCountry(e.target.value)}>
-          <option value="">All Countries</option>
-          {countries.filter((c) => c.isActive).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
-        </select>
+        <MultiSelectFilter
+          label="Country" value={countries} onChange={setCountries}
+          options={countryOptions.filter((c) => c.isActive).map((c) => ({ value: c.code, label: c.name }))}
+        />
 
         {/* Date range presets */}
         <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
@@ -197,7 +197,7 @@ export default function PipelineAnalyticsPage() {
           className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400" />
 
         {hasFilters && (
-          <button onClick={() => { setCountry(''); setLeadSources([]); setDateFrom(''); setDateTo(''); setPreset('') }}
+          <button onClick={() => { setCountries([]); setLeadSources([]); setDateFrom(''); setDateTo(''); setPreset('') }}
             className="text-xs text-indigo-500 hover:text-indigo-700 font-semibold underline underline-offset-2">Clear all</button>
         )}
       </div>

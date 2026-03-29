@@ -8,8 +8,10 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const leadSources = searchParams.get('leadSources')?.split(',').filter(Boolean) || []
   const filters = {}
-  if (searchParams.get('country'))          filters.country          = searchParams.get('country')
-  if (searchParams.get('accountManagerId')) filters.accountManagerId = searchParams.get('accountManagerId')
-  if (leadSources.length > 0)              filters.leadSources      = leadSources
+  const cs  = searchParams.get('countries')
+  if (cs) filters.countries = cs.split(',').filter(Boolean)
+  const ams = searchParams.get('accountManagerIds')
+  if (ams) filters.accountManagerIds = ams.split(',').filter(Boolean)
+  if (leadSources.length > 0) filters.leadSources = leadSources
   return NextResponse.json(await getChurnAnalysis(filters))
 }

@@ -1,24 +1,16 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 
-export const LEAD_SOURCES = [
-  { value: 'Foodics',            label: 'Foodics' },
-  { value: 'EmployeeReferral',   label: 'Employee Referral' },
-  { value: 'CustomerReferral',   label: 'Customer Referral' },
-  { value: 'PartnerReferral',    label: 'Partner Referral' },
-  { value: 'Website',            label: 'Website' },
-  { value: 'AmbassadorReferral', label: 'Ambassador Referral' },
-  { value: 'DirectSales',        label: 'Direct Sales' },
-  { value: 'Sonic',              label: 'Sonic' },
-]
-
 /**
- * Checkbox-based lead source filter dropdown.
+ * Generic multi-select checkbox filter dropdown — same UX as LeadSourceFilter.
  *
- * value:    string[]  — selected sources; empty array = all sources (no filter)
- * onChange: (string[]) => void
+ * Props:
+ *   label    — button label text (e.g. "Country", "Account Manager")
+ *   options  — [{ value, label }]
+ *   value    — string[] of selected values; empty array = all / no filter
+ *   onChange — (string[]) => void
  */
-export function LeadSourceFilter({ value = [], onChange }) {
+export function MultiSelectFilter({ label, options = [], value = [], onChange }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -30,30 +22,25 @@ export function LeadSourceFilter({ value = [], onChange }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const selected = value || []
-  // "filtered" = some (but not all) sources are chosen
-  const isFiltered = selected.length > 0 && selected.length < LEAD_SOURCES.length
+  const selected   = value || []
+  const isFiltered = selected.length > 0 && selected.length < options.length
+  const isChecked  = (v) => selected.length === 0 || selected.includes(v)
 
-  const isChecked = (src) => selected.length === 0 || selected.includes(src)
-
-  const only = (src) => {
-    onChange([src])
-    setOpen(false)
-  }
-
-  const toggle = (src) => {
+  const toggle = (v) => {
     if (selected.length === 0) {
-      // Currently "all selected" — uncheck = select every source except this one
-      onChange(LEAD_SOURCES.map((s) => s.value).filter((s) => s !== src))
-    } else if (selected.includes(src)) {
-      const next = selected.filter((s) => s !== src)
-      // If nothing remains, reset to "all" (empty)
+      onChange(options.map((o) => o.value).filter((o) => o !== v))
+    } else if (selected.includes(v)) {
+      const next = selected.filter((s) => s !== v)
       onChange(next.length === 0 ? [] : next)
     } else {
-      const next = [...selected, src]
-      // If all are now chosen, normalise back to empty (= all)
-      onChange(next.length === LEAD_SOURCES.length ? [] : next)
+      const next = [...selected, v]
+      onChange(next.length === options.length ? [] : next)
     }
+  }
+
+  const only = (v) => {
+    onChange([v])
+    setOpen(false)
   }
 
   return (
@@ -69,7 +56,7 @@ export function LeadSourceFilter({ value = [], onChange }) {
             : 'border-gray-200 text-gray-700 hover:border-gray-300',
         ].join(' ')}
       >
-        <span>Lead Sources</span>
+        <span>{label}</span>
         {isFiltered && (
           <span className="bg-[#5061F6] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
             {selected.length}
@@ -84,11 +71,11 @@ export function LeadSourceFilter({ value = [], onChange }) {
       </button>
 
       {open && (
-        <div className="absolute top-full mt-1.5 left-0 z-50 bg-white border border-gray-100 rounded-2xl shadow-xl py-2 min-w-[210px]">
-          {/* Header row */}
+        <div className="absolute top-full mt-1.5 left-0 z-50 bg-white border border-gray-100 rounded-2xl shadow-xl py-2 min-w-[200px] max-h-72 overflow-y-auto">
+          {/* Header */}
           <div className="px-3 pb-2 mb-1 border-b border-gray-100 flex items-center justify-between">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              Lead Sources
+              {label}
             </span>
             <button
               type="button"
@@ -99,28 +86,28 @@ export function LeadSourceFilter({ value = [], onChange }) {
             </button>
           </div>
 
-          {/* Checkboxes */}
-          {LEAD_SOURCES.map(({ value: src, label }) => (
+          {/* Options */}
+          {options.map(({ value: v, label: l }) => (
             <div
-              key={src}
+              key={v}
               className="flex items-center justify-between px-3 py-1.5 hover:bg-[#F5F2FF] group"
             >
               <label className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0">
                 <input
                   type="checkbox"
-                  checked={isChecked(src)}
-                  onChange={() => toggle(src)}
+                  checked={isChecked(v)}
+                  onChange={() => toggle(v)}
                   className="w-3.5 h-3.5 accent-[#5061F6] cursor-pointer flex-shrink-0"
                 />
                 <span className="text-sm text-gray-700 group-hover:text-[#5061F6] select-none truncate">
-                  {label}
+                  {l}
                 </span>
               </label>
               <button
                 type="button"
-                onClick={() => only(src)}
+                onClick={() => only(v)}
                 className="ml-2 flex-shrink-0 text-[10px] font-semibold text-gray-300 hover:text-[#5061F6] opacity-0 group-hover:opacity-100 transition-opacity"
-                title={`Only ${label}`}
+                title={`Only ${l}`}
               >
                 Only
               </button>

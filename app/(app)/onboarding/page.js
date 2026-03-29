@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { DataTable } from '@/components/ui/DataTable'
 import { LeadSourceFilter } from '@/components/ui/LeadSourceFilter'
+import { MultiSelectFilter } from '@/components/ui/MultiSelectFilter'
 
 // ─── Phase definitions ────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ export default function OnboardingPage() {
   const [phase,       setPhase]       = useState('')
   const [search,      setSearch]      = useState('')
   const [leadSources, setLeadSources] = useState([])
-  const [csRep,       setCsRep]       = useState('')
+  const [csReps_f,    setCsReps_f]    = useState([])
   const [syncMsg,     setSyncMsg]     = useState(null)
 
   const { data: trackers = [], isLoading } = useQuery({
@@ -228,7 +229,7 @@ export default function OnboardingPage() {
   const baseFiltered = trackers.filter((t) => {
     if (search && !t.account?.name?.toLowerCase().includes(search.toLowerCase())) return false
     if (leadSources.length > 0 && !leadSources.includes(t.account?.leadSource)) return false
-    if (csRep  && t.accountManager?.id !== csRep) return false
+    if (csReps_f.length && !csReps_f.includes(t.accountManager?.id)) return false
     return true
   })
 
@@ -387,16 +388,10 @@ export default function OnboardingPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-56 bg-white" />
         <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
-        <select
-          value={csRep}
-          onChange={(e) => setCsRep(e.target.value)}
-          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-colors"
-        >
-          <option value="">All CS Reps</option>
-          {csReps.map((u) => (
-            <option key={u.id} value={u.id}>{u.name}</option>
-          ))}
-        </select>
+        <MultiSelectFilter
+          label="CS Rep" value={csReps_f} onChange={setCsReps_f}
+          options={csReps.map((u) => ({ value: u.id, label: u.name }))}
+        />
         {view === 'list' && (
           <div className="flex gap-1 flex-wrap">
             {[{ key: '', label: 'All', icon: '' }, ...PHASES].map((p) => (

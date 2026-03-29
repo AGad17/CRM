@@ -29,9 +29,11 @@ export async function GET(request) {
   }
 
   // Default → full enriched list for the Accounts page
+  const countriesRaw    = searchParams.get('countries')
+  const leadSourcesRaw  = searchParams.get('leadSources')
   const filters = {
-    country:    searchParams.get('country')    || undefined,
-    leadSource: searchParams.get('leadSource') || undefined,
+    countries:   countriesRaw   ? countriesRaw.split(',').filter(Boolean)   : [],
+    leadSources: leadSourcesRaw ? leadSourcesRaw.split(',').filter(Boolean) : [],
   }
   const accounts = await getAccounts(filters)
   return NextResponse.json(accounts)

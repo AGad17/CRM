@@ -6,24 +6,34 @@ import { DataTable } from '@/components/ui/DataTable'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import { AccountForm } from '@/components/forms/AccountForm'
+import { MultiSelectFilter } from '@/components/ui/MultiSelectFilter'
 
-const COUNTRIES = ['', 'KSA', 'Egypt', 'UAE', 'Bahrain', 'Jordan']
-const SOURCES = ['', 'Foodics', 'EmployeeReferral', 'CustomerReferral', 'PartnerReferral', 'Website', 'AmbassadorReferral', 'DirectSales', 'Sonic']
+const COUNTRY_OPTS = [
+  { value: 'KSA', label: 'KSA' }, { value: 'Egypt', label: 'Egypt' },
+  { value: 'UAE', label: 'UAE' }, { value: 'Bahrain', label: 'Bahrain' }, { value: 'Jordan', label: 'Jordan' },
+]
+const SOURCE_OPTS = [
+  { value: 'Foodics', label: 'Foodics' }, { value: 'EmployeeReferral', label: 'Employee Referral' },
+  { value: 'CustomerReferral', label: 'Customer Referral' }, { value: 'PartnerReferral', label: 'Partner Referral' },
+  { value: 'Website', label: 'Website' }, { value: 'AmbassadorReferral', label: 'Ambassador Referral' },
+  { value: 'DirectSales', label: 'Direct Sales' }, { value: 'Sonic', label: 'Sonic' },
+]
 
 export default function AccountsPage() {
   const router = useRouter()
   const qc = useQueryClient()
-  const [filters, setFilters] = useState({ country: '', leadSource: '' })
+  const [filterCountries,   setFilterCountries]   = useState([])
+  const [filterLeadSources, setFilterLeadSources] = useState([])
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState(null)       // { edit: account }
   const [churnTarget, setChurnTarget] = useState(null) // account row to churn
 
   const { data: accounts = [], isLoading } = useQuery({
-    queryKey: ['accounts', filters],
+    queryKey: ['accounts', filterCountries, filterLeadSources],
     queryFn: () => {
       const p = new URLSearchParams()
-      if (filters.country) p.set('country', filters.country)
-      if (filters.leadSource) p.set('leadSource', filters.leadSource)
+      if (filterCountries.length)   p.set('countries',    filterCountries.join(','))
+      if (filterLeadSources.length) p.set('leadSources',  filterLeadSources.join(','))
       return fetch(`/api/accounts?${p}`).then((r) => r.json())
     },
   })
@@ -111,12 +121,8 @@ export default function AccountsPage() {
     <div className="space-y-5">
       {/* Filters + Create */}
       <div className="flex items-center gap-3 flex-wrap">
-        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white" value={filters.country} onChange={(e) => setFilters({ ...filters, country: e.target.value })}>
-          {COUNTRIES.map((c) => <option key={c} value={c}>{c || 'All Countries'}</option>)}
-        </select>
-        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white" value={filters.leadSource} onChange={(e) => setFilters({ ...filters, leadSource: e.target.value })}>
-          {SOURCES.map((s) => <option key={s} value={s}>{s ? s.replace(/([A-Z])/g, ' $1').trim() : 'All Lead Sources'}</option>)}
-        </select>
+        <MultiSelectFilter label="Country"     options={COUNTRY_OPTS} value={filterCountries}   onChange={setFilterCountries} />
+        <MultiSelectFilter label="Lead Source" options={SOURCE_OPTS}  value={filterLeadSources} onChange={setFilterLeadSources} />
         <input
           type="text"
           placeholder="Search accounts…"
