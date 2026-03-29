@@ -15,6 +15,7 @@ const ROLE_LABELS = {
 const MODULE_LABELS = {
   dashboard: 'Dashboard', accounts: 'Accounts', pipeline: 'Pipeline',
   onboarding: 'Onboarding', invoicing: 'Invoicing', analytics: 'Analytics', settings: 'Settings',
+  cases: 'Cases & Outages',
 }
 const ACTION_LABELS = { view: 'View', create: 'Create', edit: 'Edit', delete: 'Delete', admin: 'Admin' }
 const ACTION_COLORS = {
