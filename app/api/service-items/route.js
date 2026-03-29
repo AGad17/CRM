@@ -13,7 +13,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const { error } = await requirePermission('pipeline', 'write')
+  const { error } = await requirePermission('pipeline', 'create')
   if (error) return error
 
   const body = await request.json()

@@ -3,7 +3,7 @@ import { requirePermission } from '@/lib/roleGuard'
 import { updateServiceItem, deleteServiceItem } from '@/lib/db/serviceItems'
 
 export async function PUT(request, { params }) {
-  const { error } = await requirePermission('pipeline', 'write')
+  const { error } = await requirePermission('pipeline', 'edit')
   if (error) return error
 
   const { id } = await params
@@ -15,7 +15,7 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
-  const { error } = await requirePermission('pipeline', 'delete')
+  const { error } = await requirePermission('pipeline', 'edit')
   if (error) return error
 
   const { id } = await params
