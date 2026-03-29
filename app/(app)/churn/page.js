@@ -201,12 +201,13 @@ function LensSummaryTable({ s }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ChurnPage() {
-  const [tab,         setTab]         = useState('overview')
-  const [country,     setCountry]     = useState('')
-  const [leadSources, setLeadSources] = useState([])
-  const [typeFilter,  setTypeFilter]  = useState('')
-  const [from,        setFrom]        = useState('')
-  const [to,          setTo]          = useState('')
+  const [tab,              setTab]              = useState('overview')
+  const [country,          setCountry]          = useState('')
+  const [leadSources,      setLeadSources]      = useState([])
+  const [accountManagerId, setAccountManagerId] = useState('')
+  const [typeFilter,       setTypeFilter]       = useState('')
+  const [from,             setFrom]             = useState('')
+  const [to,               setTo]               = useState('')
 
   // ── Queries ──────────────────────────────────────────────────────────────
   const { data: countries = [] } = useQuery({
@@ -214,20 +215,33 @@ export default function ChurnPage() {
     queryFn: () => fetch('/api/countries').then((r) => r.json()),
   })
 
+  const { data: accountManagers = [] } = useQuery({
+    queryKey: ['account-managers-churn'],
+    queryFn: () => fetch('/api/users?role=CUSTOMER_SUCCESS,CCO_ADMIN,REVENUE_MANAGER').then((r) => r.json()).catch(() => []),
+  })
+
   const sharedParams = useMemo(() => {
     const p = new URLSearchParams()
-    if (country) p.set('country', country)
+    if (country)          p.set('country', country)
     if (leadSources.length) p.set('leadSources', leadSources.join(','))
+    if (accountManagerId) p.set('accountManagerId', accountManagerId)
     return p
-  }, [country, leadSources])
+  }, [country, leadSources, accountManagerId])
+
+  const summaryParams = useMemo(() => {
+    const p = new URLSearchParams(sharedParams)
+    if (from) p.set('from', from)
+    if (to)   p.set('to', to)
+    return p
+  }, [sharedParams, from, to])
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
-    queryKey: ['churn-summary', country, leadSources],
-    queryFn: () => fetch(`/api/analytics/churn-summary?${sharedParams}`).then((r) => r.json()),
+    queryKey: ['churn-summary', country, leadSources, accountManagerId, from, to],
+    queryFn: () => fetch(`/api/analytics/churn-summary?${summaryParams}`).then((r) => r.json()),
   })
 
   const { data: trends, isLoading: trendsLoading } = useQuery({
-    queryKey: ['churn-trends', country, leadSources],
+    queryKey: ['churn-trends', country, leadSources, accountManagerId],
     queryFn: () => fetch(`/api/analytics/churn?${sharedParams}`).then((r) => r.json()),
   })
 
@@ -240,7 +254,7 @@ export default function ChurnPage() {
   }, [sharedParams, typeFilter, from, to])
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery({
-    queryKey: ['churn-accounts', country, leadSources, typeFilter, from, to],
+    queryKey: ['churn-accounts', country, leadSources, accountManagerId, typeFilter, from, to],
     queryFn: () => fetch(`/api/analytics/churn-accounts?${accountParams}`).then((r) => r.json()),
   })
 
@@ -288,9 +302,10 @@ export default function ChurnPage() {
         : <span className="text-gray-300">—</span>,
       getValue: (r) => r.warehouses ?? 0,
     },
-    { key: 'country',    label: 'Country',  render: (r) => r.country },
-    { key: 'leadSource', label: 'Source',   render: (r) => r.leadSource?.replace(/([A-Z])/g, ' $1').trim() },
-    { key: 'status',     label: 'Status',   render: (r) => <StatusBadge status={r.status} /> },
+    { key: 'country',        label: 'Country',  render: (r) => r.country },
+    { key: 'accountManager', label: 'Acct Manager', render: (r) => r.accountManager ?? <span className="text-gray-300">—</span> },
+    { key: 'leadSource',     label: 'Source',   render: (r) => r.leadSource?.replace(/([A-Z])/g, ' $1').trim() },
+    { key: 'status',         label: 'Status',   render: (r) => <StatusBadge status={r.status} /> },
     {
       key: 'exitDate', label: 'Exit Date',
       render: (r) => new Date(r.exitDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
@@ -357,7 +372,8 @@ export default function ChurnPage() {
     { key: 'accumulativeChurnRate', label: 'Cumulative %', render: (r) => <ChurnRateBadge value={r.accumulativeChurnRate} size="lg" /> },
   ]
 
-  const hasFilters = country || leadSources.length || typeFilter || from || to
+  const hasFilters = country || leadSources.length || accountManagerId || typeFilter || from || to
+  const inputCls   = 'text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300'
 
   return (
     <div className="space-y-6">
@@ -365,30 +381,37 @@ export default function ChurnPage() {
       {/* ── Filter Bar ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mr-1">Filter</span>
+
+        {/* Always-visible filters */}
         <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
-        <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-          value={country} onChange={(e) => setCountry(e.target.value)}>
+        <select className={inputCls} value={country} onChange={(e) => setCountry(e.target.value)}>
           <option value="">All Countries</option>
           {countries.filter((c) => c.isActive).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
         </select>
+        <select className={inputCls} value={accountManagerId} onChange={(e) => setAccountManagerId(e.target.value)}>
+          <option value="">All Account Managers</option>
+          {accountManagers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+        </select>
 
-        {tab === 'accounts' && <>
-          <select className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+        {/* Date range — shown on overview + accounts tabs */}
+        {(tab === 'overview' || tab === 'accounts') && <>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+            className={inputCls} title="Exit date from" />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
+            className={inputCls} title="Exit date to" />
+        </>}
+
+        {/* Type filter — accounts tab only */}
+        {tab === 'accounts' && (
+          <select className={inputCls} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
             <option value="">Cancelled + Expired</option>
             <option value="churned">Cancelled only</option>
             <option value="expired">Expired only</option>
           </select>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-            className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            title="Exit date from" />
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-            className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            title="Exit date to" />
-        </>}
+        )}
 
         {hasFilters && (
-          <button onClick={() => { setCountry(''); setLeadSources([]); setTypeFilter(''); setFrom(''); setTo('') }}
+          <button onClick={() => { setCountry(''); setLeadSources([]); setAccountManagerId(''); setTypeFilter(''); setFrom(''); setTo('') }}
             className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold underline underline-offset-2">
             Clear all
           </button>
