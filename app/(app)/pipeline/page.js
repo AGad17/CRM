@@ -129,6 +129,19 @@ function fmtUSD(v) {
   return `$${Math.round(v).toLocaleString('en-US')}`
 }
 
+// Best USD figure for a lead: deal MRR (if closed) else estimated value
+function leadValueUSD(lead) {
+  if (lead.dealMRR) return toUSD(lead.dealMRR, lead.dealCountry)
+  return toUSD(lead.estimatedValue, lead.countryCode)
+}
+
+// Best local-currency figure for display on a card
+function leadValueLocal(lead) {
+  if (lead.dealMRR)       return fmtValue(lead.dealMRR, lead.dealCountry)
+  if (lead.estimatedValue) return fmtValue(lead.estimatedValue, lead.countryCode)
+  return null
+}
+
 function initials(name) {
   if (!name) return '?'
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
@@ -616,7 +629,8 @@ function LeadForm({ form, setForm, errors, agents, pricing, serviceItems = [], o
 // ─── Kanban Card ─────────────────────────────────────────────────────────────
 
 function LeadCard({ lead, onStageAction, onEdit, isAdmin }) {
-  const val = fmtValue(lead.estimatedValue, lead.countryCode)
+  const val        = leadValueLocal(lead)
+  const isMRR      = !!lead.dealMRR   // true when value comes from a real deal
   const riskStatus = leadRiskStatus(lead)
   const daysSinceUpdate = Math.floor((Date.now() - new Date(lead.updatedAt).getTime()) / 86400000)
   const borderCls = riskStatus === 'overdue' ? 'border-l-4 border-l-red-400'
@@ -657,9 +671,12 @@ function LeadCard({ lead, onStageAction, onEdit, isAdmin }) {
       {/* Value + meta */}
       <div className="flex items-center justify-between text-xs text-gray-400">
         <div>
-          <span className="font-semibold text-gray-800 text-sm">{val || '—'}</span>
-          {lead.estimatedValue && COUNTRY_CURRENCY[lead.countryCode] !== 'USD' && (
-            <p className="text-[10px] text-gray-400 leading-tight">{fmtUSD(toUSD(lead.estimatedValue, lead.countryCode))} USD</p>
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-gray-800 text-sm">{val || '—'}</span>
+            {isMRR && <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">MRR</span>}
+          </div>
+          {val && leadValueUSD(lead) > 0 && (
+            <p className="text-[10px] text-gray-400 leading-tight">{fmtUSD(leadValueUSD(lead))} USD</p>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -1192,7 +1209,7 @@ export default function PipelinePage() {
           <div className="grid grid-cols-4 gap-4 items-start">
             {STAGES.map((s) => {
               const col      = byStage(s.key)
-              const colUSD   = col.reduce((sum, l) => sum + toUSD(l.estimatedValue, l.countryCode), 0)
+              const colUSD   = col.reduce((sum, l) => sum + leadValueUSD(l), 0)
               return (
                 <div key={s.key} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden flex flex-col">
                   {/* Column header */}
