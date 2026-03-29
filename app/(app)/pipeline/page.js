@@ -1308,7 +1308,7 @@ export default function PipelinePage() {
                       <div>
                         <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Last MRR</p>
                         <p className="font-semibold text-gray-800 text-sm">
-                          USD {(account.totalMRR || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          USD {(account.lastMRR || account.totalMRR || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       </div>
                       <div className="text-right">

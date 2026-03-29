@@ -125,9 +125,9 @@ function TrackerCard({ tracker, phase, onClick }) {
           {tracker.account?.country?.name || '—'}
         </span>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {tracker.deal?.totalMRR > 0 && (
+          {tracker.accountMRR > 0 && (
             <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-              ${Number(tracker.deal.totalMRR).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              ${Math.round(tracker.accountMRR).toLocaleString('en-US')}
             </span>
           )}
           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${daysCls}`}>
@@ -421,7 +421,7 @@ export default function OnboardingPage() {
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-1 px-1">
           {PHASES.map((p) => {
             const cards = filtered.filter((t) => t.phase === p.key)
-            const colMRR = cards.reduce((sum, t) => sum + (Number(t.deal?.totalMRR) || 0), 0)
+            const colMRR = cards.reduce((sum, t) => sum + (t.accountMRR || 0), 0)
             return (
               <div key={p.key} className="flex-none w-64">
                 <div className={`rounded-t-xl px-3 py-2.5 border border-b-0 ${p.light}`}>
