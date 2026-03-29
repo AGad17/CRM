@@ -111,19 +111,8 @@ function stageInfo(key) {
   return STAGES.find((s) => s.key === key) || STAGES[0]
 }
 
-function fmtValue(v, countryCode) {
-  if (!v) return null
-  const cur = COUNTRY_CURRENCY[countryCode] || ''
-  return `${cur} ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-}
-
-function toUSD(value, countryCode) {
-  if (!value) return 0
-  const cur  = COUNTRY_CURRENCY[countryCode]
-  const rate = FX_TO_USD[cur] ?? 1
-  return Number(value) * rate
-}
-
+// All estimatedValue and accountMRR figures are stored in USD.
+// COUNTRY_CURRENCY / FX_TO_USD are kept for future multi-currency leads.
 function fmtUSD(v) {
   if (!v) return null
   return `$${Math.round(v).toLocaleString('en-US')}`
@@ -131,15 +120,15 @@ function fmtUSD(v) {
 
 // Best USD figure for a lead: contract/deal MRR first, then manual estimated value
 function leadValueUSD(lead) {
-  if (lead.accountMRR)     return toUSD(lead.accountMRR, lead.countryCode)
-  if (lead.estimatedValue) return toUSD(lead.estimatedValue, lead.countryCode)
+  if (lead.accountMRR)     return Number(lead.accountMRR)
+  if (lead.estimatedValue) return Number(lead.estimatedValue)
   return 0
 }
 
 // Best local-currency figure for display on a card
 function leadValueLocal(lead) {
-  if (lead.accountMRR)     return fmtValue(lead.accountMRR, lead.countryCode)
-  if (lead.estimatedValue) return fmtValue(lead.estimatedValue, lead.countryCode)
+  if (lead.accountMRR)     return fmtUSD(lead.accountMRR)
+  if (lead.estimatedValue) return fmtUSD(lead.estimatedValue)
   return null
 }
 
@@ -617,7 +606,7 @@ function LeadForm({ form, setForm, errors, agents, pricing, serviceItems = [], o
       {(!form.lineItems || form.lineItems.length === 0) && (
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-            Est. Deal Value {COUNTRY_CURRENCY[form.countryCode] ? `(${COUNTRY_CURRENCY[form.countryCode]})` : ''}
+            Est. Deal Value (USD)
             <span className="text-gray-300 font-normal ml-1 normal-case">· or add line items above to auto-calculate</span>
           </label>
           <input className={cls('estimatedValue')} type="number" min="0" value={form.estimatedValue} onChange={set('estimatedValue')} placeholder="0" />
@@ -676,9 +665,6 @@ function LeadCard({ lead, onStageAction, onEdit, isAdmin }) {
             <span className="font-semibold text-gray-800 text-sm">{val || '—'}</span>
             {isMRR && <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">MRR</span>}
           </div>
-          {val && leadValueUSD(lead) > 0 && (
-            <p className="text-[10px] text-gray-400 leading-tight">{fmtUSD(leadValueUSD(lead))} USD</p>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <span>{daysAgo(lead.opportunityDate)}</span>
@@ -1070,7 +1056,7 @@ export default function PipelinePage() {
     { key: 'channel',       label: 'Channel',    render: (r) => <ChannelBadge channel={r.channel} /> },
     { key: 'countryCode',   label: 'Country',    render: (r) => r.countryCode || '—' },
     { key: 'packageInterest',label:'Package',    render: (r) => r.packageInterest || '—' },
-    { key: 'estimatedValue',label: 'Est. Value', render: (r) => fmtValue(r.estimatedValue, r.countryCode) || '—' },
+    { key: 'estimatedValue',label: 'Est. Value (USD)', render: (r) => fmtUSD(r.estimatedValue) || '—' },
     { key: 'stage',         label: 'Stage',      render: (r) => <StageBadge stage={r.stage} /> },
     { key: 'owner',         label: 'Owner',      render: (r) => r.owner?.name || '—' },
     { key: 'createdAt',     label: 'Created',    render: (r) => new Date(r.createdAt).toLocaleDateString() },
@@ -1156,7 +1142,7 @@ export default function PipelinePage() {
       {tab === 'leads' && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <KPICard label="In Pipeline"    value={kpis.inPipeline}   format="integer" subLabel="Lead + Qualified" />
-          <KPICard label="Pipeline Value" value={kpis.pipelineVal}  format="number"  subLabel="Qualified stage" />
+          <KPICard label="Pipeline Value" value={kpis.pipelineVal}  format="currency"  subLabel="Qualified stage — USD" />
           <KPICard label="Won This Month" value={kpis.wonThisMonth} format="integer" subLabel="Closed Won" />
           <KPICard label="Win Rate"       value={kpis.winRate}      format="percent" subLabel="Won ÷ (Won + Lost)" />
         </div>
