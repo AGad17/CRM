@@ -20,7 +20,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const { error, session } = await requirePermission('accounts', 'edit')
+  const { error, session } = await requirePermission('cases', 'create')
   if (error) return error
 
   const body = await request.json()

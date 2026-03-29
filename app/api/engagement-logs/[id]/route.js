@@ -3,7 +3,7 @@ import { requirePermission } from '@/lib/roleGuard'
 import { updateEngagementLog, deleteEngagementLog } from '@/lib/db/engagementLogs'
 
 export async function PUT(request, { params }) {
-  const { error } = await requirePermission('accounts', 'edit')
+  const { error } = await requirePermission('cases', 'create')
   if (error) return error
 
   const body = await request.json()
@@ -19,7 +19,7 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
-  const { error } = await requirePermission('accounts', 'edit')
+  const { error } = await requirePermission('cases', 'create')
   if (error) return error
 
   await deleteEngagementLog(params.id)
