@@ -129,15 +129,16 @@ function fmtUSD(v) {
   return `$${Math.round(v).toLocaleString('en-US')}`
 }
 
-// Best USD figure for a lead: deal MRR (if closed) else estimated value
+// Best USD figure for a lead: contract/deal MRR first, then manual estimated value
 function leadValueUSD(lead) {
-  if (lead.dealMRR) return toUSD(lead.dealMRR, lead.dealCountry)
-  return toUSD(lead.estimatedValue, lead.countryCode)
+  if (lead.accountMRR)     return toUSD(lead.accountMRR, lead.countryCode)
+  if (lead.estimatedValue) return toUSD(lead.estimatedValue, lead.countryCode)
+  return 0
 }
 
 // Best local-currency figure for display on a card
 function leadValueLocal(lead) {
-  if (lead.dealMRR)       return fmtValue(lead.dealMRR, lead.dealCountry)
+  if (lead.accountMRR)     return fmtValue(lead.accountMRR, lead.countryCode)
   if (lead.estimatedValue) return fmtValue(lead.estimatedValue, lead.countryCode)
   return null
 }
@@ -630,7 +631,7 @@ function LeadForm({ form, setForm, errors, agents, pricing, serviceItems = [], o
 
 function LeadCard({ lead, onStageAction, onEdit, isAdmin }) {
   const val        = leadValueLocal(lead)
-  const isMRR      = !!lead.dealMRR   // true when value comes from a real deal
+  const isMRR      = !!lead.accountMRR   // true when value comes from contracts/deal
   const riskStatus = leadRiskStatus(lead)
   const daysSinceUpdate = Math.floor((Date.now() - new Date(lead.updatedAt).getTime()) / 86400000)
   const borderCls = riskStatus === 'overdue' ? 'border-l-4 border-l-red-400'
