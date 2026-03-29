@@ -431,9 +431,9 @@ export default function OnboardingPage() {
                   </div>
                   <div className="flex items-center justify-between mt-0.5">
                     <p className="text-xs text-gray-400">{p.team}</p>
-                    {colMRR > 0 && (
+                    {cards.length > 0 && (
                       <p className="text-xs font-semibold text-gray-700">
-                        ${colMRR.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                        {colMRR > 0 ? `$${colMRR.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'}
                         <span className="font-normal text-gray-400 ml-0.5">MRR</span>
                       </p>
                     )}

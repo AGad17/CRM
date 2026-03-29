@@ -1204,9 +1204,9 @@ export default function PipelinePage() {
                       </div>
                       <span className="text-xs font-bold text-gray-500 bg-gray-100 rounded-full px-1.5 py-0.5">{col.length}</span>
                     </div>
-                    {colUSD > 0 && (
+                    {col.length > 0 && (
                       <p className="text-xs font-semibold text-gray-600 mt-0.5 pl-3.5">
-                        {fmtUSD(colUSD)} <span className="font-normal text-gray-400">total</span>
+                        {colUSD > 0 ? fmtUSD(colUSD) : '—'} <span className="font-normal text-gray-400">total</span>
                       </p>
                     )}
                   </div>

@@ -68,7 +68,7 @@ function ServicesSection({ isAdmin }) {
   const [editId, setEditId] = useState(null)
   const [msg, setMsg] = useState(null)
 
-  function flash(m) { setMsg(m); setTimeout(() => setMsg(null), 3000) }
+  function flash(m) { setMsg(m); setTimeout(() => setMsg(null), 4000) }
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['service-items-all'],
@@ -77,19 +77,29 @@ function ServicesSection({ isAdmin }) {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['service-items-all'] })
 
+  async function apiFetch(url, opts) {
+    const r = await fetch(url, opts)
+    const json = await r.json()
+    if (!r.ok) throw new Error(json?.error || `Request failed (${r.status})`)
+    return json
+  }
+
+  const isEditing = editId !== null
   const saveM = useMutation({
-    mutationFn: (data) => editId
-      ? fetch(`/api/service-items/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(r => r.json())
-      : fetch('/api/service-items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(r => r.json()),
-    onSuccess: () => { invalidate(); setForm(EMPTY_SVC); setEditId(null); flash(editId ? 'Service updated!' : 'Service added!') },
+    mutationFn: (data) => isEditing
+      ? apiFetch(`/api/service-items/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+      : apiFetch('/api/service-items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+    onSuccess: () => { invalidate(); setForm(EMPTY_SVC); setEditId(null); flash(isEditing ? 'Service updated!' : 'Service added!') },
+    onError: (e) => flash(`Error: ${e.message}`),
   })
 
   const toggleM = useMutation({
-    mutationFn: ({ id, isActive }) => fetch(`/api/service-items/${id}`, {
+    mutationFn: ({ id, isActive }) => apiFetch(`/api/service-items/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...items.find(i => i.id === id), isActive }),
-    }).then(r => r.json()),
+    }),
     onSuccess: () => { invalidate(); flash('Saved!') },
+    onError: (e) => flash(`Error: ${e.message}`),
   })
 
   function startEdit(item) {
@@ -104,7 +114,7 @@ function ServicesSection({ isAdmin }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        {msg && <span className="text-sm text-emerald-600 font-medium bg-emerald-50 px-3 py-1.5 rounded-lg">{msg}</span>}
+        {msg && <span className={`text-sm font-medium px-3 py-1.5 rounded-lg ${msg.startsWith('Error') ? 'text-red-600 bg-red-50' : 'text-emerald-600 bg-emerald-50'}`}>{msg}</span>}
       </div>
 
       {/* Add / Edit form */}
