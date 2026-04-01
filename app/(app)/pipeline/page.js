@@ -51,9 +51,10 @@ const COUNTRY_CURRENCY = { Egypt: 'EGP', KSA: 'SAR', UAE: 'AED', Bahrain: 'BHD',
 const FX_TO_USD = { EGP: 0.020, SAR: 0.2667, AED: 0.2723, BHD: 2.6525, JOD: 1.4104, USD: 1 }
 
 const OPP_TYPES = [
-  { key: 'New',       label: 'New',       desc: 'Brand new account — no prior relationship', icon: '✨' },
-  { key: 'Expansion', label: 'Expansion', desc: 'Existing account adding more branches or modules', icon: '📈' },
-  { key: 'Renewal',   label: 'Renewal',   desc: 'Existing account renewing their current contract', icon: '🔄' },
+  { key: 'New',               label: 'New',               desc: 'Brand new account — no prior relationship',               icon: '✨' },
+  { key: 'Expansion',         label: 'Expansion',         desc: 'Existing account adding more branches or modules',         icon: '📈' },
+  { key: 'Renewal',           label: 'Renewal',           desc: 'Existing account renewing their current contract',         icon: '🔄' },
+  { key: 'ReturningCustomer', label: 'Returning Customer', desc: 'Previously churned account coming back — new contract',   icon: '🔁' },
 ]
 
 const LOST_REASON_CATEGORIES = [
@@ -93,9 +94,10 @@ const ACTIVITY_ACTION_LABELS = {
 }
 
 const OPP_COLORS = {
-  New:       'bg-indigo-100 text-indigo-700',
-  Expansion: 'bg-emerald-100 text-emerald-700',
-  Renewal:   'bg-amber-100 text-amber-700',
+  New:               'bg-indigo-100 text-indigo-700',
+  Expansion:         'bg-emerald-100 text-emerald-700',
+  Renewal:           'bg-amber-100 text-amber-700',
+  ReturningCustomer: 'bg-rose-100 text-rose-700',
 }
 
 const EMPTY_FORM = {
@@ -758,7 +760,7 @@ export default function PipelinePage() {
   const [modalTab, setModalTab]       = useState('details')
   const [commentText, setCommentText] = useState('')
   // New Opportunity flow
-  const [oppType, setOppType] = useState(null)           // null | 'New' | 'Expansion' | 'Renewal'
+  const [oppType, setOppType] = useState(null)           // null | 'New' | 'Expansion' | 'Renewal' | 'ReturningCustomer'
   const [accountSearch, setAccountSearch] = useState('')
   const [selectedAccount, setSelectedAccount] = useState(null)
 
@@ -794,6 +796,12 @@ export default function PipelinePage() {
   const { data: accounts = [] } = useQuery({
     queryKey: ['crm-accounts'],
     queryFn: () => fetch('/api/accounts?selector=true').then((r) => r.json()),
+  })
+
+  const { data: churnedAccounts = [] } = useQuery({
+    queryKey: ['crm-accounts-churned'],
+    queryFn: () => fetch('/api/accounts?selector=churned').then((r) => r.json()),
+    enabled: oppType === 'ReturningCustomer',
   })
 
   const { data: pricing } = useQuery({
@@ -971,7 +979,7 @@ export default function PipelinePage() {
 
   function validateForm() {
     const e = {}
-    const isExpRen = oppType === 'Expansion' || oppType === 'Renewal'
+    const isExpRen = oppType === 'Expansion' || oppType === 'Renewal' || oppType === 'ReturningCustomer'
     if (!isExpRen && !formData.companyName.trim()) e.companyName = 'Required'
     if (isExpRen && !selectedAccount)              e.account     = 'Select an account'
     if (!formData.channel)                         e.channel     = 'Required'
@@ -982,7 +990,7 @@ export default function PipelinePage() {
   function handleSubmit() {
     const e = validateForm()
     if (Object.keys(e).length > 0) { setFormErrors(e); return }
-    const isExpRen = oppType === 'Expansion' || oppType === 'Renewal'
+    const isExpRen = oppType === 'Expansion' || oppType === 'Renewal' || oppType === 'ReturningCustomer'
 
     // Strip internal _key before sending to API
     const cleanLineItems = (formData.lineItems || []).map(({ _key, ...rest }) => ({
@@ -1378,12 +1386,17 @@ export default function PipelinePage() {
               {/* Type badge + back link */}
               <div className="flex items-center gap-2">
                 <button onClick={() => { setOppType(null); setSelectedAccount(null); setFormErrors({}) }} className="text-xs text-gray-400 hover:text-gray-700 underline">← Back</button>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${OPP_COLORS[oppType]}`}>{oppType}</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${OPP_COLORS[oppType]}`}>{OPP_TYPES.find(t => t.key === oppType)?.label || oppType}</span>
               </div>
 
-              {/* Expansion / Renewal: account selector */}
-              {(oppType === 'Expansion' || oppType === 'Renewal') ? (
+              {/* Expansion / Renewal / Returning Customer: account selector */}
+              {(oppType === 'Expansion' || oppType === 'Renewal' || oppType === 'ReturningCustomer') ? (
                 <div className="space-y-3">
+                  {oppType === 'ReturningCustomer' && (
+                    <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-xs text-rose-700">
+                      Only previously churned accounts are shown below.
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Select Account *</label>
                     <input
@@ -1394,12 +1407,12 @@ export default function PipelinePage() {
                       className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${formErrors.account ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white'}`}
                     />
                     {formErrors.account && <p className="text-xs text-red-500 mt-0.5">{formErrors.account}</p>}
-                    {accountSearch && !selectedAccount && (
-                      <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm max-h-48 overflow-y-auto">
-                        {accounts
-                          .filter((a) => a.name.toLowerCase().includes(accountSearch.toLowerCase()))
-                          .slice(0, 8)
-                          .map((a) => (
+                    {accountSearch && !selectedAccount && (() => {
+                      const pool = oppType === 'ReturningCustomer' ? churnedAccounts : accounts
+                      const filtered = pool.filter((a) => a.name.toLowerCase().includes(accountSearch.toLowerCase()))
+                      return (
+                        <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm max-h-48 overflow-y-auto">
+                          {filtered.slice(0, 8).map((a) => (
                             <button
                               key={a.id}
                               onClick={() => { setSelectedAccount(a); setAccountSearch(a.name) }}
@@ -1407,14 +1420,17 @@ export default function PipelinePage() {
                             >
                               <span className="font-medium text-gray-900">{a.name}</span>
                               <span className="text-gray-400 text-xs ml-2">{a.country?.code} · {a.numberOfBranches} branches</span>
+                              {oppType === 'ReturningCustomer' && <span className="ml-2 text-xs font-medium text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-full">Churned</span>}
                             </button>
-                          ))
-                        }
-                        {accounts.filter((a) => a.name.toLowerCase().includes(accountSearch.toLowerCase())).length === 0 && (
-                          <p className="px-3 py-2 text-sm text-gray-400">No accounts found</p>
-                        )}
-                      </div>
-                    )}
+                          ))}
+                          {filtered.length === 0 && (
+                            <p className="px-3 py-2 text-sm text-gray-400">
+                              {oppType === 'ReturningCustomer' ? 'No churned accounts found' : 'No accounts found'}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })()}
                     {selectedAccount && (
                       <div className="mt-1 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 text-sm flex items-center justify-between">
                         <span><span className="font-semibold text-indigo-800">{selectedAccount.name}</span> <span className="text-indigo-500 text-xs">{selectedAccount.country?.code} · {selectedAccount.numberOfBranches} branches</span></span>

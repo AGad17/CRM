@@ -28,6 +28,31 @@ export async function GET(request) {
     return NextResponse.json(active)
   }
 
+  // ?selector=churned → lightweight churned-only list for the Returning Customer opportunity picker
+  if (searchParams.get('selector') === 'churned') {
+    const now = new Date()
+    const accounts = await prisma.account.findMany({
+      where: {
+        // Has at least one cancelled contract
+        contracts: { some: { cancellationDate: { not: null } } },
+        // No currently active contracts
+        NOT: {
+          contracts: {
+            some: { cancellationDate: null, startDate: { lte: now }, endDate: { gte: now } },
+          },
+        },
+      },
+      select: {
+        id:               true,
+        name:             true,
+        numberOfBranches: true,
+        country:          { select: { code: true, name: true, currency: true } },
+      },
+      orderBy: { name: 'asc' },
+    })
+    return NextResponse.json(accounts)
+  }
+
   // Default → full enriched list for the Accounts page
   const countriesRaw    = searchParams.get('countries')
   const leadSourcesRaw  = searchParams.get('leadSources')

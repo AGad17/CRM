@@ -24,6 +24,7 @@ enum ContractType {
   New
   Renewal
   Expansion
+  ReturningCustomer
 }
 
 enum Role {
@@ -100,6 +101,7 @@ enum DealType {
   Renewal
   Upsell
   Expansion
+  ReturningCustomer
 }
 
 // ─── Country (dynamic DB table) ───────────────────────────────────────────────
