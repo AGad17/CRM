@@ -149,6 +149,7 @@ model Account {
   brandNames      AccountBrand[]
   engagementLogs  EngagementLog[]
   cases           EngagementCase[] @relation("AccountCases")
+  tasks           Task[]
 
   @@map("accounts")
 }
@@ -291,6 +292,8 @@ model User {
   notifications   Notification[]      @relation("UserNotifications")
   leadComments      LeadComment[]       @relation("LeadCommentAuthor")
   leadActivities    LeadActivity[]      @relation("LeadActivityActor")
+  assignedTasks     Task[]              @relation("TaskAssignee")
+  createdTasks      Task[]              @relation("TaskCreator")
 
   @@map("users")
 }
@@ -608,6 +611,7 @@ model Lead {
 
   comments   LeadComment[]
   activities LeadActivity[]
+  tasks      Task[]
 
   @@map("leads")
 }
@@ -873,6 +877,7 @@ model EngagementCase {
   openedBy    User             @relation("UserOpenedCases",   fields: [openedById],   references: [id])
   assignedTo  User?            @relation("UserAssignedCases", fields: [assignedToId], references: [id])
   followUps   CaseFollowUp[]
+  tasks       Task[]
   outage      EngagementCase?  @relation("OutageCases",       fields: [outageId],     references: [id])
   linkedCases EngagementCase[] @relation("OutageCases")
 
@@ -921,6 +926,52 @@ enum NotificationType {
   OnboardingTaskOverdue
   CaseOverdue
   LeadAssignmentChanged
+  TaskAssigned
+}
+
+// ─── Tasks ────────────────────────────────────────────────────────────────────
+
+enum TaskType {
+  Call
+  Email
+  Meeting
+  FollowUp
+  Demo
+  Other
+}
+
+enum TaskStatus {
+  Open
+  Done
+  Cancelled
+}
+
+model Task {
+  id             Int        @id @default(autoincrement())
+  title          String
+  type           TaskType
+  assignedToId   String
+  createdById    String
+  dueDate        DateTime
+  status         TaskStatus @default(Open)
+  notes          String?
+  accountId      Int?
+  leadId         Int?
+  caseId         Int?
+  completedAt    DateTime?
+  completedNotes String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  assignedTo User            @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  createdBy  User            @relation("TaskCreator",  fields: [createdById],  references: [id])
+  account    Account?        @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  lead       Lead?           @relation(fields: [leadId],    references: [id], onDelete: SetNull)
+  case       EngagementCase? @relation(fields: [caseId],    references: [id], onDelete: SetNull)
+
+  @@index([assignedToId, dueDate])
+  @@index([status])
+  @@map("tasks")
 }
 
 enum ChurnReason {
