@@ -577,6 +577,7 @@ model Lead {
   channel           LeadSource
   countryCode       String?
   estimatedValue    Decimal?    @db.Decimal(12, 2)
+  valueCurrency     String?     @default("USD")
   numberOfBranches  Int?
   packageInterest   InvoicePkg?
   stage             LeadStage   @default(Lead)

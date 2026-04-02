@@ -31,6 +31,7 @@ export async function GET(req) {
       channel: true,
       countryCode: true,
       estimatedValue: true,
+      valueCurrency: true,
       convertedAt: true,
       createdAt: true,
       updatedAt: true,
@@ -44,7 +45,9 @@ export async function GET(req) {
   return NextResponse.json(computeAnalytics(leads))
 }
 
+const FX_TO_USD = { EGP: 0.020, SAR: 0.2667, AED: 0.2723, BHD: 2.6525, JOD: 1.4104, USD: 1 }
 function toNum(v) { return v ? Number(v) : 0 }
+function toUSD(v, currency) { return toNum(v) * (FX_TO_USD[currency] ?? 1) }
 
 function fmtMonth(d) {
   const x = new Date(d)
@@ -79,7 +82,7 @@ function computeAnalytics(leads) {
     return d.getFullYear() * 100 + d.getMonth() === thisMonthKey
   }).length
 
-  const pipelineValue = qualified.reduce((s, l) => s + toNum(l.estimatedValue), 0)
+  const pipelineValue = qualified.reduce((s, l) => s + toUSD(l.estimatedValue, l.valueCurrency), 0)
 
   // Use actual win rates per channel for weighted forecast
   const channelWinRates = {}
@@ -91,8 +94,8 @@ function computeAnalytics(leads) {
     channelWinRates[ch] = total > 0 ? chWon / total : 0.3 // fallback 30% if no history
   }
   const weightedForecast =
-    qualified.reduce((s, l) => s + toNum(l.estimatedValue) * (channelWinRates[l.channel] ?? 0.3), 0) +
-    active.reduce((s, l)    => s + toNum(l.estimatedValue) * (channelWinRates[l.channel] ?? 0.3) * 0.3, 0)
+    qualified.reduce((s, l) => s + toUSD(l.estimatedValue, l.valueCurrency) * (channelWinRates[l.channel] ?? 0.3), 0) +
+    active.reduce((s, l)    => s + toUSD(l.estimatedValue, l.valueCurrency) * (channelWinRates[l.channel] ?? 0.3) * 0.3, 0)
 
   const summary = {
     total: leads.length,
@@ -115,7 +118,7 @@ function computeAnalytics(leads) {
       stage,
       label: STAGE_LABELS[stage] || stage,
       count: group.length,
-      value: group.reduce((s, l) => s + toNum(l.estimatedValue), 0),
+      value: group.reduce((s, l) => s + toUSD(l.estimatedValue, l.valueCurrency), 0),
     }
   })
 
@@ -127,7 +130,7 @@ function computeAnalytics(leads) {
     channelMap[key].total++
     if (l.stage === 'ClosedWon')  channelMap[key].won++
     if (l.stage === 'ClosedLost') channelMap[key].lost++
-    channelMap[key].valueSum += toNum(l.estimatedValue)
+    channelMap[key].valueSum += toUSD(l.estimatedValue, l.valueCurrency)
   }
   const byChannel = Object.values(channelMap)
     .sort((a, b) => b.total - a.total)
@@ -144,7 +147,7 @@ function computeAnalytics(leads) {
     if (!countryMap[key]) countryMap[key] = { country: key, total: 0, won: 0, pipelineValue: 0 }
     countryMap[key].total++
     if (l.stage === 'ClosedWon') countryMap[key].won++
-    if (l.stage === 'Qualified')  countryMap[key].pipelineValue += toNum(l.estimatedValue)
+    if (l.stage === 'Qualified')  countryMap[key].pipelineValue += toUSD(l.estimatedValue, l.valueCurrency)
   }
   const byCountry = Object.values(countryMap)
     .sort((a, b) => b.total - a.total)

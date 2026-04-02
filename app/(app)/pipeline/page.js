@@ -114,24 +114,32 @@ function stageInfo(key) {
   return STAGES.find((s) => s.key === key) || STAGES[0]
 }
 
-// All estimatedValue and accountMRR figures are stored in USD.
-// COUNTRY_CURRENCY / FX_TO_USD are kept for future multi-currency leads.
+// accountMRR is always USD. estimatedValue is stored in valueCurrency (defaults to USD for old records).
 function fmtUSD(v) {
   if (!v) return null
   return `$${Math.round(v).toLocaleString('en-US')}`
 }
 
-// Best USD figure for a lead: contract/deal MRR first, then manual estimated value
-function leadValueUSD(lead) {
-  if (lead.accountMRR)     return Number(lead.accountMRR)
-  if (lead.estimatedValue) return Number(lead.estimatedValue)
-  return 0
+function fmtLocal(v, currency) {
+  if (!v) return null
+  const formatted = Math.round(Number(v)).toLocaleString('en-US')
+  if (!currency || currency === 'USD') return `$${formatted}`
+  return `${currency} ${formatted}`
 }
 
-// Best local-currency figure for display on a card
+// Convert a local-currency estimatedValue to USD using hardcoded FX rates.
+// accountMRR is always already in USD.
+function leadValueUSD(lead) {
+  if (lead.accountMRR) return Number(lead.accountMRR)
+  if (!lead.estimatedValue) return 0
+  const fx = FX_TO_USD[lead.valueCurrency] ?? 1
+  return Number(lead.estimatedValue) * fx
+}
+
+// Display value on lead cards — show in the lead's own currency
 function leadValueLocal(lead) {
   if (lead.accountMRR)     return fmtUSD(lead.accountMRR)
-  if (lead.estimatedValue) return fmtUSD(lead.estimatedValue)
+  if (lead.estimatedValue) return fmtLocal(lead.estimatedValue, lead.valueCurrency)
   return null
 }
 
@@ -307,7 +315,11 @@ function LineItemBuilder({ items = [], onChange, pricing, serviceItems = [], cou
                     <label className="block text-xs text-gray-500 mb-1">Module *</label>
                     <select value={addonForm.key} onChange={(e) => {
                       const mod = ADDON_MODULES.find((m) => m.key === e.target.value)
-                      setAddonForm((p) => ({ ...p, key: e.target.value, qty: mod?.unitLabel === 'module' ? '1' : p.qty }))
+                      const addonRow = (pricing?.addOnPricing || []).find(
+                        (r) => r.countryCode === countryCode && r.salesChannel === channel && r.module === e.target.value
+                      )
+                      const presetPrice = addonRow ? String(Number(addonRow.annualPrice)) : ''
+                      setAddonForm((p) => ({ ...p, key: e.target.value, qty: mod?.unitLabel === 'module' ? '1' : p.qty, unitPrice: presetPrice }))
                     }}
                       className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
                       <option value="">Select…</option>
@@ -609,7 +621,7 @@ function LeadForm({ form, setForm, errors, agents, pricing, serviceItems = [], o
       {(!form.lineItems || form.lineItems.length === 0) && (
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-            Est. Deal Value (USD)
+            Est. Deal Value ({COUNTRY_CURRENCY[form.countryCode] || 'USD'})
             <span className="text-gray-300 font-normal ml-1 normal-case">· or add line items above to auto-calculate</span>
           </label>
           <input className={cls('estimatedValue')} type="number" min="0" value={form.estimatedValue} onChange={set('estimatedValue')} placeholder="0" />
@@ -911,13 +923,14 @@ export default function PipelinePage() {
   const thisMonth = (d) => { const x = new Date(d); return x.getFullYear() === now.getFullYear() && x.getMonth() === now.getMonth() }
 
   const kpis = useMemo(() => {
-    const inPipeline   = leads.filter((l) => l.stage === 'Lead' || l.stage === 'Qualified').length
-    const pipelineVal  = leads.filter((l) => l.stage === 'Qualified').reduce((s, l) => s + (l.estimatedValue || 0), 0)
-    const wonThisMonth = leads.filter((l) => l.stage === 'ClosedWon' && l.convertedAt && thisMonth(l.convertedAt)).length
-    const totalClosed  = leads.filter((l) => l.stage === 'ClosedWon' || l.stage === 'ClosedLost').length
-    const totalWon     = leads.filter((l) => l.stage === 'ClosedWon').length
-    const winRate      = totalClosed > 0 ? totalWon / totalClosed : null
-    return { inPipeline, pipelineVal, wonThisMonth, winRate }
+    const inPipeline    = leads.filter((l) => l.stage === 'Lead' || l.stage === 'Qualified').length
+    const leadsVal      = leads.filter((l) => l.stage === 'Lead').reduce((s, l) => s + leadValueUSD(l), 0)
+    const qualifiedVal  = leads.filter((l) => l.stage === 'Qualified').reduce((s, l) => s + leadValueUSD(l), 0)
+    const wonThisMonth  = leads.filter((l) => l.stage === 'ClosedWon' && l.convertedAt && thisMonth(l.convertedAt)).length
+    const totalClosed   = leads.filter((l) => l.stage === 'ClosedWon' || l.stage === 'ClosedLost').length
+    const totalWon      = leads.filter((l) => l.stage === 'ClosedWon').length
+    const winRate       = totalClosed > 0 ? totalWon / totalClosed : null
+    return { inPipeline, leadsVal, qualifiedVal, wonThisMonth, winRate }
   }, [leads])
 
   // ── At-risk count ──
@@ -1005,17 +1018,22 @@ export default function PipelinePage() {
     // Derive packageInterest + numberOfBranches from package line item (backward compat)
     const pkgItem = cleanLineItems.find((i) => i.category === 'package')
 
+    const resolvedCountry = isExpRen && selectedAccount
+      ? (selectedAccount.country?.code || formData.countryCode)
+      : formData.countryCode
+
     const payload = {
       ...formData,
       lineItems:        cleanLineItems.length > 0 ? cleanLineItems : null,
       estimatedValue,
+      valueCurrency:    COUNTRY_CURRENCY[resolvedCountry] || 'USD',
       packageInterest:  pkgItem?.productKey  || null,
       numberOfBranches: pkgItem ? Number(pkgItem.qty) || null : null,
       opportunityType:  oppType || 'New',
       nextActionDate:   formData.nextActionDate || '',
       ...(isExpRen && selectedAccount && {
         companyName: selectedAccount.name,
-        countryCode: selectedAccount.country?.code || formData.countryCode,
+        countryCode: resolvedCountry,
         accountId:   selectedAccount.id,
       }),
     }
@@ -1149,11 +1167,12 @@ export default function PipelinePage() {
 
       {/* KPIs (leads tab only) */}
       {tab === 'leads' && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <KPICard label="In Pipeline"    value={kpis.inPipeline}   format="integer" subLabel="Lead + Qualified" />
-          <KPICard label="Pipeline Value" value={kpis.pipelineVal}  format="currency"  subLabel="Qualified stage — USD" />
-          <KPICard label="Won This Month" value={kpis.wonThisMonth} format="integer" subLabel="Closed Won" />
-          <KPICard label="Win Rate"       value={kpis.winRate}      format="percent" subLabel="Won ÷ (Won + Lost)" />
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+          <KPICard label="In Pipeline"       value={kpis.inPipeline}   format="integer"  subLabel="Lead + Qualified" />
+          <KPICard label="Leads Value"       value={kpis.leadsVal}     format="currency" subLabel="Lead stage — USD" />
+          <KPICard label="Qualified Value"   value={kpis.qualifiedVal} format="currency" subLabel="Qualified stage — USD" />
+          <KPICard label="Won This Month"    value={kpis.wonThisMonth} format="integer"  subLabel="Closed Won" />
+          <KPICard label="Win Rate"          value={kpis.winRate}      format="percent"  subLabel="Won ÷ (Won + Lost)" />
         </div>
       )}
 
