@@ -103,6 +103,7 @@ const OPP_COLORS = {
 const EMPTY_FORM = {
   companyName: '', contactName: '', contactEmail: '', contactPhone: '',
   channel: '', countryCode: '', estimatedValue: '',
+  dealDiscountPct: '', brandNames: [],
   opportunityDate: new Date().toISOString().slice(0, 10),
   expectedCloseDate: '', nextActionDate: '', notes: '', ownerId: '',
   lineItems: [],
@@ -187,7 +188,7 @@ function ChannelBadge({ channel }) {
 
 // ─── Line-Item Builder ────────────────────────────────────────────────────────
 
-function LineItemBuilder({ items = [], onChange, pricing, serviceItems = [], countryCode, channel }) {
+function LineItemBuilder({ items = [], onChange, pricing, serviceItems = [], countryCode, channel, dealDiscountPct = '', onDealDiscountChange }) {
   const [showPicker, setShowPicker] = useState(false)
   const [pickerTab, setPickerTab]   = useState('package')
   const [pkgForm,   setPkgForm]     = useState({ package: '', qty: '' })
@@ -218,17 +219,25 @@ function LineItemBuilder({ items = [], onChange, pricing, serviceItems = [], cou
     setShowPicker(false)
   }
   function removeItem(key) { onChange(items.filter((i) => i._key !== key)) }
+  function lineSubtotal(item) {
+    const gross = Number(item.qty || 0) * Number(item.unitPrice || 0)
+    const disc  = Math.min(Math.max(Number(item.discountPct || 0), 0), 100)
+    return gross * (1 - disc / 100)
+  }
+
   function updateItem(key, field, val) {
     onChange(items.map((i) => {
       if (i._key !== key) return i
       const u = { ...i, [field]: val }
-      u.subtotal = Number(u.qty || 0) * Number(u.unitPrice || 0)
+      u.subtotal = lineSubtotal(u)
       return u
     }))
   }
 
-  const recurringTotal = items.filter((i) => !i.isOneTime).reduce((s, i) => s + (Number(i.qty || 0) * Number(i.unitPrice || 0)), 0)
-  const onetimeTotal   = items.filter((i) =>  i.isOneTime).reduce((s, i) => s + (Number(i.qty || 0) * Number(i.unitPrice || 0)), 0)
+  const recurringTotal = items.filter((i) => !i.isOneTime).reduce((s, i) => s + lineSubtotal(i), 0)
+  const onetimeTotal   = items.filter((i) =>  i.isOneTime).reduce((s, i) => s + lineSubtotal(i), 0)
+  const dealDisc       = Math.min(Math.max(Number(dealDiscountPct || 0), 0), 100)
+  const grandTotal     = (recurringTotal + onetimeTotal) * (1 - dealDisc / 100)
 
   return (
     <div className="space-y-3">
@@ -447,15 +456,16 @@ function LineItemBuilder({ items = [], onChange, pricing, serviceItems = [], cou
         <div className="space-y-1.5">
           {/* Header row */}
           <div className="grid grid-cols-12 gap-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-1">
-            <div className="col-span-5">Product</div>
+            <div className="col-span-4">Product</div>
             <div className="col-span-2 text-right">Qty</div>
             <div className="col-span-2 text-right">Unit Price</div>
+            <div className="col-span-1 text-right">Disc%</div>
             <div className="col-span-2 text-right">Subtotal</div>
             <div className="col-span-1" />
           </div>
           {items.map((item) => (
             <div key={item._key} className="grid grid-cols-12 gap-1 items-center bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
-              <div className="col-span-5 min-w-0">
+              <div className="col-span-4 min-w-0">
                 <p className="text-xs font-semibold text-gray-800 leading-tight truncate">{item.name}</p>
                 <span className={`text-[10px] font-medium ${item.isOneTime ? 'text-amber-600' : 'text-indigo-600'}`}>
                   {item.isOneTime ? '⚡ One-time' : '🔄 Annual'}
@@ -474,10 +484,22 @@ function LineItemBuilder({ items = [], onChange, pricing, serviceItems = [], cou
                   className={`w-full text-right text-xs border rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 ${item.pricingType === 'Fixed' && item.category !== 'package' ? 'bg-gray-100 border-gray-100 text-gray-500' : 'bg-white border-gray-200'}`}
                 />
               </div>
+              <div className="col-span-1">
+                <input type="number" min="0" max="100" value={item.discountPct ?? ''}
+                  onChange={(e) => updateItem(item._key, 'discountPct', e.target.value === '' ? 0 : Number(e.target.value))}
+                  placeholder="0"
+                  className="w-full text-right text-xs border border-gray-200 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-rose-400 bg-white"
+                />
+              </div>
               <div className="col-span-2 text-right">
                 <span className="text-xs font-semibold text-gray-700">
-                  {(Number(item.qty || 0) * Number(item.unitPrice || 0)).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                  {lineSubtotal(item).toLocaleString('en-US', { maximumFractionDigits: 0 })}
                 </span>
+                {Number(item.discountPct || 0) > 0 && (
+                  <span className="block text-[10px] text-rose-400 line-through">
+                    {(Number(item.qty || 0) * Number(item.unitPrice || 0)).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                  </span>
+                )}
               </div>
               <div className="col-span-1 flex justify-end">
                 <button type="button" onClick={() => removeItem(item._key)} className="text-gray-300 hover:text-red-500 transition-colors text-sm leading-none">✕</button>
@@ -485,17 +507,38 @@ function LineItemBuilder({ items = [], onChange, pricing, serviceItems = [], cou
             </div>
           ))}
 
-          {/* Totals */}
-          <div className="border-t border-gray-100 pt-2 space-y-1 text-right pr-1">
-            {recurringTotal > 0 && (
-              <p className="text-xs text-gray-500">🔄 Annual recurring: <span className="font-semibold text-gray-700">{currency} {recurringTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span></p>
-            )}
-            {onetimeTotal > 0 && (
-              <p className="text-xs text-gray-500">⚡ One-time fees: <span className="font-semibold text-gray-700">{currency} {onetimeTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span></p>
-            )}
-            <p className="text-xs font-bold text-gray-900">
-              Grand Total: {currency} {(recurringTotal + onetimeTotal).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-            </p>
+          {/* Totals + deal discount */}
+          <div className="border-t border-gray-100 pt-2 space-y-1.5">
+            <div className="text-right space-y-1 pr-1">
+              {recurringTotal > 0 && (
+                <p className="text-xs text-gray-500">🔄 Annual recurring: <span className="font-semibold text-gray-700">{currency} {recurringTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span></p>
+              )}
+              {onetimeTotal > 0 && (
+                <p className="text-xs text-gray-500">⚡ One-time fees: <span className="font-semibold text-gray-700">{currency} {onetimeTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span></p>
+              )}
+            </div>
+            {/* Deal-level discount row */}
+            <div className="flex items-center justify-between gap-2 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+              <label className="text-xs font-semibold text-rose-600 whitespace-nowrap">Deal Discount %</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number" min="0" max="100"
+                  value={dealDiscountPct}
+                  onChange={(e) => onDealDiscountChange?.(e.target.value)}
+                  placeholder="0"
+                  className="w-20 text-right text-xs border border-rose-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-rose-400 bg-white"
+                />
+                <span className="text-xs text-rose-400">%</span>
+              </div>
+            </div>
+            <div className="text-right pr-1">
+              {dealDisc > 0 && (
+                <p className="text-xs text-rose-500">Discount ({dealDisc}%): <span className="font-semibold">−{currency} {((recurringTotal + onetimeTotal) * dealDisc / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span></p>
+              )}
+              <p className="text-sm font-bold text-gray-900">
+                Grand Total: {currency} {grandTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -511,6 +554,43 @@ function LineItemBuilder({ items = [], onChange, pricing, serviceItems = [], cou
 }
 
 // ─── Lead Form ───────────────────────────────────────────────────────────────
+
+function BrandNameInput({ brands = [], onChange }) {
+  const [input, setInput] = useState('')
+  function add() {
+    const name = input.trim()
+    if (!name || brands.includes(name)) return
+    onChange([...brands, name])
+    setInput('')
+  }
+  function remove(name) { onChange(brands.filter((b) => b !== name)) }
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Brand Names</label>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {brands.map((b) => (
+          <span key={b} className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 text-xs rounded-full border border-indigo-100">
+            {b}
+            <button type="button" onClick={() => remove(b)} className="text-indigo-300 hover:text-indigo-700 leading-none">✕</button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text" value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+          placeholder="Type a brand name and press Enter…"
+          className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        />
+        <button type="button" onClick={add}
+          className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
+          + Add
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function LeadForm({ form, setForm, errors, agents, pricing, serviceItems = [], onDupCheck, dupWarning = [] }) {
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }))
@@ -614,6 +694,16 @@ function LeadForm({ form, setForm, errors, agents, pricing, serviceItems = [], o
           serviceItems={serviceItems}
           countryCode={form.countryCode}
           channel={form.channel}
+          dealDiscountPct={form.dealDiscountPct}
+          onDealDiscountChange={(v) => setForm((p) => ({ ...p, dealDiscountPct: v }))}
+        />
+      </div>
+
+      {/* ── Brand Names ── */}
+      <div className="border-t border-gray-100 pt-4">
+        <BrandNameInput
+          brands={form.brandNames || []}
+          onChange={(names) => setForm((p) => ({ ...p, brandNames: names }))}
         />
       </div>
 
@@ -1000,6 +1090,8 @@ export default function PipelinePage() {
       channel:           lead.channel,
       countryCode:       lead.countryCode      || '',
       estimatedValue:    storedItems.length === 0 && lead.estimatedValue != null ? String(lead.estimatedValue) : '',
+      dealDiscountPct:   lead.dealDiscountPct != null ? String(lead.dealDiscountPct) : '',
+      brandNames:        Array.isArray(lead.brandNames) ? lead.brandNames : [],
       opportunityDate:   lead.opportunityDate   ? new Date(lead.opportunityDate).toISOString().slice(0, 10)   : new Date().toISOString().slice(0, 10),
       expectedCloseDate: lead.expectedCloseDate ? new Date(lead.expectedCloseDate).toISOString().slice(0, 10) : '',
       nextActionDate:    lead.nextActionDate    ? new Date(lead.nextActionDate).toISOString().slice(0, 10)    : '',
@@ -1026,15 +1118,17 @@ export default function PipelinePage() {
     if (Object.keys(e).length > 0) { setFormErrors(e); return }
     const isExpRen = oppType === 'Expansion' || oppType === 'Renewal' || oppType === 'ReturningCustomer'
 
-    // Strip internal _key before sending to API
-    const cleanLineItems = (formData.lineItems || []).map(({ _key, ...rest }) => ({
-      ...rest,
-      subtotal: Number(rest.qty || 0) * Number(rest.unitPrice || 0),
-    }))
+    // Strip internal _key before sending to API; keep discountPct per line
+    const cleanLineItems = (formData.lineItems || []).map(({ _key, ...rest }) => {
+      const disc = Math.min(Math.max(Number(rest.discountPct || 0), 0), 100)
+      return { ...rest, subtotal: Number(rest.qty || 0) * Number(rest.unitPrice || 0) * (1 - disc / 100) }
+    })
 
-    // Derive estimatedValue from line items total; fall back to manual field
-    const lineItemTotal   = cleanLineItems.reduce((s, i) => s + (i.subtotal || 0), 0)
-    const estimatedValue  = lineItemTotal > 0 ? lineItemTotal : (Number(formData.estimatedValue) || null)
+    // Derive estimatedValue: sum discounted line subtotals, then apply deal discount
+    const lineItemTotal  = cleanLineItems.reduce((s, i) => s + (i.subtotal || 0), 0)
+    const dealDisc       = Math.min(Math.max(Number(formData.dealDiscountPct || 0), 0), 100)
+    const discountedTotal = lineItemTotal > 0 ? lineItemTotal * (1 - dealDisc / 100) : 0
+    const estimatedValue  = discountedTotal > 0 ? discountedTotal : (Number(formData.estimatedValue) || null)
 
     // Derive packageInterest + numberOfBranches from package line item (backward compat)
     const pkgItem = cleanLineItems.find((i) => i.category === 'package')
@@ -1047,6 +1141,8 @@ export default function PipelinePage() {
       ...formData,
       lineItems:        cleanLineItems.length > 0 ? cleanLineItems : null,
       estimatedValue,
+      dealDiscountPct:  dealDisc > 0 ? dealDisc : null,
+      brandNames:       formData.brandNames?.length > 0 ? formData.brandNames : null,
       valueCurrency:    COUNTRY_CURRENCY[resolvedCountry] || 'USD',
       packageInterest:  pkgItem?.productKey  || null,
       numberOfBranches: pkgItem ? Number(pkgItem.qty) || null : null,

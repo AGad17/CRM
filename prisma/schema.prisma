@@ -598,7 +598,9 @@ model Lead {
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
-  lineItems  Json?          // [{ id, category, productKey, serviceItemId, name, qty, unitPrice, isOneTime, pricingType, subtotal }]
+  dealDiscountPct Decimal?   @db.Decimal(5, 2)   // overall deal-level discount %
+  brandNames      Json?                           // ["Brand A", "Brand B"]
+  lineItems  Json?          // [{ id, category, productKey, serviceItemId, name, qty, unitPrice, discountPct, isOneTime, pricingType, subtotal }]
 
   comments   LeadComment[]
   activities LeadActivity[]

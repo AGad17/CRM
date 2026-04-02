@@ -167,6 +167,29 @@ export async function POST(request, { params }) {
         })
       }
 
+      // 1b. Migrate brand names from lead to AccountBrand table
+      const leadBrands = Array.isArray(lead.brandNames) ? lead.brandNames : []
+      if (leadBrands.length > 0) {
+        await tx.accountBrand.createMany({
+          data: leadBrands.map((name) => ({ accountId: account.id, name })),
+          skipDuplicates: true,
+        })
+        // Update brands count: for new accounts set it; for existing accounts add to it
+        if (isExistingAccount) {
+          await tx.account.update({
+            where: { id: account.id },
+            data:  { brands: { increment: leadBrands.length } },
+          })
+        } else {
+          // New account was created with brands: Number(body.brands) || 1
+          // Override with actual brand names count if available
+          await tx.account.update({
+            where: { id: account.id },
+            data:  { brands: leadBrands.length },
+          })
+        }
+      }
+
       // 2. Create Deal with nested Invoices
       const deal = await tx.deal.create({
         data: {
