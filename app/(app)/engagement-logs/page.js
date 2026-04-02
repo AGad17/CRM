@@ -102,6 +102,7 @@ function LogModal({ accounts, initial, onClose, onSave, isSaving }) {
   const [form, setForm] = useState({
     accountId: initial?.accountId ?? '',
     channel:   initial?.channel   ?? '',
+    direction: initial?.direction ?? 'Outbound',
     objective: initial?.objective ?? '',
     notes:     initial?.notes     ?? '',
     loggedAt:  initial?.loggedAt
@@ -263,6 +264,29 @@ function LogModal({ accounts, initial, onClose, onSave, isSaving }) {
             </div>
           </div>
 
+          {/* Direction toggle */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Direction</label>
+            <div className="flex gap-2">
+              {['Outbound', 'Inbound'].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => set('direction', d)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                    form.direction === d
+                      ? d === 'Outbound'
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {d === 'Outbound' ? '↑ Outbound' : '↓ Inbound'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Notes */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Notes</label>
@@ -311,7 +335,7 @@ function exportCsv(logs) {
     return s.includes(',') || s.includes('"') || s.includes('\n')
       ? '"' + s.replace(/"/g, '""') + '"' : s
   }
-  const headers = ['Date', 'Start Time', 'End Time', 'Duration', 'Account', 'Channel', 'Objective', 'Notes', 'Logged By']
+  const headers = ['Date', 'Start Time', 'End Time', 'Duration', 'Account', 'Channel', 'Direction', 'Objective', 'Notes', 'Logged By']
   const rows = logs.map((r) => [
     new Date(r.loggedAt).toLocaleDateString('en-GB'),
     fmtTime(r.startTime),
@@ -319,6 +343,7 @@ function exportCsv(logs) {
     calcDuration(r.startTime, r.endTime) ?? '',
     r.account?.name,
     CHANNEL_LABELS[r.channel]     || r.channel,
+    r.direction || 'Outbound',
     OBJECTIVE_LABELS[r.objective] || r.objective,
     r.notes,
     r.loggedBy?.name || r.loggedBy?.email,
@@ -338,8 +363,9 @@ export default function EngagementLogsPage() {
   const qc = useQueryClient()
 
   // ── Filters ──
-  const [accountSearch, setAccountSearch] = useState('')
+  const [accountSearch,    setAccountSearch]    = useState('')
   const [filterChannel,   setFilterChannel]   = useState('')
+  const [filterDirection, setFilterDirection] = useState('')
   const [filterObjective, setFilterObjective] = useState('')
   const [filterFrom, setFilterFrom] = useState('')
   const [filterTo,   setFilterTo]   = useState('')
@@ -355,12 +381,13 @@ export default function EngagementLogsPage() {
 
   const params = new URLSearchParams()
   if (filterChannel)   params.set('channel',   filterChannel)
+  if (filterDirection) params.set('direction',  filterDirection)
   if (filterObjective) params.set('objective',  filterObjective)
   if (filterFrom)      params.set('from',       filterFrom)
   if (filterTo)        params.set('to',         filterTo)
 
   const { data: logs = [], isLoading } = useQuery({
-    queryKey: ['engagement-logs', filterChannel, filterObjective, filterFrom, filterTo],
+    queryKey: ['engagement-logs', filterChannel, filterDirection, filterObjective, filterFrom, filterTo],
     queryFn:  () => fetch(`/api/engagement-logs?${params}`).then((r) => r.json()),
   })
 
@@ -438,7 +465,7 @@ export default function EngagementLogsPage() {
   }
 
   const isSaving = createMutation.isPending || updateMutation.isPending
-  const hasFilters = filterChannel || filterObjective || filterFrom || filterTo
+  const hasFilters = filterChannel || filterDirection || filterObjective || filterFrom || filterTo
 
   return (
     <div className="space-y-6">
@@ -510,6 +537,16 @@ export default function EngagementLogsPage() {
         </select>
 
         <select
+          value={filterDirection}
+          onChange={(e) => setFilterDirection(e.target.value)}
+          className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
+        >
+          <option value="">All Directions</option>
+          <option value="Outbound">↑ Outbound</option>
+          <option value="Inbound">↓ Inbound</option>
+        </select>
+
+        <select
           value={filterObjective}
           onChange={(e) => setFilterObjective(e.target.value)}
           className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#5061F6]/30 focus:border-[#5061F6]"
@@ -539,7 +576,7 @@ export default function EngagementLogsPage() {
 
         {(hasFilters || accountSearch) && (
           <button
-            onClick={() => { setFilterChannel(''); setFilterObjective(''); setFilterFrom(''); setFilterTo(''); setAccountSearch('') }}
+            onClick={() => { setFilterChannel(''); setFilterDirection(''); setFilterObjective(''); setFilterFrom(''); setFilterTo(''); setAccountSearch('') }}
             className="text-xs text-[#5061F6] hover:text-[#3b4cc4] font-semibold underline underline-offset-2"
           >
             Clear all
@@ -563,7 +600,7 @@ export default function EngagementLogsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ background: 'linear-gradient(to right, #F5F2FF, #FAFAFA)' }} className="border-b border-gray-100">
-                {['Date', 'Duration', 'Account', 'Channel', 'Objective', 'Notes', 'Logged By', ''].map((h) => (
+                {['Date', 'Duration', 'Account', 'Channel', 'Objective', 'Notes', 'Logged By', ''].map((h) => (  // Direction shown inline under Channel
                   <th key={h} className="px-4 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-widest text-left whitespace-nowrap">
                     {h}
                   </th>
@@ -591,7 +628,12 @@ export default function EngagementLogsPage() {
                       ? <a href={`/accounts/${log.account.id}`} className="hover:text-[#5061F6] hover:underline">{log.account.name}</a>
                       : log.account?.name || '—'}
                   </td>
-                  <td className="px-4 py-3"><ChannelBadge value={log.channel} /></td>
+                  <td className="px-4 py-3">
+                    <ChannelBadge value={log.channel} />
+                    <span className={`mt-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${log.direction === 'Inbound' ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700'}`}>
+                      {log.direction === 'Inbound' ? '↓ In' : '↑ Out'}
+                    </span>
+                  </td>
                   <td className="px-4 py-3"><ObjectiveBadge value={log.objective} /></td>
                   <td className="px-4 py-3 text-gray-600 max-w-xs">
                     {log.notes

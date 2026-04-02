@@ -776,6 +776,27 @@ export default function PipelinePage() {
   const [accountSearch, setAccountSearch] = useState('')
   const [selectedAccount, setSelectedAccount] = useState(null)
 
+  // Auto-fill form fields when an account is selected for Expansion/Renewal/ReturningCustomer
+  useEffect(() => {
+    if (selectedAccount) {
+      setFormData((prev) => ({
+        ...prev,
+        companyName:  selectedAccount.name          || prev.companyName,
+        countryCode:  selectedAccount.country?.code || prev.countryCode,
+        contactName:  selectedAccount.contactName   || '',
+        contactEmail: selectedAccount.contactEmail  || '',
+        contactPhone: selectedAccount.contactPhone  || '',
+      }))
+    } else if (oppType === 'Expansion' || oppType === 'Renewal' || oppType === 'ReturningCustomer') {
+      // Account was cleared — reset the account-derived fields
+      setFormData((prev) => ({
+        ...prev,
+        companyName: '', countryCode: '',
+        contactName: '', contactEmail: '', contactPhone: '',
+      }))
+    }
+  }, [selectedAccount]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Data ──
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ['pipeline-leads'],

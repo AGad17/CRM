@@ -17,14 +17,24 @@ export async function GET(request) {
         name:             true,
         numberOfBranches: true,
         country:          { select: { code: true, name: true, currency: true } },
-        leads:            { select: { stage: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+        leads: {
+          select: { stage: true, contactName: true, contactEmail: true, contactPhone: true, channel: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
       orderBy: { name: 'asc' },
     })
     const active = accounts.filter((a) => {
       const lastLead = a.leads[0]
       return !lastLead || lastLead.stage !== 'Churned'
-    })
+    }).map(({ leads, ...a }) => ({
+      ...a,
+      contactName:  leads[0]?.contactName  || null,
+      contactEmail: leads[0]?.contactEmail || null,
+      contactPhone: leads[0]?.contactPhone || null,
+      lastChannel:  leads[0]?.channel      || null,
+    }))
     return NextResponse.json(active)
   }
 
@@ -47,10 +57,21 @@ export async function GET(request) {
         name:             true,
         numberOfBranches: true,
         country:          { select: { code: true, name: true, currency: true } },
+        leads: {
+          select: { contactName: true, contactEmail: true, contactPhone: true, channel: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
       orderBy: { name: 'asc' },
     })
-    return NextResponse.json(accounts)
+    return NextResponse.json(accounts.map(({ leads, ...a }) => ({
+      ...a,
+      contactName:  leads[0]?.contactName  || null,
+      contactEmail: leads[0]?.contactEmail || null,
+      contactPhone: leads[0]?.contactPhone || null,
+      lastChannel:  leads[0]?.channel      || null,
+    })))
   }
 
   // Default → full enriched list for the Accounts page

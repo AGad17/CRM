@@ -10,12 +10,15 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url)
   const filters = {}
-  if (searchParams.get('status'))       filters.status       = searchParams.get('status')
-  if (searchParams.get('objective'))    filters.objective    = searchParams.get('objective')
-  if (searchParams.get('accountId'))    filters.accountId    = searchParams.get('accountId')
-  if (searchParams.get('assignedToId')) filters.assignedToId = searchParams.get('assignedToId')
-  if (searchParams.get('from'))         filters.from         = searchParams.get('from')
-  if (searchParams.get('to'))           filters.to           = searchParams.get('to')
+  if (searchParams.get('status'))      filters.status    = searchParams.get('status')
+  if (searchParams.get('objective'))   filters.objective = searchParams.get('objective')
+  if (searchParams.get('accountId'))   filters.accountId = searchParams.get('accountId')
+  if (searchParams.get('from'))        filters.from      = searchParams.get('from')
+  if (searchParams.get('to'))          filters.to        = searchParams.get('to')
+  const assignedToIds = searchParams.get('assignedToIds')?.split(',').filter(Boolean)
+  const openedByIds   = searchParams.get('openedByIds')?.split(',').filter(Boolean)
+  if (assignedToIds?.length) filters.assignedToIds = assignedToIds
+  if (openedByIds?.length)   filters.openedByIds   = openedByIds
 
   const cases = await getCases(filters)
   return NextResponse.json(cases)

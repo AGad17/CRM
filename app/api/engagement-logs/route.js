@@ -10,6 +10,7 @@ export async function GET(request) {
   const filters = {}
   if (searchParams.get('accountId'))  filters.accountId  = searchParams.get('accountId')
   if (searchParams.get('channel'))    filters.channel    = searchParams.get('channel')
+  if (searchParams.get('direction'))  filters.direction  = searchParams.get('direction')
   if (searchParams.get('objective'))  filters.objective  = searchParams.get('objective')
   if (searchParams.get('loggedById')) filters.loggedById = searchParams.get('loggedById')
   if (searchParams.get('from'))       filters.from       = searchParams.get('from')

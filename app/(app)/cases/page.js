@@ -2,6 +2,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
+import { MultiSelectFilter } from '@/components/ui/MultiSelectFilter'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -419,7 +420,7 @@ function VoidModal({ caseData, onClose, onConfirm, isPending }) {
 export default function CasesPage() {
   const qc = useQueryClient()
 
-  const [filters, setFilters] = useState({ status: '', objective: '', assignedToId: '', from: '', to: '' })
+  const [filters, setFilters] = useState({ status: '', objective: '', assignedToIds: [], openedByIds: [], from: '', to: '' })
   const [search,  setSearch]  = useState('')
   const [modal,   setModal]   = useState(false)
   const [editCase,  setEditCase]  = useState(null) // case object to edit
@@ -429,7 +430,12 @@ export default function CasesPage() {
     queryKey: ['cases', filters],
     queryFn: () => {
       const p = new URLSearchParams()
-      Object.entries(filters).forEach(([k, v]) => v && p.set(k, v))
+      if (filters.status)                  p.set('status',        filters.status)
+      if (filters.objective)               p.set('objective',     filters.objective)
+      if (filters.from)                    p.set('from',          filters.from)
+      if (filters.to)                      p.set('to',            filters.to)
+      if (filters.assignedToIds?.length)   p.set('assignedToIds', filters.assignedToIds.join(','))
+      if (filters.openedByIds?.length)     p.set('openedByIds',   filters.openedByIds.join(','))
       return fetch(`/api/cases?${p}`).then(r => r.json()).then(d => Array.isArray(d) ? d : [])
     },
   })
@@ -503,7 +509,7 @@ export default function CasesPage() {
   }, [cases, search])
 
   function clearFilters() {
-    setFilters({ status: '', objective: '', assignedToId: '', from: '', to: '' })
+    setFilters({ status: '', objective: '', assignedToIds: [], openedByIds: [], from: '', to: '' })
     setSearch('')
   }
 
@@ -570,17 +576,18 @@ export default function CasesPage() {
             ))}
           </select>
         </div>
-        <div>
-          <p className="text-xs text-gray-400 mb-1">Assigned To</p>
-          <select
-            value={filters.assignedToId}
-            onChange={e => setFilters(f => ({ ...f, assignedToId: e.target.value }))}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
-          >
-            <option value="">All Staff</option>
-            {staffUsers.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
-          </select>
-        </div>
+        <MultiSelectFilter
+          label="Assigned To"
+          options={staffUsers.map(u => ({ value: u.id, label: u.name || u.email }))}
+          selected={filters.assignedToIds}
+          onChange={v => setFilters(f => ({ ...f, assignedToIds: v }))}
+        />
+        <MultiSelectFilter
+          label="Opened By"
+          options={staffUsers.map(u => ({ value: u.id, label: u.name || u.email }))}
+          selected={filters.openedByIds}
+          onChange={v => setFilters(f => ({ ...f, openedByIds: v }))}
+        />
         <div>
           <p className="text-xs text-gray-400 mb-1">From</p>
           <input
@@ -599,7 +606,7 @@ export default function CasesPage() {
             className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
           />
         </div>
-        {(search || Object.values(filters).some(Boolean)) && (
+        {(search || filters.status || filters.objective || filters.from || filters.to || filters.assignedToIds?.length || filters.openedByIds?.length) && (
           <button onClick={clearFilters} className="text-xs text-indigo-500 hover:text-indigo-700 underline self-end pb-1.5">
             Clear all
           </button>

@@ -819,6 +819,7 @@ model EngagementLog {
   accountId   Int
   loggedById  String
   channel     CommChannel
+  direction   String              @default("Outbound")
   objective   EngagementObjective
   notes       String?
   loggedAt    DateTime
