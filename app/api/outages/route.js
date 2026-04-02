@@ -16,8 +16,8 @@ export async function POST(request) {
   if (error) return error
 
   const body = await request.json()
-  if (!body.title || !body.channel) {
-    return NextResponse.json({ error: 'title and channel are required' }, { status: 400 })
+  if (!body.title) {
+    return NextResponse.json({ error: 'title is required' }, { status: 400 })
   }
 
   const outage = await createOutage(body, session.user.id)

@@ -364,6 +364,14 @@ export default function EngagementLogsPage() {
     queryFn:  () => fetch(`/api/engagement-logs?${params}`).then((r) => r.json()),
   })
 
+  // Separate unfiltered query for KPIs — so "This Month" / "Time Logged (Month)" always
+  // reflect the full month regardless of which channel/objective/date filters are active.
+  const { data: allLogs = [] } = useQuery({
+    queryKey: ['engagement-logs-all'],
+    queryFn:  () => fetch('/api/engagement-logs').then((r) => r.json()),
+    staleTime: 60_000,
+  })
+
   // ── Filtered client-side by account name search ──
   const displayed = useMemo(() => {
     if (!accountSearch.trim()) return logs
@@ -371,23 +379,23 @@ export default function EngagementLogsPage() {
     return logs.filter((l) => l.account?.name?.toLowerCase().includes(q))
   }, [logs, accountSearch])
 
-  // ── KPIs ──
+  // ── KPIs (computed from allLogs — unaffected by active filters) ──
   const now = new Date()
   const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const logsThisMonth  = logs.filter((l) => new Date(l.loggedAt) >= thisMonthStart).length
+  const logsThisMonth  = allLogs.filter((l) => new Date(l.loggedAt) >= thisMonthStart).length
 
-  const channelCounts = logs.reduce((acc, l) => {
+  const channelCounts = allLogs.reduce((acc, l) => {
     acc[l.channel] = (acc[l.channel] || 0) + 1; return acc
   }, {})
   const topChannel = Object.keys(channelCounts).sort((a, b) => channelCounts[b] - channelCounts[a])[0]
 
-  const objectiveCounts = logs.reduce((acc, l) => {
+  const objectiveCounts = allLogs.reduce((acc, l) => {
     acc[l.objective] = (acc[l.objective] || 0) + 1; return acc
   }, {})
   const topObjective = Object.keys(objectiveCounts).sort((a, b) => objectiveCounts[b] - objectiveCounts[a])[0]
 
   // Total time logged this month (mins)
-  const totalMinsThisMonth = logs
+  const totalMinsThisMonth = allLogs
     .filter((l) => new Date(l.loggedAt) >= thisMonthStart && l.startTime && l.endTime)
     .reduce((sum, l) => {
       const ms = new Date(l.endTime) - new Date(l.startTime)
