@@ -57,3 +57,29 @@ export async function POST(request, { params }) {
 
   return NextResponse.json(comment, { status: 201 })
 }
+
+export async function PATCH(request, { params }) {
+  const { error, session } = await requirePermission('pipeline', 'edit')
+  if (error) return error
+
+  const { id } = await params
+  const body = await request.json()
+
+  if (body.action === 'void') {
+    if (!body.commentId) return NextResponse.json({ error: 'commentId is required' }, { status: 400 })
+    const existing = await prisma.leadComment.findUnique({ where: { id: Number(body.commentId) } })
+    if (!existing) return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
+    if (existing.voidedAt) return NextResponse.json({ error: 'Comment is already voided' }, { status: 400 })
+    const isAuthor = existing.authorId === session?.user?.id
+    const isAdmin  = session?.user?.role === 'CCO_ADMIN'
+    if (!isAuthor && !isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const comment = await prisma.leadComment.update({
+      where:   { id: Number(body.commentId) },
+      data:    { voidedAt: new Date(), voidedById: session.user.id, voidedByName: session.user.name || session.user.email },
+      include: { author: { select: { id: true, name: true, email: true } } },
+    })
+    return NextResponse.json(comment)
+  }
+
+  return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+}

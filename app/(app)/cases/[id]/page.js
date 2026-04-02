@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { MentionTextarea } from '@/components/ui/MentionTextarea'
@@ -184,6 +185,9 @@ function VoidModal({ c, onClose, onConfirm, isPending }) {
 export default function CaseDetailPage() {
   const { id } = useParams()
   const qc     = useQueryClient()
+  const { data: session } = useSession()
+  const currentUserId = session?.user?.id
+  const isAdmin       = session?.user?.role === 'CCO_ADMIN'
 
   const [showFollowUp,   setShowFollowUp]   = useState(false)
   const [fuForm,         setFuForm]         = useState({ channel: '', actionTaken: '', notes: '', loggedAt: new Date().toISOString().split('T')[0] })
@@ -284,6 +288,16 @@ export default function CaseDetailPage() {
 
   const deleteFuMutation = useMutation({
     mutationFn: (fid) => fetch(`/api/cases/${id}/follow-ups/${fid}`, { method: 'DELETE' }).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['case', id] }),
+  })
+
+  const voidFuMutation = useMutation({
+    mutationFn: (followUpId) =>
+      fetch(`/api/cases/${id}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: 'voidFollowUp', followUpId }),
+      }).then(r => r.json()),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['case', id] }),
   })
 
@@ -522,36 +536,42 @@ export default function CaseDetailPage() {
             {/* Merged follow-ups + edit/void activity */}
             {timelineEvents.map((ev, i) => {
               if (ev.type === 'followup') {
-                const fu = ev.data
+                const fu       = ev.data
+                const isVoided = !!fu.voidedAt
+                const canVoid  = !isVoided && (fu.author?.id === currentUserId || fu.authorId === currentUserId || isAdmin)
                 return (
-                  <div key={`fu-${fu.id}`} id={`followup-${fu.id}`} className="relative flex gap-4 pb-5 group scroll-mt-24">
-                    <div className="relative z-10 w-6 h-6 rounded-full bg-gray-100 border-2 border-gray-200 flex-shrink-0 flex items-center justify-center">
-                      <span className="text-xs">💬</span>
+                  <div key={`fu-${fu.id}`} id={`followup-${fu.id}`} className={`relative flex gap-4 pb-5 group scroll-mt-24 ${isVoided ? 'opacity-70' : ''}`}>
+                    <div className={`relative z-10 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isVoided ? 'bg-red-50 border-red-200' : 'bg-gray-100 border-gray-200'}`}>
+                      <span className="text-xs">{isVoided ? '⊘' : '💬'}</span>
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="text-sm font-semibold text-gray-700">Follow-up</span>
+                        <span className={`text-sm font-semibold ${isVoided ? 'text-gray-400' : 'text-gray-700'}`}>Follow-up</span>
                         <span className="text-xs text-gray-400">by {fu.author?.name || fu.author?.email}</span>
                         <span className="text-xs text-gray-400">· {fmtDate(fu.loggedAt)}</span>
-                        <button
-                          onClick={() => { if (confirm('Delete this follow-up?')) deleteFuMutation.mutate(fu.id) }}
-                          className="ml-auto text-xs text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          🗑
-                        </button>
+                        {canVoid && (
+                          <button
+                            onClick={() => { if (confirm('Void this follow-up? It will remain visible with a strikethrough.')) voidFuMutation.mutate(fu.id) }}
+                            className="ml-auto text-xs text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Void follow-up"
+                          >⊘</button>
+                        )}
                       </div>
                       {fu.channel && (
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 mb-1">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium mb-1 ${isVoided ? 'bg-gray-100 text-gray-400' : 'bg-blue-50 text-blue-700'}`}>
                           {CHANNEL_LABELS[fu.channel] || fu.channel}
                         </span>
                       )}
                       {fu.actionTaken && (
-                        <p className="text-xs text-gray-500 mb-1">
-                          <span className="font-medium text-gray-600">Action taken:</span> {fu.actionTaken}
+                        <p className={`text-xs mb-1 ${isVoided ? 'text-gray-400 line-through' : 'text-gray-500'}`}>
+                          <span className={`font-medium ${isVoided ? 'text-gray-400' : 'text-gray-600'}`}>Action taken:</span> {fu.actionTaken}
                         </p>
                       )}
                       {fu.notes && (
-                        <RenderedNote content={fu.notes} className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2" />
+                        <RenderedNote content={fu.notes} className={`text-sm rounded-lg px-3 py-2 ${isVoided ? 'text-gray-400 line-through bg-gray-50' : 'text-gray-600 bg-gray-50'}`} />
+                      )}
+                      {isVoided && (
+                        <p className="text-xs text-red-400 mt-1">Voided by {fu.voidedByName} · {new Date(fu.voidedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                       )}
                     </div>
                   </div>

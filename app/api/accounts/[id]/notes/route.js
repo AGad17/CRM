@@ -59,6 +59,31 @@ export async function POST(request, { params }) {
   return NextResponse.json(note, { status: 201 })
 }
 
+export async function PATCH(request, { params }) {
+  const { error, session } = await requirePermission('accounts', 'edit')
+  if (error) return error
+
+  const { id } = await params
+  const body = await request.json()
+
+  if (body.action === 'void') {
+    if (!body.noteId) return NextResponse.json({ error: 'noteId is required' }, { status: 400 })
+    const existing = await prisma.accountNote.findUnique({ where: { id: Number(body.noteId) } })
+    if (!existing) return NextResponse.json({ error: 'Note not found' }, { status: 404 })
+    if (existing.voidedAt) return NextResponse.json({ error: 'Note is already voided' }, { status: 400 })
+    const isAuthor = existing.authorId && existing.authorId === session?.user?.id
+    const isAdmin  = session?.user?.role === 'CCO_ADMIN'
+    if (!isAuthor && !isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const note = await prisma.accountNote.update({
+      where: { id: Number(body.noteId) },
+      data:  { voidedAt: new Date(), voidedById: session.user.id, voidedByName: session.user.name || session.user.email },
+    })
+    return NextResponse.json(note)
+  }
+
+  return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+}
+
 export async function DELETE(request, { params }) {
   const { error } = await requirePermission('accounts', 'edit')
   if (error) return error

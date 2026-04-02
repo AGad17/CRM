@@ -1029,6 +1029,16 @@ export default function PipelinePage() {
     },
   })
 
+  const voidCommentM = useMutation({
+    mutationFn: ({ leadId, commentId }) =>
+      fetch(`/api/pipeline/${leadId}/comments`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: 'void', commentId }),
+      }).then((r) => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['lead-comments', editLeadId] }),
+  })
+
   // ── KPIs ──
   const now = new Date()
   const thisMonth = (d) => { const x = new Date(d); return x.getFullYear() === now.getFullYear() && x.getMonth() === now.getMonth() }
@@ -1776,20 +1786,34 @@ export default function PipelinePage() {
                   <p className="text-sm text-gray-400 text-center py-6">No comments or activity yet.</p>
                 )
                 return timeline.map((item) => {
-                  if (item._type === 'comment') return (
-                    <div key={`c-${item.id}`} id={`comment-${item.id}`} className="flex gap-3 scroll-mt-4">
-                      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
-                        {(item.author?.name || '?')[0].toUpperCase()}
-                      </div>
-                      <div className="flex-1 bg-gray-50 rounded-xl px-3 py-2">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-semibold text-gray-700">{item.author?.name || item.author?.email}</span>
-                          <span className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                  if (item._type === 'comment') {
+                    const isVoided  = !!item.voidedAt
+                    const canVoid   = !isVoided && (item.author?.id === session?.user?.id || isAdmin)
+                    return (
+                      <div key={`c-${item.id}`} id={`comment-${item.id}`} className="flex gap-3 scroll-mt-4 group">
+                        <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${isVoided ? 'bg-gray-100 text-gray-400' : 'bg-indigo-100 text-indigo-700'}`}>
+                          {(item.author?.name || '?')[0].toUpperCase()}
                         </div>
-                        <RenderedNote content={item.content} className="text-sm text-gray-700 leading-relaxed" />
+                        <div className={`flex-1 rounded-xl px-3 py-2 ${isVoided ? 'bg-gray-50' : 'bg-gray-50'}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-semibold text-gray-700">{item.author?.name || item.author?.email}</span>
+                            <span className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                            {canVoid && (
+                              <button
+                                onClick={() => { if (confirm('Void this comment?')) voidCommentM.mutate({ leadId: editLeadId, commentId: item.id }) }}
+                                className="ml-auto opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all text-xs"
+                                title="Void comment"
+                              >⊘</button>
+                            )}
+                          </div>
+                          <RenderedNote content={item.content} className={`text-sm leading-relaxed ${isVoided ? 'text-gray-400 line-through' : 'text-gray-700'}`} />
+                          {isVoided && (
+                            <p className="text-xs text-red-400 mt-1">Voided by {item.voidedByName} · {new Date(item.voidedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )
+                    )
+                  }
                   // Activity log entry
                   const meta = item.meta || {}
                   const labelFn = ACTIVITY_ACTION_LABELS[item.action]

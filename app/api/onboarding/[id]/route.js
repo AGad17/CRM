@@ -61,8 +61,9 @@ export async function PATCH(request, { params }) {
 
     if (body.action === 'notes') {
       if (!body.content?.trim()) return NextResponse.json({ error: 'content is required' }, { status: 400 })
-      const author = session?.user?.name || session?.user?.email || null
-      const note   = await addNote(id, body.content.trim(), author)
+      const author   = session?.user?.name || session?.user?.email || null
+      const authorId = session?.user?.id || null
+      const note     = await addNote(id, body.content.trim(), author, authorId)
       // @mention notifications
       const mentions = parseMentions(body.content)
       if (mentions.length) {
@@ -120,7 +121,22 @@ export async function PATCH(request, { params }) {
       return NextResponse.json(tracker)
     }
 
-    return NextResponse.json({ error: 'action must be advance, setPhase, assign, assignTeam, or notes' }, { status: 400 })
+    if (body.action === 'voidNote') {
+      if (!body.noteId) return NextResponse.json({ error: 'noteId is required' }, { status: 400 })
+      const existing = await prisma.onboardingNote.findUnique({ where: { id: Number(body.noteId) } })
+      if (!existing) return NextResponse.json({ error: 'Note not found' }, { status: 404 })
+      if (existing.voidedAt) return NextResponse.json({ error: 'Note is already voided' }, { status: 400 })
+      const isAuthor = existing.authorId && existing.authorId === session?.user?.id
+      const isAdmin  = session?.user?.role === 'CCO_ADMIN'
+      if (!isAuthor && !isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      const note = await prisma.onboardingNote.update({
+        where: { id: Number(body.noteId) },
+        data:  { voidedAt: new Date(), voidedById: session.user.id, voidedByName: session.user.name || session.user.email },
+      })
+      return NextResponse.json(note)
+    }
+
+    return NextResponse.json({ error: 'action must be advance, setPhase, assign, assignTeam, notes, or voidNote' }, { status: 400 })
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 400 })
   }

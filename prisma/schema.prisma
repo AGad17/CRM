@@ -504,11 +504,15 @@ model OnboardingTracker {
 }
 
 model OnboardingNote {
-  id        Int               @id @default(autoincrement())
-  trackerId Int
-  content   String
-  author    String?           // display name / email captured from session at write time
-  createdAt DateTime          @default(now())
+  id           Int       @id @default(autoincrement())
+  trackerId    Int
+  content      String
+  author       String?   // display name / email captured from session at write time
+  authorId     String?   // User.id for permission checks
+  createdAt    DateTime  @default(now())
+  voidedAt     DateTime?
+  voidedById   String?
+  voidedByName String?
 
   tracker OnboardingTracker @relation(fields: [trackerId], references: [id], onDelete: Cascade)
 
@@ -609,12 +613,15 @@ model Lead {
 }
 
 model LeadComment {
-  id        Int      @id @default(autoincrement())
-  leadId    Int
-  authorId  String
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           Int       @id @default(autoincrement())
+  leadId       Int
+  authorId     String
+  content      String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  voidedAt     DateTime?
+  voidedById   String?
+  voidedByName String?
 
   lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
   author User @relation("LeadCommentAuthor", fields: [authorId], references: [id])
@@ -801,12 +808,15 @@ enum OutageStatus {
 // ─── Account Notes ────────────────────────────────────────────────────────────
 
 model AccountNote {
-  id         Int      @id @default(autoincrement())
-  accountId  Int
-  content    String
-  authorId   String?
-  authorName String?
-  createdAt  DateTime @default(now())
+  id           Int       @id @default(autoincrement())
+  accountId    Int
+  content      String
+  authorId     String?
+  authorName   String?
+  createdAt    DateTime  @default(now())
+  voidedAt     DateTime?
+  voidedById   String?
+  voidedByName String?
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -874,14 +884,17 @@ model EngagementCase {
 }
 
 model CaseFollowUp {
-  id          Int          @id @default(autoincrement())
-  caseId      Int
-  authorId    String
-  channel     CommChannel?
-  actionTaken String?
-  notes       String?
-  loggedAt    DateTime
-  createdAt   DateTime     @default(now())
+  id           Int          @id @default(autoincrement())
+  caseId       Int
+  authorId     String
+  channel      CommChannel?
+  actionTaken  String?
+  notes        String?
+  loggedAt     DateTime
+  createdAt    DateTime     @default(now())
+  voidedAt     DateTime?
+  voidedById   String?
+  voidedByName String?
 
   case   EngagementCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
   author User           @relation("UserFollowUps", fields: [authorId], references: [id])

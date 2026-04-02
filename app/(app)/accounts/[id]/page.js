@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/Badge'
 import { KPICard } from '@/components/ui/KPICard'
@@ -39,6 +40,9 @@ function combineDateAndTime(date, time) {
 export default function AccountDetailPage() {
   const { id } = useParams()
   const router = useRouter()
+  const { data: session } = useSession()
+  const currentUserId = session?.user?.id
+  const isAdmin       = session?.user?.role === 'CCO_ADMIN'
   const [showHandover, setShowHandover] = useState(
     typeof window !== 'undefined' && window.location.hash === '#handover'
   )
@@ -131,6 +135,16 @@ export default function AccountDetailPage() {
   const deleteNote = useMutation({
     mutationFn: (noteId) =>
       fetch(`/api/accounts/${id}/notes?noteId=${noteId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['account-notes', id] }),
+  })
+
+  const voidNote = useMutation({
+    mutationFn: (noteId) =>
+      fetch(`/api/accounts/${id}/notes`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'void', noteId }),
+      }).then((r) => r.json()),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['account-notes', id] }),
   })
 
@@ -505,24 +519,35 @@ export default function AccountDetailPage() {
           </div>
           {notes.length > 0 && (
             <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-50">
-              {notes.map((note) => (
-                <div key={note.id} id={`note-${note.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 group scroll-mt-24">
-                  <div className="flex-1 min-w-0">
-                    <RenderedNote content={note.content} className="text-sm text-gray-800" />
-                    <p className="text-xs text-gray-400 mt-1">
-                      {note.authorName && <span>{note.authorName} · </span>}
-                      {new Date(note.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </p>
+              {notes.map((note) => {
+                const isVoided   = !!note.voidedAt
+                const canVoid    = !isVoided && (note.authorId === currentUserId || isAdmin)
+                return (
+                  <div key={note.id} id={`note-${note.id}`} className={`flex items-start gap-3 px-4 py-3 group scroll-mt-24 ${isVoided ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
+                    <div className="flex-1 min-w-0">
+                      <RenderedNote content={note.content} className={`text-sm ${isVoided ? 'text-gray-400 line-through' : 'text-gray-800'}`} />
+                      <p className="text-xs text-gray-400 mt-1">
+                        {note.authorName && <span>{note.authorName} · </span>}
+                        {new Date(note.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                      {isVoided && (
+                        <p className="text-xs text-red-400 mt-0.5">
+                          Voided by {note.voidedByName} · {new Date(note.voidedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                      )}
+                    </div>
+                    {canVoid && (
+                      <button
+                        onClick={() => { if (confirm('Void this note? It will remain visible with a strikethrough.')) voidNote.mutate(note.id) }}
+                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all text-xs mt-0.5 flex-shrink-0"
+                        title="Void note"
+                      >
+                        ⊘
+                      </button>
+                    )}
                   </div>
-                  <button
-                    onClick={() => deleteNote.mutate(note.id)}
-                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all text-xs mt-0.5 flex-shrink-0"
-                    title="Delete note"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

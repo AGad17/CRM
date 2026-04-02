@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { MentionTextarea } from '@/components/ui/MentionTextarea'
 import { RenderedNote } from '@/components/ui/RenderedNote'
@@ -75,6 +76,9 @@ function ScorePicker({ value, onChange, max = 5, labels }) {
 
 export default function OnboardingDetailPage() {
   const { id } = useParams()
+  const { data: session } = useSession()
+  const currentUserId = session?.user?.id
+  const isAdmin       = session?.user?.role === 'CCO_ADMIN'
   const router  = useRouter()
   const qc      = useQueryClient()
   const [newNote, setNewNote] = useState('')
@@ -191,6 +195,16 @@ export default function OnboardingDetailPage() {
       setNewNote('')
       qc.invalidateQueries({ queryKey: ['onboarding', id] })
     },
+  })
+
+  const voidNoteMutation = useMutation({
+    mutationFn: (noteId) =>
+      fetch(`/api/onboarding/${id}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: 'voidNote', noteId }),
+      }).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['onboarding', id] }),
   })
 
   const assignAmMutation = useMutation({
@@ -1062,11 +1076,13 @@ export default function OnboardingDetailPage() {
             <p className="text-sm text-gray-300 italic px-1">No notes yet. Add the first one below.</p>
           ) : (
             tracker.noteEntries.map((note) => {
-              const d = new Date(note.createdAt)
-              const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-              const timeStr = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+              const d        = new Date(note.createdAt)
+              const dateStr  = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+              const timeStr  = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+              const isVoided = !!note.voidedAt
+              const canVoid  = !isVoided && (note.authorId === currentUserId || isAdmin)
               return (
-                <div key={note.id} id={`note-${note.id}`} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 scroll-mt-24">
+                <div key={note.id} id={`note-${note.id}`} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 scroll-mt-24 group">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <span className="text-xs font-semibold text-gray-700">{dateStr}</span>
                     <span className="text-gray-300 text-xs">·</span>
@@ -1077,8 +1093,18 @@ export default function OnboardingDetailPage() {
                         <span className="text-xs font-medium text-indigo-500">{note.author}</span>
                       </>
                     )}
+                    {canVoid && (
+                      <button
+                        onClick={() => { if (confirm('Void this note?')) voidNoteMutation.mutate(note.id) }}
+                        className="ml-auto opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all text-xs"
+                        title="Void note"
+                      >⊘</button>
+                    )}
                   </div>
-                  <RenderedNote content={note.content} className="text-sm text-gray-700 leading-relaxed" />
+                  <RenderedNote content={note.content} className={`text-sm leading-relaxed ${isVoided ? 'text-gray-400 line-through' : 'text-gray-700'}`} />
+                  {isVoided && (
+                    <p className="text-xs text-red-400 mt-1">Voided by {note.voidedByName} · {new Date(note.voidedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                  )}
                 </div>
               )
             })

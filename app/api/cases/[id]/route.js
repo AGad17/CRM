@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/roleGuard'
+import { prisma } from '@/lib/prisma'
 import {
   getCase,
   updateCase,
@@ -112,6 +113,22 @@ export async function PATCH(request, { params }) {
       })
     }
     return NextResponse.json(c)
+  }
+
+  if (body.action === 'voidFollowUp') {
+    if (!body.followUpId) return NextResponse.json({ error: 'followUpId is required' }, { status: 400 })
+    const existing = await prisma.caseFollowUp.findUnique({ where: { id: Number(body.followUpId) } })
+    if (!existing) return NextResponse.json({ error: 'Follow-up not found' }, { status: 404 })
+    if (existing.voidedAt) return NextResponse.json({ error: 'Follow-up is already voided' }, { status: 400 })
+    const isAuthor = existing.authorId === session.user.id
+    const isAdmin  = session.user.role === 'CCO_ADMIN'
+    if (!isAuthor && !isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const fu = await prisma.caseFollowUp.update({
+      where:   { id: Number(body.followUpId) },
+      data:    { voidedAt: new Date(), voidedById: session.user.id, voidedByName: session.user.name || session.user.email },
+      include: { author: { select: { id: true, name: true, email: true } } },
+    })
+    return NextResponse.json(fu)
   }
 
   if (body.action === 'addFollowUp') {
