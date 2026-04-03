@@ -245,7 +245,7 @@ function CompleteModal({ task, onConfirm, onClose }) {
 
 // ─── Task Form Modal ──────────────────────────────────────────────────────────
 
-function TaskModal({ initial, users, currentUserId, isAdmin, onSave, onClose, isSaving }) {
+function TaskModal({ initial, users, accounts, currentUserId, isAdmin, onSave, onClose, isSaving }) {
   const [form, setForm] = useState(() => {
     if (initial) {
       return {
@@ -261,9 +261,14 @@ function TaskModal({ initial, users, currentUserId, isAdmin, onSave, onClose, is
     }
     return { ...EMPTY_FORM, assignedToId: currentUserId || '', dueDate: new Date().toISOString().split('T')[0] }
   })
+  const [accountSearch, setAccountSearch] = useState(() => initial?.account?.name || '')
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const isEdit = !!initial
+
+  const filteredAccounts = accountSearch && !form.accountId
+    ? (accounts || []).filter(a => a.name.toLowerCase().includes(accountSearch.toLowerCase())).slice(0, 20)
+    : []
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -333,16 +338,37 @@ function TaskModal({ initial, users, currentUserId, isAdmin, onSave, onClose, is
           />
         </div>
 
-        {/* Link to entity */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Link to Account ID <span className="font-normal text-gray-400">(optional)</span></label>
+        {/* Link to Account */}
+        <div className="relative">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Link to Account <span className="font-normal text-gray-400">(optional)</span></label>
           <input
-            type="number"
-            value={form.accountId}
-            onChange={e => set('accountId', e.target.value)}
-            placeholder="Account ID"
+            type="text"
+            value={accountSearch}
+            onChange={e => { setAccountSearch(e.target.value); set('accountId', '') }}
+            placeholder="Search account name…"
             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
           />
+          {form.accountId && (
+            <button
+              type="button"
+              onClick={() => { setAccountSearch(''); set('accountId', '') }}
+              className="absolute right-2.5 top-8 text-gray-400 hover:text-gray-600 text-xs"
+            >✕</button>
+          )}
+          {filteredAccounts.length > 0 && (
+            <div className="absolute z-10 w-full mt-1 border border-gray-200 rounded-xl overflow-y-auto max-h-44 bg-white shadow-lg">
+              {filteredAccounts.map(a => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => { set('accountId', String(a.id)); setAccountSearch(a.name) }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 first:rounded-t-xl last:rounded-b-xl"
+                >
+                  {a.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
@@ -443,6 +469,13 @@ export default function TasksPage() {
   const { data: users = [] } = useQuery({
     queryKey: ['users-list'],
     queryFn:  () => fetch('/api/users').then(r => r.json()),
+    enabled:  !!currentUserId,
+  })
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['accounts-list'],
+    queryFn:  () => fetch('/api/accounts?limit=1000').then(r => r.json()).then(d => d.accounts || d),
+    staleTime: 5 * 60 * 1000,
     enabled:  !!currentUserId,
   })
 
@@ -623,6 +656,7 @@ export default function TasksPage() {
         <TaskModal
           initial={editTask}
           users={users}
+          accounts={accounts}
           currentUserId={currentUserId}
           isAdmin={isAdmin}
           onSave={handleSave}
