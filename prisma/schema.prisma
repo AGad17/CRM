@@ -864,11 +864,13 @@ model EngagementCase {
   title        String
   description  String?
   status       CaseStatus          @default(Open)
-  voidReason   String?
-  openedAt     DateTime            @default(now())
-  resolvedAt   DateTime?
-  outageStatus OutageStatus?
-  outageId     Int?
+  voidReason          String?
+  openedAt            DateTime  @default(now())
+  resolvedAt          DateTime?
+  dueDate             DateTime?
+  reminderHoursBefore Int?
+  outageStatus        OutageStatus?
+  outageId            Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -925,6 +927,7 @@ enum NotificationType {
   MentionInLeadComment
   OnboardingTaskOverdue
   CaseOverdue
+  CaseReminderDue
   LeadAssignmentChanged
   TaskAssigned
 }

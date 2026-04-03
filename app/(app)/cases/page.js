@@ -72,14 +72,16 @@ function formatTTR(openedAt, resolvedAt) {
 
 function CaseModal({ accounts, staffUsers, activeOutages = [], onClose, onSave, prefillAccountId, isPending }) {
   const [form, setForm] = useState({
-    accountId:    prefillAccountId || '',
-    title:        '',
-    channel:      '',
-    objective:    '',
-    description:  '',
-    assignedToId: '',
-    openedAt:     new Date().toISOString().split('T')[0],
-    outageId:     '',
+    accountId:           prefillAccountId || '',
+    title:               '',
+    channel:             '',
+    objective:           '',
+    description:         '',
+    assignedToId:        '',
+    openedAt:            new Date().toISOString().split('T')[0],
+    outageId:            '',
+    dueDate:             '',
+    reminderHoursBefore: '',
   })
   const [search, setSearch] = useState('')
 
@@ -202,7 +204,35 @@ function CaseModal({ accounts, staffUsers, activeOutages = [], onClose, onSave, 
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
             />
           </div>
+          {/* Due Date */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Due Date</label>
+            <input
+              type="date"
+              value={form.dueDate}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            />
+          </div>
         </div>
+
+        {/* Reminder */}
+        {form.dueDate && (
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Remind before due date</label>
+            <select
+              value={form.reminderHoursBefore}
+              onChange={e => setForm(f => ({ ...f, reminderHoursBefore: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+            >
+              <option value="">— No reminder —</option>
+              <option value="24">24 hours before</option>
+              <option value="48">48 hours before</option>
+              <option value="72">72 hours before</option>
+            </select>
+          </div>
+        )}
 
         {activeOutages.length > 0 && (
           <div>
@@ -245,12 +275,14 @@ function CaseModal({ accounts, staffUsers, activeOutages = [], onClose, onSave, 
 
 function EditCaseModal({ caseData, accounts, staffUsers, onClose, onSave, isPending }) {
   const [form, setForm] = useState({
-    accountId:    caseData.account ? String(caseData.account.id) : '',
-    title:        caseData.title || '',
-    channel:      caseData.channel || '',
-    objective:    caseData.objective || '',
-    description:  caseData.description || '',
-    assignedToId: caseData.assignedTo?.id || '',
+    accountId:           caseData.account ? String(caseData.account.id) : '',
+    title:               caseData.title || '',
+    channel:             caseData.channel || '',
+    objective:           caseData.objective || '',
+    description:         caseData.description || '',
+    assignedToId:        caseData.assignedTo?.id || '',
+    dueDate:             caseData.dueDate ? new Date(caseData.dueDate).toISOString().split('T')[0] : '',
+    reminderHoursBefore: caseData.reminderHoursBefore?.toString() || '',
   })
   const [search, setSearch] = useState(caseData.account?.name || '')
 
@@ -354,6 +386,33 @@ function EditCaseModal({ caseData, accounts, staffUsers, onClose, onSave, isPend
             <option value="">— Unassigned —</option>
             {staffUsers.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
           </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Due Date</label>
+            <input
+              type="date"
+              value={form.dueDate}
+              onChange={e => setForm(f => ({ ...f, dueDate: e.target.value, reminderHoursBefore: e.target.value ? f.reminderHoursBefore : '' }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            />
+          </div>
+          {form.dueDate && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Remind before due date</label>
+              <select
+                value={form.reminderHoursBefore}
+                onChange={e => setForm(f => ({ ...f, reminderHoursBefore: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+              >
+                <option value="">— No reminder —</option>
+                <option value="24">24 hours before</option>
+                <option value="48">48 hours before</option>
+                <option value="72">72 hours before</option>
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

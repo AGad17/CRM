@@ -23,7 +23,7 @@ export async function POST(request) {
   }
 
   const now     = new Date()
-  const results = { renewals: 0, invoices: 0, onboardingTasks: 0, cases: 0 }
+  const results = { renewals: 0, invoices: 0, onboardingTasks: 0, cases: 0, caseReminders: 0 }
 
   // ── Helper: fetch CCO_ADMIN ids (cached per run) ───────────────────────────
   let _adminIds = null
@@ -188,6 +188,53 @@ export async function POST(request) {
       if (!(await notificationExists(userId, 'CaseOverdue', link))) {
         await createNotification({ userId, type: 'CaseOverdue', title, body, link })
         results.cases++
+      }
+    }
+  }
+
+  // ── 5. Case Due-Date Reminders ─────────────────────────────────────────────
+  // Fires for open/escalated cases with a dueDate:
+  //   a) Overdue: dueDate has passed — notify assignee + creator
+  //   b) Approaching: (dueDate - reminderHoursBefore) <= now <= dueDate — notify assignee + creator
+  const casesWithDueDate = await prisma.engagementCase.findMany({
+    where: { status: { in: ['Open', 'Escalated'] }, dueDate: { not: null } },
+    include: {
+      account:    { select: { id: true, name: true } },
+      assignedTo: { select: { name: true } },
+    },
+  })
+
+  for (const c of casesWithDueDate) {
+    const due        = new Date(c.dueDate)
+    const link       = `/cases/${c.id}`
+    const accountSfx = c.account ? ` — ${c.account.name}` : ''
+    const recipients = [...new Set([c.assignedToId, c.openedById].filter(Boolean))]
+
+    if (due < now) {
+      // Overdue: past due, case still open
+      const dedupeKey = `${link}?overdue=1`
+      const title     = `Case overdue: "${c.title}"${accountSfx}`
+      const body      = `Due date was ${due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} — case is still ${c.status.toLowerCase()}.`
+      for (const userId of recipients) {
+        if (!(await notificationExists(userId, 'CaseReminderDue', dedupeKey))) {
+          await createNotification({ userId, type: 'CaseReminderDue', title, body, link })
+          results.caseReminders++
+        }
+      }
+    } else if (c.reminderHoursBefore) {
+      // Approaching: reminder window has opened
+      const reminderAt = new Date(due.getTime() - c.reminderHoursBefore * 3_600_000)
+      if (reminderAt <= now) {
+        const hoursLeft = Math.max(0, Math.round((due - now) / 3_600_000))
+        const dedupeKey = `${link}?reminder=1`
+        const title     = `Case due in ${hoursLeft}h: "${c.title}"${accountSfx}`
+        const body      = `Due: ${due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}. Assigned to ${c.assignedTo?.name || 'Unassigned'}.`
+        for (const userId of recipients) {
+          if (!(await notificationExists(userId, 'CaseReminderDue', dedupeKey))) {
+            await createNotification({ userId, type: 'CaseReminderDue', title, body, link })
+            results.caseReminders++
+          }
+        }
       }
     }
   }

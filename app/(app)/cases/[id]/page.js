@@ -36,12 +36,14 @@ function fmtDateTime(d) {
 
 function EditCaseModal({ c, accounts, staffUsers, onClose, onSave, isPending }) {
   const [form, setForm] = useState({
-    accountId:    c.account ? String(c.account.id) : '',
-    title:        c.title || '',
-    channel:      c.channel || '',
-    objective:    c.objective || '',
-    description:  c.description || '',
-    assignedToId: c.assignedTo?.id || '',
+    accountId:           c.account ? String(c.account.id) : '',
+    title:               c.title || '',
+    channel:             c.channel || '',
+    objective:           c.objective || '',
+    description:         c.description || '',
+    assignedToId:        c.assignedTo?.id || '',
+    dueDate:             c.dueDate ? new Date(c.dueDate).toISOString().split('T')[0] : '',
+    reminderHoursBefore: c.reminderHoursBefore?.toString() || '',
   })
   const [search, setSearch] = useState(c.account?.name || '')
 
@@ -124,6 +126,33 @@ function EditCaseModal({ c, accounts, staffUsers, onClose, onSave, isPending }) 
             <option value="">— Unassigned —</option>
             {staffUsers.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
           </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Due Date</label>
+            <input
+              type="date"
+              value={form.dueDate}
+              onChange={e => setForm(f => ({ ...f, dueDate: e.target.value, reminderHoursBefore: e.target.value ? f.reminderHoursBefore : '' }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            />
+          </div>
+          {form.dueDate && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Remind before due date</label>
+              <select
+                value={form.reminderHoursBefore}
+                onChange={e => setForm(f => ({ ...f, reminderHoursBefore: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+              >
+                <option value="">— No reminder —</option>
+                <option value="24">24 hours before</option>
+                <option value="48">48 hours before</option>
+                <option value="72">72 hours before</option>
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
@@ -340,6 +369,15 @@ export default function CaseDetailPage() {
               </span>
               <span className="text-gray-400">Opened {fmtDate(c.openedAt)}</span>
               <span className="text-gray-400">by {c.openedBy?.name || c.openedBy?.email}</span>
+              {c.dueDate && (() => {
+                const due = new Date(c.dueDate)
+                const isOverdue = due < new Date() && !['Resolved', 'ClosedUnresolved', 'Voided'].includes(c.status)
+                return (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isOverdue ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700'}`}>
+                    {isOverdue ? '⚠ ' : ''}Due {fmtDate(c.dueDate)}{isOverdue ? ' · Overdue' : ''}
+                  </span>
+                )
+              })()}
             </div>
             <p className="text-sm text-gray-500">
               Assigned to: <span className="font-medium text-gray-700">
