@@ -57,12 +57,13 @@ function isThisWeek(d) {
 
 function TaskCard({ task, currentUserId, isAdmin, onComplete, onCancel, onDelete, onEdit, highlight }) {
   const isOb     = task.source === 'onboarding'
-  const type     = isOb ? null : (TASK_TYPES[task.type] || TASK_TYPES.Other)
+  const isCase   = task.source === 'case'
+  const type     = (isOb || isCase) ? null : (TASK_TYPES[task.type] || TASK_TYPES.Other)
   const overdue  = task.status === 'Open' && isOverdue(task.dueDate)
   const today    = task.status === 'Open' && isToday(task.dueDate)
   const done     = task.status === 'Done'
   const cancelled = task.status === 'Cancelled'
-  const canAct   = !isOb && (isAdmin || task.assignedToId === currentUserId || task.createdById === currentUserId)
+  const canAct   = !isOb && !isCase && (isAdmin || task.assignedToId === currentUserId || task.createdById === currentUserId)
 
   return (
     <div className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
@@ -78,12 +79,12 @@ function TaskCard({ task, currentUserId, isAdmin, onComplete, onCancel, onDelete
         onClick={() => canAct && !done && !cancelled && onComplete(task)}
         disabled={!canAct || done || cancelled}
         className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-          done      ? 'bg-green-500 border-green-500 text-white' :
-          cancelled ? 'bg-gray-300 border-gray-300' :
-          isOb      ? 'border-gray-200 opacity-40 cursor-default' :
+          done           ? 'bg-green-500 border-green-500 text-white' :
+          cancelled      ? 'bg-gray-300 border-gray-300' :
+          isOb || isCase ? 'border-gray-200 opacity-40 cursor-default' :
           'border-gray-300 hover:border-green-400 cursor-pointer'
         } disabled:cursor-default`}
-        title={isOb ? 'Complete in Customer Journey' : done ? 'Completed' : 'Mark as done'}
+        title={isCase ? 'Manage in Cases' : isOb ? 'Complete in Customer Journey' : done ? 'Completed' : 'Mark as done'}
       >
         {done && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
       </button>
@@ -91,7 +92,11 @@ function TaskCard({ task, currentUserId, isAdmin, onComplete, onCancel, onDelete
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-2 flex-wrap">
-          {isOb ? (
+          {isCase ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+              🎫 {task.phaseLabel || 'Case'}
+            </span>
+          ) : isOb ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
               📋 {task.phaseLabel}
             </span>
@@ -146,7 +151,14 @@ function TaskCard({ task, currentUserId, isAdmin, onComplete, onCancel, onDelete
       </div>
 
       {/* Actions */}
-      {isOb ? (
+      {isCase ? (
+        <a
+          href={`/cases/${task.caseId}`}
+          className="text-xs text-orange-600 hover:text-orange-800 border border-orange-200 hover:border-orange-400 px-2 py-1 rounded-lg flex-shrink-0 transition-colors whitespace-nowrap"
+        >
+          ↗ Case
+        </a>
+      ) : isOb ? (
         <a
           href={`/onboarding/${task.trackerId}`}
           className="text-xs text-emerald-600 hover:text-emerald-800 border border-emerald-200 hover:border-emerald-400 px-2 py-1 rounded-lg flex-shrink-0 transition-colors whitespace-nowrap"
@@ -363,6 +375,7 @@ export default function TasksPage() {
   const [showModal,    setShowModal]    = useState(false)
   const [editTask,     setEditTask]     = useState(null)
   const [completeTask, setCompleteTask] = useState(null)
+  const [tab,          setTab]          = useState('all')
   const highlightId = searchParams.get('highlight') ? Number(searchParams.get('highlight')) : null
 
   // Active assignee filter: admin can filter by user, others always see their own
@@ -388,6 +401,44 @@ export default function TasksPage() {
 
   const isLoading = tasksLoading || obLoading
   const allTasks  = useMemo(() => [...tasks, ...obTasks], [tasks, obTasks])
+
+  const { data: rawUnassignedCases = [] } = useQuery({
+    queryKey: ['cases-unassigned'],
+    queryFn:  () => fetch('/api/cases?assignedToId=none').then(r => r.json()),
+    enabled:  tab === 'unassigned' && !!currentUserId,
+  })
+
+  const unassignedCases = useMemo(() => rawUnassignedCases
+    .filter(c => c.status === 'Open' || c.status === 'Escalated')
+    .map(c => ({
+      id:             `case-${c.id}`,
+      source:         'case',
+      title:          c.title,
+      dueDate:        c.dueDate || null,
+      status:         'Open',
+      type:           null,
+      assignedToId:   null,
+      assignedTo:     null,
+      createdById:    c.openedById,
+      account:        c.account,
+      accountId:      c.accountId,
+      lead:           null,
+      leadId:         null,
+      case:           { id: c.id, title: c.title },
+      caseId:         c.id,
+      notes:          c.description || null,
+      completedAt:    null,
+      completedNotes: null,
+      phaseLabel:     c.objective,
+    })), [rawUnassignedCases])
+
+  const unassignedItems = useMemo(
+    () => {
+      const fromTasks = allTasks.filter(t => !t.assignedToId)
+      return [...fromTasks, ...unassignedCases]
+    },
+    [allTasks, unassignedCases]
+  )
 
   const { data: users = [] } = useQuery({
     queryKey: ['users-list'],
@@ -490,11 +541,48 @@ export default function TasksPage() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-gray-100 pb-1">
+        <button
+          onClick={() => setTab('all')}
+          className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${tab === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500 hover:text-gray-800'}`}
+        >All Tasks</button>
+        <button
+          onClick={() => setTab('unassigned')}
+          className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${tab === 'unassigned' ? 'bg-orange-50 text-orange-700' : 'text-gray-500 hover:text-gray-800'}`}
+        >
+          Unassigned
+          {tab === 'unassigned' && unassignedItems.length > 0 && (
+            <span className="ml-1.5 bg-orange-100 text-orange-700 text-xs px-1.5 py-0.5 rounded-full">{unassignedItems.length}</span>
+          )}
+        </button>
+      </div>
+
       {/* Task groups */}
       {isLoading ? (
         <div className="space-y-4">
           {[1,2,3].map(i => <div key={i} className="h-16 bg-gray-100 animate-pulse rounded-xl" />)}
         </div>
+      ) : tab === 'unassigned' ? (
+        unassignedItems.length === 0 ? (
+          <div className="text-center py-16 text-gray-400">
+            <p className="text-4xl mb-3">✅</p>
+            <p className="text-lg font-semibold text-gray-500">No unassigned items</p>
+            <p className="text-sm mt-1">All tasks and cases are assigned.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {unassignedItems
+              .sort((a, b) => {
+                if (!a.dueDate && !b.dueDate) return 0
+                if (!a.dueDate) return 1
+                if (!b.dueDate) return -1
+                return new Date(a.dueDate) - new Date(b.dueDate)
+              })
+              .map(t => <TaskCard key={t.id} task={t} {...cardProps} />)
+            }
+          </div>
+        )
       ) : openTasks.length === 0 && finishedTasks.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <p className="text-4xl mb-3">✅</p>

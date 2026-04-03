@@ -378,6 +378,11 @@ export default function CaseDetailPage() {
                   </span>
                 )
               })()}
+              {c.reminderHoursBefore && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600">
+                  🔔 {c.reminderHoursBefore}h reminder
+                </span>
+              )}
             </div>
             <p className="text-sm text-gray-500">
               Assigned to: <span className="font-medium text-gray-700">

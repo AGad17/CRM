@@ -114,11 +114,18 @@ function TrackerCard({ tracker, phase, onClick }) {
         <p className="font-semibold text-sm text-gray-900 leading-tight truncate">
           {tracker.account?.name || '—'}
         </p>
-        {tracker.overdueCount > 0 && (
-          <span className="flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">
-            {tracker.overdueCount} late
-          </span>
-        )}
+        <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+          {tracker.overdueCount > 0 && (
+            <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">
+              {tracker.overdueCount} late
+            </span>
+          )}
+          {!tracker.accountManagerId && (
+            <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600">
+              ⚠ No AM
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-2">

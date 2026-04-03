@@ -1218,6 +1218,15 @@ export default function PipelinePage() {
     { key: 'packageInterest',label:'Package',    render: (r) => r.packageInterest || '—' },
     { key: 'estimatedValue',label: 'Est. Value (USD)', render: (r) => fmtUSD(r.estimatedValue) || '—' },
     { key: 'stage',         label: 'Stage',      render: (r) => <StageBadge stage={r.stage} /> },
+    {
+      key: 'opportunityType', label: 'Type', sortable: false,
+      render: (r) => {
+        if (!r.opportunityType) return <span className="text-gray-300 text-xs">—</span>
+        const opp   = OPP_TYPES.find(o => o.key === r.opportunityType)
+        const color = OPP_COLORS[r.opportunityType] || 'bg-gray-100 text-gray-600'
+        return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>{opp?.icon} {opp?.label || r.opportunityType}</span>
+      },
+    },
     { key: 'owner',         label: 'Owner',      render: (r) => r.owner?.name || '—' },
     { key: 'createdAt',     label: 'Created',    render: (r) => new Date(r.createdAt).toLocaleDateString() },
     {

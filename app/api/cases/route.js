@@ -17,7 +17,8 @@ export async function GET(request) {
   if (searchParams.get('to'))          filters.to        = searchParams.get('to')
   const assignedToIds = searchParams.get('assignedToIds')?.split(',').filter(Boolean)
   const openedByIds   = searchParams.get('openedByIds')?.split(',').filter(Boolean)
-  if (assignedToIds?.length) filters.assignedToIds = assignedToIds
+  if (searchParams.get('assignedToId') === 'none') filters.unassigned = true
+  else if (assignedToIds?.length) filters.assignedToIds = assignedToIds
   if (openedByIds?.length)   filters.openedByIds   = openedByIds
 
   const cases = await getCases(filters)
