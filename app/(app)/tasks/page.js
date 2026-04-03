@@ -402,6 +402,7 @@ export default function TasksPage() {
   const [editTask,     setEditTask]     = useState(null)
   const [completeTask, setCompleteTask] = useState(null)
   const [tab,          setTab]          = useState('all')
+  const [dateFilter,   setDateFilter]   = useState('all')
   const highlightId = searchParams.get('highlight') ? Number(searchParams.get('highlight')) : null
 
   // Active assignee filter: admin can filter by user, others always see their own
@@ -591,6 +592,26 @@ export default function TasksPage() {
         </button>
       </div>
 
+      {/* Date filter chips — All Tasks tab only */}
+      {tab === 'all' && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {[
+            { key: 'all',      label: 'All',      count: openTasks.length,    cls: 'bg-gray-100 text-gray-600',   active: 'bg-indigo-600 text-white' },
+            { key: 'overdue',  label: 'Overdue',  count: overdueTasks.length,  cls: 'bg-red-50 text-red-600',      active: 'bg-red-600 text-white' },
+            { key: 'today',    label: 'Today',    count: todayTasks.length,    cls: 'bg-amber-50 text-amber-700',  active: 'bg-amber-500 text-white' },
+            { key: 'upcoming', label: 'Upcoming', count: thisWeekTasks.length + upcomingTasks.length, cls: 'bg-blue-50 text-blue-600', active: 'bg-blue-600 text-white' },
+          ].map(f => (
+            <button
+              key={f.key}
+              onClick={() => setDateFilter(f.key)}
+              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${dateFilter === f.key ? f.active : f.cls + ' hover:opacity-80'}`}
+            >
+              {f.label}{f.count > 0 ? ` (${f.count})` : ''}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Task groups */}
       {isLoading ? (
         <div className="space-y-4">
@@ -624,10 +645,14 @@ export default function TasksPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          <TaskGroup title="Overdue"    color="bg-red-100 text-red-700"    tasks={overdueTasks}  highlightId={highlightId} {...cardProps} />
-          <TaskGroup title="Today"      color="bg-amber-100 text-amber-700" tasks={todayTasks}    highlightId={highlightId} {...cardProps} />
-          <TaskGroup title="This Week"  color="bg-blue-100 text-blue-700"   tasks={thisWeekTasks} highlightId={highlightId} {...cardProps} />
-          <TaskGroup title="Upcoming"   color="bg-gray-100 text-gray-600"   tasks={upcomingTasks} highlightId={highlightId} {...cardProps} />
+          {(dateFilter === 'all' || dateFilter === 'overdue') &&
+            <TaskGroup title="Overdue"   color="bg-red-100 text-red-700"    tasks={overdueTasks}  highlightId={highlightId} {...cardProps} />}
+          {(dateFilter === 'all' || dateFilter === 'today') &&
+            <TaskGroup title="Today"     color="bg-amber-100 text-amber-700" tasks={todayTasks}    highlightId={highlightId} {...cardProps} />}
+          {(dateFilter === 'all' || dateFilter === 'upcoming') &&
+            <TaskGroup title="This Week" color="bg-blue-100 text-blue-700"   tasks={thisWeekTasks} highlightId={highlightId} {...cardProps} />}
+          {(dateFilter === 'all' || dateFilter === 'upcoming') &&
+            <TaskGroup title="Upcoming"  color="bg-gray-100 text-gray-600"   tasks={upcomingTasks} highlightId={highlightId} {...cardProps} />}
 
           {/* Done / Cancelled toggle */}
           {finishedTasks.length > 0 && (
