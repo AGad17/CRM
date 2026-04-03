@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
@@ -26,12 +26,14 @@ function toDateStr(d) {
 }
 
 function isToday(d) {
+  if (!d) return false
   const t = new Date(d)
   const now = new Date()
   return t.getFullYear() === now.getFullYear() && t.getMonth() === now.getMonth() && t.getDate() === now.getDate()
 }
 
 function isOverdue(d) {
+  if (!d) return false
   const t = new Date(d)
   const now = new Date()
   now.setHours(0, 0, 0, 0)
@@ -39,6 +41,7 @@ function isOverdue(d) {
 }
 
 function isThisWeek(d) {
+  if (!d) return false
   const t = new Date(d)
   const now = new Date()
   const startOfWeek = new Date(now)
@@ -53,12 +56,13 @@ function isThisWeek(d) {
 // ─── TaskCard ─────────────────────────────────────────────────────────────────
 
 function TaskCard({ task, currentUserId, isAdmin, onComplete, onCancel, onDelete, onEdit, highlight }) {
-  const type     = TASK_TYPES[task.type] || TASK_TYPES.Other
+  const isOb     = task.source === 'onboarding'
+  const type     = isOb ? null : (TASK_TYPES[task.type] || TASK_TYPES.Other)
   const overdue  = task.status === 'Open' && isOverdue(task.dueDate)
   const today    = task.status === 'Open' && isToday(task.dueDate)
   const done     = task.status === 'Done'
   const cancelled = task.status === 'Cancelled'
-  const canAct   = isAdmin || task.assignedToId === currentUserId || task.createdById === currentUserId
+  const canAct   = !isOb && (isAdmin || task.assignedToId === currentUserId || task.createdById === currentUserId)
 
   return (
     <div className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
@@ -76,9 +80,10 @@ function TaskCard({ task, currentUserId, isAdmin, onComplete, onCancel, onDelete
         className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
           done      ? 'bg-green-500 border-green-500 text-white' :
           cancelled ? 'bg-gray-300 border-gray-300' :
+          isOb      ? 'border-gray-200 opacity-40 cursor-default' :
           'border-gray-300 hover:border-green-400 cursor-pointer'
         } disabled:cursor-default`}
-        title={done ? 'Completed' : 'Mark as done'}
+        title={isOb ? 'Complete in Customer Journey' : done ? 'Completed' : 'Mark as done'}
       >
         {done && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
       </button>
@@ -86,9 +91,15 @@ function TaskCard({ task, currentUserId, isAdmin, onComplete, onCancel, onDelete
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-2 flex-wrap">
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${type.color}`}>
-            <span>{type.emoji}</span> {type.label}
-          </span>
+          {isOb ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+              📋 {task.phaseLabel}
+            </span>
+          ) : (
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${type.color}`}>
+              <span>{type.emoji}</span> {type.label}
+            </span>
+          )}
           <span className={`text-sm font-medium ${done || cancelled ? 'line-through text-gray-400' : 'text-gray-800'}`}>
             {task.title}
           </span>
@@ -97,10 +108,11 @@ function TaskCard({ task, currentUserId, isAdmin, onComplete, onCancel, onDelete
         {/* Meta row */}
         <div className="flex items-center gap-3 mt-1 flex-wrap">
           <span className={`text-xs ${overdue ? 'text-red-600 font-semibold' : today ? 'text-amber-600 font-semibold' : done ? 'text-green-600' : 'text-gray-400'}`}>
-            {done ? `✓ Done ${toDateStr(task.completedAt)}` :
-             cancelled ? '✕ Cancelled' :
-             overdue ? `⚠ Overdue · ${toDateStr(task.dueDate)}` :
-             today   ? `Today · ${toDateStr(task.dueDate)}` :
+            {!task.dueDate  ? '— No due date' :
+             done           ? `✓ Done ${toDateStr(task.completedAt)}` :
+             cancelled      ? '✕ Cancelled' :
+             overdue        ? `⚠ Overdue · ${toDateStr(task.dueDate)}` :
+             today          ? `Today · ${toDateStr(task.dueDate)}` :
              `Due ${toDateStr(task.dueDate)}`}
           </span>
           {task.assignedTo && (
@@ -134,7 +146,14 @@ function TaskCard({ task, currentUserId, isAdmin, onComplete, onCancel, onDelete
       </div>
 
       {/* Actions */}
-      {canAct && (
+      {isOb ? (
+        <a
+          href={`/onboarding/${task.trackerId}`}
+          className="text-xs text-emerald-600 hover:text-emerald-800 border border-emerald-200 hover:border-emerald-400 px-2 py-1 rounded-lg flex-shrink-0 transition-colors whitespace-nowrap"
+        >
+          ↗ Tracker
+        </a>
+      ) : canAct && (
         <div className="flex items-center gap-1 flex-shrink-0">
           {!done && !cancelled && (
             <button
@@ -355,11 +374,20 @@ export default function TasksPage() {
   else if (isAdmin) qs.set('all', '1')
   qs.set('includeAll', 'true')
 
-  const { data: tasks = [], isLoading } = useQuery({
+  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
     queryKey: ['tasks', activeUserId, isAdmin],
     queryFn:  () => fetch(`/api/tasks?${qs.toString()}`).then(r => r.json()),
     enabled:  !!currentUserId,
   })
+
+  const { data: obTasks = [], isLoading: obLoading } = useQuery({
+    queryKey: ['ob-tasks-pending', activeUserId, isAdmin],
+    queryFn:  () => fetch(`/api/onboarding/tasks-pending?${qs.toString()}`).then(r => r.json()),
+    enabled:  !!currentUserId,
+  })
+
+  const isLoading = tasksLoading || obLoading
+  const allTasks  = useMemo(() => [...tasks, ...obTasks], [tasks, obTasks])
 
   const { data: users = [] } = useQuery({
     queryKey: ['users-list'],
@@ -368,23 +396,28 @@ export default function TasksPage() {
   })
 
   // Mutations
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ['tasks'] })
+    qc.invalidateQueries({ queryKey: ['ob-tasks-pending'] })
+  }
+
   const createM = useMutation({
     mutationFn: (data) => fetch('/api/tasks', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
     }).then(r => r.json()),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); setShowModal(false) },
+    onSuccess: () => { invalidateAll(); setShowModal(false) },
   })
 
   const updateM = useMutation({
     mutationFn: ({ id, ...data }) => fetch(`/api/tasks/${id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
     }).then(r => r.json()),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); setEditTask(null); setCompleteTask(null) },
+    onSuccess: () => { invalidateAll(); setEditTask(null); setCompleteTask(null) },
   })
 
   const deleteM = useMutation({
     mutationFn: (id) => fetch(`/api/tasks/${id}`, { method: 'DELETE' }),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['tasks'] }),
+    onSuccess:  () => invalidateAll(),
   })
 
   // Handlers
@@ -402,9 +435,9 @@ export default function TasksPage() {
 
   const handleCancel = (task) => updateM.mutate({ id: task.id, status: 'Cancelled' })
 
-  // Bucket tasks
-  const openTasks      = tasks.filter(t => t.status === 'Open')
-  const finishedTasks  = tasks.filter(t => t.status !== 'Open')
+  // Bucket tasks (generic + onboarding merged)
+  const openTasks      = allTasks.filter(t => t.status === 'Open')
+  const finishedTasks  = allTasks.filter(t => t.status !== 'Open')
 
   const overdueTasks   = openTasks.filter(t => isOverdue(t.dueDate))
   const todayTasks     = openTasks.filter(t => isToday(t.dueDate))
@@ -431,6 +464,7 @@ export default function TasksPage() {
           <p className="text-sm text-gray-400 mt-0.5">
             {isAdmin && !filterUserId ? `All team tasks` : `Tasks for ${users.find(u => u.id === (filterUserId || currentUserId))?.name || 'you'}`}
             {' · '}{openTasks.length} open
+            {obTasks.filter(t => t.status === 'Open').length > 0 && <span className="text-emerald-600"> · {obTasks.filter(t => t.status === 'Open').length} from Customer Journey</span>}
             {overdueTasks.length > 0 && <span className="text-red-500 font-semibold"> · {overdueTasks.length} overdue</span>}
           </p>
         </div>

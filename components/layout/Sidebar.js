@@ -113,7 +113,6 @@ function IcTasks() {
 
 const NAV = [
   { label: 'Dashboard', icon: IcDashboard, href: '/dashboard' },
-  { label: 'Tasks',     icon: IcTasks,     href: '/tasks'     },
   {
     label: 'Accounts', icon: IcAccounts,
     children: [
@@ -169,6 +168,7 @@ const NAV = [
   {
     label: 'Team', icon: IcTeam,
     children: [
+      { href: '/tasks',         label: 'Tasks'         },
       { href: '/team/workload', label: 'Workload'      },
       { href: '/team/activity', label: 'Activity Feed' },
     ],
