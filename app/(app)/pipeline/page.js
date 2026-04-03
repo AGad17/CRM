@@ -921,7 +921,7 @@ export default function PipelinePage() {
     queryFn: () => fetch('/api/accounts?selector=true').then((r) => r.json()),
   })
 
-  const { data: expiredAccounts = [] } = useQuery({
+  const { data: renewalAccounts = [] } = useQuery({
     queryKey: ['crm-accounts-expired'],
     queryFn: () => fetch('/api/accounts?selector=expired').then((r) => r.json()),
     enabled: oppType === 'Renewal',
@@ -1560,7 +1560,7 @@ export default function PipelinePage() {
                     />
                     {formErrors.account && <p className="text-xs text-red-500 mt-0.5">{formErrors.account}</p>}
                     {accountSearch && !selectedAccount && (() => {
-                      const pool = oppType === 'ReturningCustomer' ? churnedAccounts : oppType === 'Renewal' ? expiredAccounts : accounts
+                      const pool = oppType === 'ReturningCustomer' ? churnedAccounts : oppType === 'Renewal' ? renewalAccounts : accounts
                       const filtered = pool.filter((a) => a.name.toLowerCase().includes(accountSearch.toLowerCase()))
                       return (
                         <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm max-h-48 overflow-y-auto">
