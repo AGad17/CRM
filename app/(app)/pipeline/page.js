@@ -845,6 +845,7 @@ export default function PipelinePage() {
   const [channelFilter, setChannelFilter] = useState([])
   const [countryFilter, setCountryFilter] = useState([])
   const [ownerFilter,   setOwnerFilter]   = useState([])
+  const [oppTypeFilter, setOppTypeFilter] = useState([])
 
   // Modals
   // null | 'create' | { edit: lead } | { confirmLoss: lead } | { confirmChurn: lead } | { closedWonBlocked: lead, missing: string[] } | 'migrate' | { archive: lead }
@@ -1070,7 +1071,8 @@ export default function PipelinePage() {
     else if (stageFilter !== 'all')  list = list.filter((l) => l.stage === stageFilter)
     if (channelFilter.length) list = list.filter((l) => channelFilter.includes(l.channel))
     if (countryFilter.length) list = list.filter((l) => countryFilter.includes(l.countryCode))
-    if (ownerFilter.length)   list = list.filter((l) => ownerFilter.includes(l.ownerId))
+    if (ownerFilter.length)    list = list.filter((l) => ownerFilter.includes(l.ownerId))
+    if (oppTypeFilter.length)  list = list.filter((l) => oppTypeFilter.includes(l.opportunityType))
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter((l) =>
@@ -1080,7 +1082,7 @@ export default function PipelinePage() {
       )
     }
     return list
-  }, [leads, stageFilter, channelFilter, countryFilter, ownerFilter, search])
+  }, [leads, stageFilter, channelFilter, countryFilter, ownerFilter, oppTypeFilter, search])
 
   // ── Handlers ──
   function openCreate() {
@@ -1351,8 +1353,12 @@ export default function PipelinePage() {
           label="Owner" value={ownerFilter} onChange={setOwnerFilter}
           options={agents.map((a) => ({ value: a.id, label: a.name }))}
         />
-        {(search || stageFilter !== 'all' || channelFilter.length || countryFilter.length || ownerFilter.length) && (
-          <button onClick={() => { setSearch(''); setStageFilter('all'); setChannelFilter([]); setCountryFilter([]); setOwnerFilter([]) }} className="text-xs text-gray-400 hover:text-gray-700 underline">Clear</button>
+        <MultiSelectFilter
+          label="Type" value={oppTypeFilter} onChange={setOppTypeFilter}
+          options={OPP_TYPES.map((t) => ({ value: t.key, label: `${t.icon} ${t.label}` }))}
+        />
+        {(search || stageFilter !== 'all' || channelFilter.length || countryFilter.length || ownerFilter.length || oppTypeFilter.length) && (
+          <button onClick={() => { setSearch(''); setStageFilter('all'); setChannelFilter([]); setCountryFilter([]); setOwnerFilter([]); setOppTypeFilter([]) }} className="text-xs text-gray-400 hover:text-gray-700 underline">Clear</button>
         )}
         <span className="ml-auto text-xs text-gray-400">{filtered.length} leads</span>
       </div>

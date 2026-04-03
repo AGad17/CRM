@@ -236,7 +236,13 @@ export default function OnboardingPage() {
   const baseFiltered = trackers.filter((t) => {
     if (search && !t.account?.name?.toLowerCase().includes(search.toLowerCase())) return false
     if (leadSources.length > 0 && !leadSources.includes(t.account?.leadSource)) return false
-    if (csReps_f.length && !csReps_f.includes(t.accountManager?.id)) return false
+    if (csReps_f.length) {
+      const wantUnassigned = csReps_f.includes('__unassigned__')
+      const normalIds      = csReps_f.filter(id => id !== '__unassigned__')
+      const matchesNormal  = normalIds.length > 0 && normalIds.includes(t.accountManager?.id)
+      const matchesBlank   = wantUnassigned && !t.accountManagerId
+      if (!matchesNormal && !matchesBlank) return false
+    }
     return true
   })
 
@@ -397,7 +403,10 @@ export default function OnboardingPage() {
         <LeadSourceFilter value={leadSources} onChange={setLeadSources} />
         <MultiSelectFilter
           label="CS Rep" value={csReps_f} onChange={setCsReps_f}
-          options={csReps.map((u) => ({ value: u.id, label: u.name }))}
+          options={[
+            { value: '__unassigned__', label: '— Unassigned —' },
+            ...csReps.map((u) => ({ value: u.id, label: u.name })),
+          ]}
         />
         {view === 'list' && (
           <div className="flex gap-1 flex-wrap">
